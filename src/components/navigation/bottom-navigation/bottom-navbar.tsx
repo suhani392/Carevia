@@ -2,18 +2,25 @@ import React, { useState, useRef } from 'react';
 import { View, StyleSheet, Pressable, Animated, Image } from 'react-native';
 import { HomeIcon } from './icons';
 
-const BottomNavbar = () => {
-    const [activeTab, setActiveTab] = useState<'home' | 'family'>('home');
-    const slideAnim = useRef(new Animated.Value(0)).current;
+interface BottomNavbarProps {
+    activeTab: 'home' | 'family';
+    onTabChange: (tab: 'home' | 'family') => void;
+}
 
-    const toggleTab = (tab: 'home' | 'family') => {
-        setActiveTab(tab);
+const BottomNavbar: React.FC<BottomNavbarProps> = ({ activeTab, onTabChange }) => {
+    const slideAnim = useRef(new Animated.Value(activeTab === 'home' ? 0 : 1)).current;
+
+    React.useEffect(() => {
         Animated.spring(slideAnim, {
-            toValue: tab === 'home' ? 0 : 1,
+            toValue: activeTab === 'home' ? 0 : 1,
             friction: 8,
             tension: 40,
             useNativeDriver: true,
         }).start();
+    }, [activeTab]);
+
+    const toggleTab = (tab: 'home' | 'family') => {
+        onTabChange(tab);
     };
 
     const travelDistance = 235 - 126;

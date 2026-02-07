@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     inputGroup: {
-        width: 380,
+        width: 330,
         marginBottom: 15,
     },
     label: {
@@ -126,9 +126,10 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontFamily: 'Judson-Bold',
         marginBottom: 8,
+        marginLeft: 15,
     },
     input: {
-        width: 380,
+        width: 330,
         height: 55,
         backgroundColor: 'rgba(255, 255, 255, 0.6)',
         borderRadius: 20,
@@ -136,9 +137,11 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontFamily: 'Judson-Regular',
         color: '#000000',
+        borderWidth: 1,
+        borderColor: '#FFFFFF',
     },
     signUpBtn: {
-        width: 250,
+        width: 200,
         height: 50,
         backgroundColor: '#FFFFFF',
         borderRadius: 100,
@@ -153,12 +156,12 @@ const styles = StyleSheet.create({
         fontFamily: 'Judson-Bold',
     },
     dividerContainer: {
-        width: 380,
+        width: 330,
         alignItems: 'center',
         marginVertical: 30,
     },
     divider: {
-        width: 380,
+        width: 330,
         height: 1,
         backgroundColor: '#FFFFFF',
     },

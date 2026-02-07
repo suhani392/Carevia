@@ -3,10 +3,71 @@ import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Font from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import SignUp from './src/screens/SignUp/SignUp';
+
+// Context
+import { NavigationProvider, useNavigation, ScreenName } from './src/context/NavigationContext';
+
+// Screens
+import LoginScreen from './src/screens/Login/Login';
+import HomeScreen from './src/screens/Home/HomeScreen';
+import FamilyScreen from './src/screens/Family/FamilyScreen';
+import AiAssistantScreen from './src/screens/AI-Bot/AiAssistantScreen';
+import ContactUsScreen from './src/screens/ContactUs/ContactUsScreen';
+import HelpPolicyScreen from './src/screens/Help&Policy/HelpPolicyScreen';
+import SettingsScreen from './src/screens/Settings/SettingsScreen';
+import AboutUsScreen from './src/screens/About/AboutUsScreen';
+
+// Components
+import BottomNavbar from './src/components/navigation/bottom-navigation/bottom-navbar';
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
+
+function AppContent() {
+    const { currentScreen, navigate } = useNavigation();
+
+    const renderScreen = () => {
+        switch (currentScreen) {
+            case 'login':
+                return <LoginScreen />;
+            case 'home':
+                return <HomeScreen />;
+            case 'family':
+                return <FamilyScreen />;
+            case 'ai_assistant':
+                return <AiAssistantScreen />;
+            case 'contact_us':
+                return <ContactUsScreen />;
+            case 'help_policy':
+                return <HelpPolicyScreen />;
+            case 'settings':
+                return <SettingsScreen />;
+            case 'about':
+                return <AboutUsScreen />;
+            default:
+                return <HomeScreen />;
+        }
+    };
+
+    const showNavbar = currentScreen === 'home' || currentScreen === 'family';
+
+    return (
+        <View style={styles.container}>
+            <StatusBar style="light" translucent backgroundColor="transparent" />
+
+            {/* Main Screen Content */}
+            {renderScreen()}
+
+            {/* Static Navigation - Only show on Home and Family */}
+            {showNavbar && (
+                <BottomNavbar
+                    activeTab={currentScreen as 'home' | 'family'}
+                    onTabChange={(tab) => navigate(tab as ScreenName)}
+                />
+            )}
+        </View>
+    );
+}
 
 export default function App() {
     const [fontsLoaded, setFontsLoaded] = useState(false);
@@ -39,12 +100,9 @@ export default function App() {
     }
 
     return (
-        <View style={styles.container}>
-            <StatusBar style="light" translucent backgroundColor="transparent" />
-
-            {/* Active Screen for Development */}
-            <SignUp />
-        </View>
+        <NavigationProvider>
+            <AppContent />
+        </NavigationProvider>
     );
 }
 

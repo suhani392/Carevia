@@ -1,10 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, Dimensions, Platform, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useNavigation } from '../../context/NavigationContext';
 
 const { width } = Dimensions.get('window');
 
 const Login = () => {
+    const { navigate } = useNavigation();
     return (
         <LinearGradient
             colors={['#0062FF', '#5C8EDF']}
@@ -36,7 +38,10 @@ const Login = () => {
                         />
                     </View>
 
-                    <TouchableOpacity style={styles.loginBtn}>
+                    <TouchableOpacity
+                        style={styles.loginBtn}
+                        onPress={() => navigate('home')}
+                    >
                         <Text style={styles.loginBtnText}>Login</Text>
                     </TouchableOpacity>
 
@@ -102,7 +107,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     inputGroup: {
-        width: 380,
+        width: 330,
         marginBottom: 25,
     },
     label: {
@@ -110,9 +115,10 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontFamily: 'Judson-Bold',
         marginBottom: 8,
+        marginLeft: 15,
     },
     input: {
-        width: 380,
+        width: 330,
         height: 55,
         backgroundColor: 'rgba(255, 255, 255, 0.6)',
         borderRadius: 20,
@@ -120,9 +126,11 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontFamily: 'Judson-Regular',
         color: '#000000',
+        borderWidth: 1,
+        borderColor: '#FFFFFF',
     },
     loginBtn: {
-        width: 250,
+        width: 200,
         height: 50,
         backgroundColor: '#FFFFFF',
         borderRadius: 100,
@@ -137,10 +145,11 @@ const styles = StyleSheet.create({
         fontFamily: 'Judson-Bold',
     },
     forgotBtn: {
-        width: 380, // Aligns with the further increased input block width
+        width: 330, // Aligns with the further increased input block width
         alignItems: 'flex-end',
         marginTop: -10,
         marginBottom: 20,
+        paddingRight: 10,
     },
     forgotText: {
         color: '#FFFFFF',
@@ -148,12 +157,12 @@ const styles = StyleSheet.create({
         fontFamily: 'Judson-Bold',
     },
     dividerContainer: {
-        width: 380,
+        width: 330,
         alignItems: 'center',
         marginVertical: 40,
     },
     divider: {
-        width: 380,
+        width: 330,
         height: 1,
         backgroundColor: '#FFFFFF',
     },
