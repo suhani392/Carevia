@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Text, Image, Dimensions } from 'react-native';
+import { View, StyleSheet, ScrollView, Text, Image, Dimensions, TouchableOpacity } from 'react-native';
 import HomeHeader from '../Home/HomeHeader';
 import AppStatusBar from '../../components/status-bar/status-bar';
 import Menu from '../../components/navigation/menu-drawer/menu';
+import { useNavigation } from '../../context/NavigationContext';
 
 const { width } = Dimensions.get('window');
 
 const FamilyScreen = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const { navigate } = useNavigation();
 
     const familyMembers = [
         { name: "Vaibhav Badhe", image: "https://avatar.iran.liara.run/public/1" },
@@ -37,10 +39,14 @@ const FamilyScreen = () => {
 
                     <View style={styles.memberGrid}>
                         {familyMembers.map((member, index) => (
-                            <View key={index} style={styles.memberCard}>
+                            <TouchableOpacity
+                                key={index}
+                                style={styles.memberCard}
+                                onPress={() => navigate('documents', { name: member.name })}
+                            >
                                 <Image source={{ uri: member.image }} style={styles.memberAvatar} />
                                 <Text style={styles.memberName}>{member.name}</Text>
-                            </View>
+                            </TouchableOpacity>
                         ))}
                     </View>
                 </View>

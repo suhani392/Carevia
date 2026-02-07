@@ -6,6 +6,7 @@ import * as SplashScreen from 'expo-splash-screen';
 
 // Context
 import { NavigationProvider, useNavigation, ScreenName } from './src/context/NavigationContext';
+import { AppProvider } from './src/context/AppContext';
 
 // Screens
 import LoginScreen from './src/screens/Login/Login';
@@ -16,6 +17,10 @@ import ContactUsScreen from './src/screens/ContactUs/ContactUsScreen';
 import HelpPolicyScreen from './src/screens/Help&Policy/HelpPolicyScreen';
 import SettingsScreen from './src/screens/Settings/SettingsScreen';
 import AboutUsScreen from './src/screens/About/AboutUsScreen';
+import SignUpScreen from './src/screens/SignUp/SignUp';
+import DocumentsScreen from './src/screens/Documents/DocumentsScreen';
+
+import ReportsScreen from './src/screens/Report/ReportsScreen';
 
 // Components
 import BottomNavbar from './src/components/navigation/bottom-navigation/bottom-navbar';
@@ -30,6 +35,8 @@ function AppContent() {
         switch (currentScreen) {
             case 'login':
                 return <LoginScreen />;
+            case 'signup':
+                return <SignUpScreen />;
             case 'home':
                 return <HomeScreen />;
             case 'family':
@@ -44,6 +51,10 @@ function AppContent() {
                 return <SettingsScreen />;
             case 'about':
                 return <AboutUsScreen />;
+            case 'documents':
+                return <DocumentsScreen />;
+            case 'reports':
+                return <ReportsScreen />;
             default:
                 return <HomeScreen />;
         }
@@ -100,9 +111,11 @@ export default function App() {
     }
 
     return (
-        <NavigationProvider>
-            <AppContent />
-        </NavigationProvider>
+        <AppProvider>
+            <NavigationProvider>
+                <AppContent />
+            </NavigationProvider>
+        </AppProvider>
     );
 }
 

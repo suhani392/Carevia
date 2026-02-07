@@ -2,30 +2,47 @@ import React, { createContext, useContext, useState, ReactNode } from 'react';
 
 export type ScreenName =
     | 'login'
+    | 'signup'
     | 'home'
     | 'family'
     | 'ai_assistant'
     | 'contact_us'
     | 'help_policy'
     | 'settings'
-    | 'about';
+    | 'about'
+    | 'documents'
+    | 'reports';
 
 interface NavigationContextType {
     currentScreen: ScreenName;
-    navigate: (screen: ScreenName) => void;
+    screenParams: any;
+    navigate: (screen: ScreenName, params?: any) => void;
+    goBack: () => void;
 }
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
 
 export const NavigationProvider = ({ children }: { children: ReactNode }) => {
-    const [currentScreen, setCurrentScreen] = useState<ScreenName>('login'); // Default to login
+    const [currentScreen, setCurrentScreen] = useState<ScreenName>('login');
+    const [screenParams, setScreenParams] = useState<any>(null);
+    const [history, setHistory] = useState<ScreenName[]>([]);
 
-    const navigate = (screen: ScreenName) => {
+    const navigate = (screen: ScreenName, params?: any) => {
+        setHistory(prev => [...prev, currentScreen]);
         setCurrentScreen(screen);
+        setScreenParams(params || null);
+    };
+
+    const goBack = () => {
+        if (history.length > 0) {
+            const previousScreen = history[history.length - 1];
+            setHistory(prev => prev.slice(0, -1));
+            setCurrentScreen(previousScreen);
+        }
     };
 
     return (
-        <NavigationContext.Provider value={{ currentScreen, navigate }}>
+        <NavigationContext.Provider value={{ currentScreen, screenParams, navigate, goBack }}>
             {children}
         </NavigationContext.Provider>
     );

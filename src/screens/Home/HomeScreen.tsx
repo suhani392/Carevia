@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Text, Image } from 'react-native';
+import { View, StyleSheet, ScrollView, Text, Image, Pressable } from 'react-native';
 import HomeHeader from './HomeHeader';
 import { ReportIcon, BotIcon } from './Icons';
 import AppStatusBar from '../../components/status-bar/status-bar';
 import Menu from '../../components/navigation/menu-drawer/menu';
+import { useNavigation } from '../../context/NavigationContext';
+import { useAppContext } from '../../context/AppContext';
 
 const HomeScreen = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const { navigate } = useNavigation();
+    const { updates } = useAppContext();
 
     return (
         <View style={styles.container}>
@@ -24,7 +28,10 @@ const HomeScreen = () => {
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Emergency Access</Text>
                     <View style={styles.emergencyRow}>
-                        <View style={styles.largeCard}>
+                        <Pressable
+                            style={styles.largeCard}
+                            onPress={() => navigate('documents')}
+                        >
                             <Text style={styles.cardTitle}>My Documents</Text>
                             <View style={styles.docIconContainer}>
                                 <Image
@@ -33,14 +40,17 @@ const HomeScreen = () => {
                                     resizeMode="contain"
                                 />
                             </View>
-                        </View>
+                        </Pressable>
                         <View style={styles.smallCardColumn}>
-                            <View style={styles.smallCard}>
+                            <Pressable
+                                style={styles.smallCard}
+                                onPress={() => navigate('reports')}
+                            >
                                 <View style={styles.reportIconContainer}>
                                     <ReportIcon size={28} color="#3C87FF" />
                                 </View>
                                 <Text style={styles.smallCardText} numberOfLines={1}>View Reports</Text>
-                            </View>
+                            </Pressable>
                             <View style={styles.smallCard}>
                                 <View style={styles.questionIconContainer}>
                                     <BotIcon size={28} color="#3C87FF" />
@@ -54,13 +64,9 @@ const HomeScreen = () => {
                 {/* Family Updates Section */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Family Updates</Text>
-                    {[
-                        { name: "Avani Badhe", text: "Avani added her blood report to the documents." },
-                        { name: "Rahul Badhe", text: "Rahul updated his vaccination records." },
-                        { name: "Sunita Badhe", text: "Sunita scheduled a health checkup for tomorrow." }
-                    ].map((update, index) => (
-                        <View key={index} style={[styles.familyCard, index > 0 && { marginTop: 15 }]}>
-                            <Text style={styles.familyName}>{update.name}</Text>
+                    {updates.map((update, index) => (
+                        <View key={update.id} style={[styles.familyCard, index > 0 && { marginTop: 15 }]}>
+                            <Text style={styles.familyName}>{update.name === 'Me' ? 'You' : update.name}</Text>
                             <Text style={styles.familyText}>{update.text}</Text>
                         </View>
                     ))}

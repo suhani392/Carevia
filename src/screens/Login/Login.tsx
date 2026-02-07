@@ -65,7 +65,7 @@ const Login = () => {
 
                 <View style={styles.footer}>
                     <Text style={styles.footerText}>Don’t have an account?</Text>
-                    <TouchableOpacity>
+                    <TouchableOpacity onPress={() => navigate('signup')}>
                         <Text style={styles.createBtnText}>Create new account</Text>
                     </TouchableOpacity>
                 </View>
