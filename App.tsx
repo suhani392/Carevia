@@ -14,13 +14,15 @@ import HomeScreen from './src/screens/Home/HomeScreen';
 import FamilyScreen from './src/screens/Family/FamilyScreen';
 import AiAssistantScreen from './src/screens/AI-Bot/AiAssistantScreen';
 import ContactUsScreen from './src/screens/ContactUs/ContactUsScreen';
-import HelpPolicyScreen from './src/screens/Help&Policy/HelpPolicyScreen';
+import HelpPolicyScreen from './src/screens/HelpPolicy/HelpPolicyScreen';
 import SettingsScreen from './src/screens/Settings/SettingsScreen';
-import AboutUsScreen from './src/screens/About/AboutUsScreen';
+import AboutUsScreen from './src/screens/About/AboutScreen';
 import SignUpScreen from './src/screens/SignUp/SignUp';
 import DocumentsScreen from './src/screens/Documents/DocumentsScreen';
 
-import ReportsScreen from './src/screens/Report/ReportsScreen';
+import ReportsScreen from './src/screens/Reports/ReportsScreen';
+import DocumentViewScreen from './src/screens/DocumentView/DocumentView';
+import ProfileScreen from './src/screens/Profile';
 
 // Components
 import BottomNavbar from './src/components/navigation/bottom-navigation/bottom-navbar';
@@ -55,6 +57,10 @@ function AppContent() {
                 return <DocumentsScreen />;
             case 'reports':
                 return <ReportsScreen />;
+            case 'document_view':
+                return <DocumentViewScreen />;
+            case 'profile':
+                return <ProfileScreen />;
             default:
                 return <HomeScreen />;
         }

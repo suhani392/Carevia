@@ -11,7 +11,9 @@ export type ScreenName =
     | 'settings'
     | 'about'
     | 'documents'
-    | 'reports';
+    | 'reports'
+    | 'document_view'
+    | 'profile';
 
 interface NavigationContextType {
     currentScreen: ScreenName;
@@ -25,19 +27,20 @@ const NavigationContext = createContext<NavigationContextType | undefined>(undef
 export const NavigationProvider = ({ children }: { children: ReactNode }) => {
     const [currentScreen, setCurrentScreen] = useState<ScreenName>('login');
     const [screenParams, setScreenParams] = useState<any>(null);
-    const [history, setHistory] = useState<ScreenName[]>([]);
+    const [history, setHistory] = useState<{ screen: ScreenName, params: any }[]>([]);
 
     const navigate = (screen: ScreenName, params?: any) => {
-        setHistory(prev => [...prev, currentScreen]);
+        setHistory(prev => [...prev, { screen: currentScreen, params: screenParams }]);
         setCurrentScreen(screen);
         setScreenParams(params || null);
     };
 
     const goBack = () => {
         if (history.length > 0) {
-            const previousScreen = history[history.length - 1];
+            const lastEntry = history[history.length - 1];
             setHistory(prev => prev.slice(0, -1));
-            setCurrentScreen(previousScreen);
+            setCurrentScreen(lastEntry.screen);
+            setScreenParams(lastEntry.params);
         }
     };
 

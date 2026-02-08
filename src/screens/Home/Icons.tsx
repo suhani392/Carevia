@@ -54,3 +54,33 @@ export const BotIcon = ({ color = '#3C87FF', size = 24 }: IconProps) => (
         <Path d="M9 11v2" />
     </Svg>
 );
+export const BackIcon = ({ color = '#FFFFFF', size = 24 }: IconProps) => (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <Path d="M19 12H5" />
+        <Path d="m12 19-7-7 7-7" />
+    </Svg>
+);
+export const CrossIcon = ({ color = '#FFFFFF', size = 24 }: IconProps) => (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <Path d="M18 6 6 18" />
+        <Path d="m6 6 12 12" />
+    </Svg>
+);
+
+export const ShareIcon = ({ color = '#000000', size = 20 }: IconProps) => (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <Circle cx="18" cy="5" r="3" />
+        <Circle cx="6" cy="12" r="3" />
+        <Circle cx="18" cy="19" r="3" />
+        <Path d="M8.59 13.51 15.42 17.49" />
+        <Path d="m15.41 6.51-6.82 3.98" />
+    </Svg>
+);
+
+export const DownloadIcon = ({ color = '#000000', size = 20 }: IconProps) => (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <Path d="M12 17V3" />
+        <Path d="m6 11 6 6 6-6" />
+        <Path d="M19 21H5" />
+    </Svg>
+);

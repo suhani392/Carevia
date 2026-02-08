@@ -51,12 +51,15 @@ const HomeScreen = () => {
                                 </View>
                                 <Text style={styles.smallCardText} numberOfLines={1}>View Reports</Text>
                             </Pressable>
-                            <View style={styles.smallCard}>
+                            <Pressable
+                                style={styles.smallCard}
+                                onPress={() => navigate('ai_assistant')}
+                            >
                                 <View style={styles.questionIconContainer}>
                                     <BotIcon size={28} color="#3C87FF" />
                                 </View>
                                 <Text style={styles.smallCardText} numberOfLines={1}>Ask Question</Text>
-                            </View>
+                            </Pressable>
                         </View>
                     </View>
                 </View>

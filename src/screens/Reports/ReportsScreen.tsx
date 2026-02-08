@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '../../context/NavigationContext';
 import { BackIcon, FileCheckIcon, ThreeDotsIcon } from './Icons';
 import AppStatusBar from '../../components/status-bar/status-bar';
+import HomeHeader from '../Home/HomeHeader';
 
 const { width } = Dimensions.get('window');
 
@@ -29,7 +30,7 @@ interface Report {
 }
 
 const ReportsScreen = () => {
-    const { goBack } = useNavigation();
+    const { goBack, navigate } = useNavigation();
 
     const [reports, setReports] = useState<Report[]>([
         { id: '1', name: 'Blood Test Report', date: '28 Jan 2026', timestamp: 1738022400000 },
@@ -118,19 +119,15 @@ const ReportsScreen = () => {
             <AppStatusBar />
 
             {/* Header */}
-            <LinearGradient
-                colors={['#0062FF', '#5C8EDF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-                style={styles.header}
-            >
-                <View style={styles.headerContent}>
-                    <TouchableOpacity onPress={goBack} style={styles.backButton}>
-                        <BackIcon />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Saved Reports</Text>
-                </View>
-            </LinearGradient>
+            <HomeHeader
+                showBackButton={true}
+                onBackPress={goBack}
+                showActionRow={false}
+                showUserBlock={false}
+                showRightIcon={false}
+                centerTitle={true}
+                title="Carevia"
+            />
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <View style={styles.titleRow}>
@@ -185,6 +182,7 @@ const ReportsScreen = () => {
                             <TouchableOpacity
                                 key={report.id}
                                 style={styles.reportCard}
+                                onPress={() => navigate('document_view', { docName: report.name, ownerName: 'Suhani Badhe' })}
                                 onLongPress={() => {
                                     setSelectedReport(report);
                                     setIsActionMenuVisible(true);
@@ -242,12 +240,12 @@ const ReportsScreen = () => {
                             end={{ x: 1, y: 0 }}
                             style={styles.menuGradient}
                         >
-                            {['View', 'Rename', 'Share', 'Delete'].map((action, index) => (
+                            {['Rename', 'Delete'].map((action, index) => (
                                 <TouchableOpacity
                                     key={action}
                                     style={[
                                         styles.menuItem,
-                                        index === 3 && { borderBottomWidth: 0 }
+                                        index === 1 && { borderBottomWidth: 0 }
                                     ]}
                                     onPress={() => handleAction(action)}
                                 >
@@ -295,32 +293,6 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#FFFFFF',
     },
-    header: {
-        height: 100,
-        borderBottomLeftRadius: 30,
-        borderBottomRightRadius: 30,
-        paddingTop: Platform.OS === 'ios' ? 40 : 10,
-        justifyContent: 'center',
-    },
-    headerContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 25,
-    },
-    backButton: {
-        width: 40,
-        height: 40,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 15,
-    },
-    headerTitle: {
-        fontFamily: 'Judson-Bold',
-        fontSize: 22,
-        color: '#FFFFFF',
-    },
     scrollContent: {
         paddingHorizontal: 25,
         paddingTop: 30,
@@ -341,9 +313,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: 'rgba(204, 204, 204, 0.4)',
-        paddingHorizontal: 15,
-        paddingVertical: 10,
-        borderRadius: 10,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
     },
     filterText: {
         fontFamily: 'Judson-Regular',

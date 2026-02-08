@@ -1,18 +1,39 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, Image, Dimensions, Platform, StatusBar, Pressable, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MenuIcon, ProfileIcon, DropdownIcon, UploadIcon } from './Icons';
+import { MenuIcon, ProfileIcon, DropdownIcon, UploadIcon, BackIcon, CrossIcon } from './Icons';
+import { useNavigation } from '../../context/NavigationContext';
 
 const { width } = Dimensions.get('window');
 
 interface HomeHeaderProps {
     onMenuPress?: () => void;
+    onBackPress?: () => void;
     showActionRow?: boolean;
+    showUserBlock?: boolean;
+    showBackButton?: boolean;
+    showCrossButton?: boolean;
+    showRightIcon?: boolean;
+    centerTitle?: boolean;
+    title?: string;
+    subtitle?: string;
 }
 
-const HomeHeader: React.FC<HomeHeaderProps> = ({ onMenuPress, showActionRow = true }) => {
+const HomeHeader: React.FC<HomeHeaderProps> = ({
+    onMenuPress,
+    onBackPress,
+    showActionRow = true,
+    showUserBlock = true,
+    showBackButton = false,
+    showCrossButton = false,
+    showRightIcon = true,
+    centerTitle = false,
+    title,
+    subtitle
+}) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const animation = useRef(new Animated.Value(0)).current;
+    const { navigate } = useNavigation();
 
     const toggleExpand = () => {
         const toValue = isExpanded ? 0 : 1;
@@ -39,46 +60,74 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({ onMenuPress, showActionRow = tr
             colors={['#0055FF', '#6A9EFF']}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
-            style={styles.container}
+            style={[
+                styles.container,
+                (!showActionRow && !showUserBlock) ? styles.compactContainer : styles.defaultContainer
+            ]}
         >
-            <View style={styles.topRow}>
-                <Pressable style={styles.iconBlock} onPress={onMenuPress}>
-                    <MenuIcon />
-                </Pressable>
-                <View style={styles.greetingContainer}>
-                    <Text style={styles.greetingTitle}>Good Morning</Text>
-                    <Text style={styles.greetingSubtitle}>Wednesday, 28 January</Text>
+            <View style={[styles.topRow, (showActionRow || showUserBlock) && styles.defaultTopRow]}>
+                {showBackButton ? (
+                    <Pressable style={styles.iconBlock} onPress={onBackPress}>
+                        <BackIcon />
+                    </Pressable>
+                ) : (
+                    <Pressable style={styles.iconBlock} onPress={onMenuPress}>
+                        <MenuIcon />
+                    </Pressable>
+                )}
+                <View style={[styles.greetingContainer, centerTitle && styles.centerContainer]}>
+                    <Text style={[styles.greetingTitle, centerTitle && styles.centerText]}>{title || 'Good Morning'}</Text>
+                    {subtitle ? (
+                        <Text style={[styles.greetingSubtitle, centerTitle && styles.centerText]}>{subtitle}</Text>
+                    ) : !centerTitle ? (
+                        <Text style={styles.greetingSubtitle}>Wednesday, 28 January</Text>
+                    ) : null}
                 </View>
-                <View style={styles.iconBlock}>
-                    <ProfileIcon />
-                </View>
+                {showRightIcon ? (
+                    <View style={styles.iconBlock}>
+                        {showCrossButton ? (
+                            <Pressable onPress={onBackPress}>
+                                <CrossIcon />
+                            </Pressable>
+                        ) : (
+                            <Pressable onPress={() => navigate('profile')}>
+                                <ProfileIcon />
+                            </Pressable>
+                        )}
+                    </View>
+                ) : centerTitle ? (
+                    /* Dynamic Spacer to ensure perfect centering when title is centered but right icon is hidden */
+                    <View style={{ width: 46 }} />
+                ) : null}
             </View>
 
-            <Pressable onPress={toggleExpand}>
-                <Animated.View style={[styles.userBlock, { height: blockHeight }]}>
-                    <View style={styles.userMainRow}>
-                        <Image
-                            source={{ uri: 'https://avatar.iran.liara.run/public/70' }}
-                            style={styles.userImage}
-                        />
-                        <View style={styles.userInfo}>
-                            <Text style={styles.userName}>Suhani Badhe</Text>
-                            <Text style={styles.userDetails}>20 years • Female</Text>
+            {showUserBlock && (
+                <Pressable onPress={toggleExpand}>
+                    <Animated.View style={[styles.userBlock, { height: blockHeight }]}>
+                        <View style={styles.userMainRow}>
+                            <Image
+                                source={{ uri: 'https://avatar.iran.liara.run/public/70' }}
+                                style={styles.userImage}
+                            />
+                            <View style={styles.userInfo}>
+                                <Text style={styles.userName}>Suhani Badhe</Text>
+                                <Text style={styles.userDetails}>20 years • Female</Text>
+                            </View>
+                            <Animated.View style={{ transform: [{ rotate }] }}>
+                                <DropdownIcon size={20} />
+                            </Animated.View>
                         </View>
-                        <Animated.View style={{ transform: [{ rotate }] }}>
-                            <DropdownIcon size={20} />
-                        </Animated.View>
-                    </View>
 
-                    {isExpanded && (
-                        <View style={styles.expandedDetails}>
-                            <Text style={styles.detailText}>8767969148</Text>
-                            <Text style={styles.detailText}>suhanibadhe@gmail.com</Text>
-                            <Text style={styles.detailText}>Pune, Maharashtra</Text>
-                        </View>
-                    )}
-                </Animated.View>
-            </Pressable>
+                        {isExpanded && (
+                            <View style={styles.expandedDetails}>
+                                <Text style={styles.detailText}>8767969148</Text>
+                                <Text style={styles.detailText}>suhanibadhe@gmail.com</Text>
+                                <Text style={styles.detailText}>Pune, Maharashtra</Text>
+                            </View>
+                        )}
+                    </Animated.View>
+                </Pressable>
+            )}
 
             {showActionRow && (
                 <>
@@ -115,15 +164,24 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({ onMenuPress, showActionRow = tr
 const styles = StyleSheet.create({
     container: {
         width: '100%',
-        paddingTop: 25,
         paddingHorizontal: 25,
         borderBottomLeftRadius: 50,
         borderBottomRightRadius: 50,
+    },
+    compactContainer: {
+        height: 100,
+        justifyContent: 'center',
+        paddingTop: Platform.OS === 'ios' ? 20 : 0,
+    },
+    defaultContainer: {
+        paddingTop: 25,
     },
     topRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+    },
+    defaultTopRow: {
         marginBottom: 30,
     },
     iconBlock: {
@@ -137,6 +195,13 @@ const styles = StyleSheet.create({
     greetingContainer: {
         flex: 1,
         marginLeft: 20,
+    },
+    centerContainer: {
+        marginLeft: 0,
+        alignItems: 'center',
+    },
+    centerText: {
+        textAlign: 'center',
     },
     greetingTitle: {
         fontFamily: 'Judson-Bold',

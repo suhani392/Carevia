@@ -17,8 +17,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import { useNavigation } from '../../context/NavigationContext';
 import { useAppContext } from '../../context/AppContext';
-import { BackIcon, FileCheckIcon, ThreeDotsIcon } from './Icons';
+import { FileCheckIcon, ThreeDotsIcon } from './Icons';
 import AppStatusBar from '../../components/status-bar/status-bar';
+import HomeHeader from '../Home/HomeHeader';
 
 const { width } = Dimensions.get('window');
 
@@ -31,7 +32,7 @@ interface Document {
 }
 
 const DocumentsScreen = () => {
-    const { screenParams, goBack } = useNavigation();
+    const { screenParams, goBack, navigate } = useNavigation();
     const { addUpdate } = useAppContext();
     const subTitleText = screenParams?.name ? `${screenParams.name}'s Documents` : 'My Documents';
     const isOwner = !screenParams?.name;
@@ -151,24 +152,33 @@ const DocumentsScreen = () => {
         }
     };
 
+    const getGreeting = () => {
+        const hour = new Date().getHours();
+        if (hour < 12) return 'Good Morning';
+        if (hour < 17) return 'Good Afternoon';
+        return 'Good Evening';
+    };
+
+    const getCurrentDate = () => {
+        return new Date().toLocaleDateString('en-GB', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long'
+        });
+    };
+
     return (
         <View style={styles.container}>
             <AppStatusBar />
-
-            {/* Header - Fixed Height 100 as per Image */}
-            <LinearGradient
-                colors={['#0062FF', '#5C8EDF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-                style={styles.header}
-            >
-                <View style={styles.headerContent}>
-                    <TouchableOpacity onPress={goBack} style={styles.backButton}>
-                        <BackIcon />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Documents</Text>
-                </View>
-            </LinearGradient>
+            <HomeHeader
+                showBackButton={true}
+                onBackPress={goBack}
+                showActionRow={false}
+                showUserBlock={false}
+                showRightIcon={false}
+                centerTitle={true}
+                title="Carevia"
+            />
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <View style={styles.titleRow}>
@@ -227,6 +237,7 @@ const DocumentsScreen = () => {
                             <TouchableOpacity
                                 key={doc.id}
                                 style={styles.docCard}
+                                onPress={() => navigate('document_view', { docName: doc.name, ownerName: screenParams?.name || 'Suhani Badhe' })}
                                 onLongPress={() => {
                                     setSelectedDoc(doc);
                                     setIsActionMenuVisible(true);
@@ -287,12 +298,12 @@ const DocumentsScreen = () => {
                             end={{ x: 1, y: 0 }}
                             style={styles.menuGradient}
                         >
-                            {['View', 'Rename', 'Share', 'Delete'].map((action, index) => (
+                            {['Rename', 'Delete'].map((action, index) => (
                                 <TouchableOpacity
                                     key={action}
                                     style={[
                                         styles.menuItem,
-                                        index === 3 && { borderBottomWidth: 0 }
+                                        index === 1 && { borderBottomWidth: 0 }
                                     ]}
                                     onPress={() => handleAction(action)}
                                 >
@@ -340,32 +351,6 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#FFFFFF',
     },
-    header: {
-        height: 100, // Small header as per image
-        borderBottomLeftRadius: 30,
-        borderBottomRightRadius: 30,
-        paddingTop: Platform.OS === 'ios' ? 40 : 10,
-        justifyContent: 'center',
-    },
-    headerContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 25,
-    },
-    backButton: {
-        width: 40,
-        height: 40,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 15,
-    },
-    headerTitle: {
-        fontFamily: 'Judson-Bold',
-        fontSize: 22,
-        color: '#FFFFFF',
-    },
     scrollContent: {
         paddingHorizontal: 25,
         paddingTop: 30,
@@ -386,9 +371,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: 'rgba(204, 204, 204, 0.4)',
-        paddingHorizontal: 15, // Increased padding
-        paddingVertical: 10,   // Increased padding
-        borderRadius: 10,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
     },
     filterText: {
         fontFamily: 'Judson-Regular',
