@@ -21,7 +21,7 @@ import {
     FingerprintIcon,
     ChevronRightIcon
 } from './Icons';
-import { AboutIcon, ContactIcon, TermsIcon } from '../HelpPolicy/Icons';
+
 
 const SettingsScreen = () => {
     const { goBack, navigate } = useNavigation();
@@ -134,29 +134,7 @@ const SettingsScreen = () => {
                     </View>
                 </View>
 
-                {/* Support Section */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Support</Text>
-                    <View style={styles.card}>
-                        <SettingItem
-                            icon={TermsIcon}
-                            label="Help & Policy"
-                            onPress={() => navigate('help_policy')}
-                        />
-                        <View style={styles.divider} />
-                        <SettingItem
-                            icon={AboutIcon}
-                            label="About Us"
-                            onPress={() => navigate('about')}
-                        />
-                        <View style={styles.divider} />
-                        <SettingItem
-                            icon={ContactIcon}
-                            label="Contact Us"
-                            onPress={() => navigate('contact_us')}
-                        />
-                    </View>
-                </View>
+
 
                 <View style={{ height: 40 }} />
             </ScrollView>

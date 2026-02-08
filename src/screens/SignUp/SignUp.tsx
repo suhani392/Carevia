@@ -1,12 +1,26 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, Dimensions, Platform, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from '../../context/NavigationContext';
 
 const { width } = Dimensions.get('window');
 
 const SignUp = () => {
     const { navigate } = useNavigation();
+    const [dob, setDob] = useState(new Date());
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [dobText, setDobText] = useState('');
+
+    const onDateChange = (event: any, selectedDate?: Date) => {
+        const currentDate = selectedDate || dob;
+        setShowDatePicker(Platform.OS === 'ios');
+        setDob(currentDate);
+
+        let tempDate = new Date(currentDate);
+        let fDate = tempDate.getDate() + '/' + (tempDate.getMonth() + 1) + '/' + tempDate.getFullYear();
+        setDobText(fDate);
+    };
     return (
         <LinearGradient
             colors={['#0062FF', '#5C8EDF']}
@@ -39,6 +53,27 @@ const SignUp = () => {
                     </View>
 
                     <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Date of Birth :</Text>
+                        <TouchableOpacity
+                            style={styles.input}
+                            onPress={() => setShowDatePicker(true)}
+                        >
+                            <Text style={[styles.dateText, !dobText && { color: 'rgba(0,0,0,0.5)' }]}>
+                                {dobText || 'Select Date (DD/MM/YYYY)'}
+                            </Text>
+                        </TouchableOpacity>
+                        {showDatePicker && (
+                            <DateTimePicker
+                                value={dob}
+                                mode="date"
+                                display="default"
+                                onChange={onDateChange}
+                                maximumDate={new Date()} // DOB cannot be in future
+                            />
+                        )}
+                    </View>
+
+                    <View style={styles.inputGroup}>
                         <Text style={styles.label}>Phone Number :</Text>
                         <TextInput
                             style={styles.input}
@@ -50,6 +85,16 @@ const SignUp = () => {
 
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>Password :</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholderTextColor="rgba(0,0,0,0.5)"
+                            secureTextEntry={true}
+                            placeholder=""
+                        />
+                    </View>
+
+                    <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Confirm Password :</Text>
                         <TextInput
                             style={styles.input}
                             placeholderTextColor="rgba(0,0,0,0.5)"
@@ -96,7 +141,7 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         paddingHorizontal: 25,
-        paddingTop: Platform.OS === 'ios' ? 120 : 100, // Further increased for vertical centering
+        paddingTop: Platform.OS === 'ios' ? 80 : 60,
         paddingBottom: 40,
         alignItems: 'center',
     },
@@ -144,6 +189,12 @@ const styles = StyleSheet.create({
         color: '#000000',
         borderWidth: 1,
         borderColor: '#FFFFFF',
+        justifyContent: 'center', // Added for date text centering
+    },
+    dateText: {
+        fontSize: 16,
+        fontFamily: 'Judson-Regular',
+        color: '#000000',
     },
     signUpBtn: {
         width: 200,

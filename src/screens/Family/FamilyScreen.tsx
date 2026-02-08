@@ -35,7 +35,12 @@ const FamilyScreen = () => {
                 <HomeHeader onMenuPress={() => setIsMenuOpen(true)} showActionRow={false} />
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Family Members</Text>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Family Members</Text>
+                        <TouchableOpacity style={styles.addMemberButton} activeOpacity={0.8}>
+                            <Text style={styles.addMemberText}>Add Member</Text>
+                        </TouchableOpacity>
+                    </View>
 
                     <View style={styles.memberGrid}>
                         {familyMembers.map((member, index) => (
@@ -72,12 +77,29 @@ const styles = StyleSheet.create({
         paddingHorizontal: 15, // Slightly less padding to fit 177px cards
         marginTop: 30,
     },
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+        paddingHorizontal: 10,
+    },
     sectionTitle: {
         fontFamily: 'Judson-Bold',
         fontSize: 22,
         color: '#000000',
-        marginBottom: 20,
-        marginLeft: 10,
+    },
+    addMemberButton: {
+        backgroundColor: '#0062FF',
+        paddingHorizontal: 15,
+        paddingVertical: 8,
+        borderRadius: 25,
+        elevation: 2,
+    },
+    addMemberText: {
+        color: '#FFFFFF',
+        fontFamily: 'Judson-Bold',
+        fontSize: 14,
     },
     memberGrid: {
         flexDirection: 'row',
@@ -85,8 +107,8 @@ const styles = StyleSheet.create({
         justifyContent: 'space-evenly', // Balanced spacing
     },
     memberCard: {
-        width: 177,
-        height: 132,
+        width: 170,
+        height: 127,
         backgroundColor: '#D9E8FF',
         borderRadius: 15,
         justifyContent: 'center',
@@ -94,15 +116,15 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     memberAvatar: {
-        width: 75,
-        height: 75,
-        borderRadius: 37.5,
+        width: 70,
+        height: 70,
+        borderRadius: 35,
         marginBottom: 8,
         backgroundColor: '#FFFFFF',
     },
     memberName: {
         fontFamily: 'Judson-Regular',
-        fontSize: 16,
+        fontSize: 15,
         color: '#000000',
         textAlign: 'center',
     },

@@ -45,6 +45,19 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
         }).start();
     };
 
+    const getGreeting = () => {
+        const hour = new Date().getHours();
+        if (hour >= 5 && hour < 12) return 'Good Morning';
+        if (hour >= 12 && hour < 17) return 'Good Afternoon';
+        return 'Good Evening';
+    };
+
+    const getFormattedDate = () => {
+        const date = new Date();
+        const options: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' };
+        return date.toLocaleDateString('en-US', options);
+    };
+
     const blockHeight = animation.interpolate({
         inputRange: [0, 1],
         outputRange: [78, 160], // Expanded height to fit details
@@ -76,11 +89,11 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
                     </Pressable>
                 )}
                 <View style={[styles.greetingContainer, centerTitle && styles.centerContainer]}>
-                    <Text style={[styles.greetingTitle, centerTitle && styles.centerText]}>{title || 'Good Morning'}</Text>
+                    <Text style={[styles.greetingTitle, centerTitle && styles.centerText]}>{title || getGreeting()}</Text>
                     {subtitle ? (
                         <Text style={[styles.greetingSubtitle, centerTitle && styles.centerText]}>{subtitle}</Text>
                     ) : !centerTitle ? (
-                        <Text style={styles.greetingSubtitle}>Wednesday, 28 January</Text>
+                        <Text style={styles.greetingSubtitle}>{getFormattedDate()}</Text>
                     ) : null}
                 </View>
                 {showRightIcon ? (

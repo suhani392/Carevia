@@ -237,7 +237,11 @@ const DocumentsScreen = () => {
                             <TouchableOpacity
                                 key={doc.id}
                                 style={styles.docCard}
-                                onPress={() => navigate('document_view', { docName: doc.name, ownerName: screenParams?.name || 'Suhani Badhe' })}
+                                onPress={() => navigate('document_view', {
+                                    docName: doc.name,
+                                    ownerName: screenParams?.name || 'Suhani Badhe',
+                                    docUri: doc.uri
+                                })}
                                 onLongPress={() => {
                                     setSelectedDoc(doc);
                                     setIsActionMenuVisible(true);

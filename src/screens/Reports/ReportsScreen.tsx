@@ -182,7 +182,11 @@ const ReportsScreen = () => {
                             <TouchableOpacity
                                 key={report.id}
                                 style={styles.reportCard}
-                                onPress={() => navigate('document_view', { docName: report.name, ownerName: 'Suhani Badhe' })}
+                                onPress={() => navigate('document_view', {
+                                    docName: report.name,
+                                    ownerName: 'Suhani Badhe',
+                                    docUri: report.uri
+                                })}
                                 onLongPress={() => {
                                     setSelectedReport(report);
                                     setIsActionMenuVisible(true);

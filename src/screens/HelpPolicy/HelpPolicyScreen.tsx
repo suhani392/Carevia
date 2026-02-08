@@ -19,8 +19,6 @@ import {
     EmergencyAccessIcon,
     SecureDataIcon,
     TermsIcon,
-    AboutIcon,
-    ContactIcon,
     RateIcon,
     FeedbackIcon,
     PlusIcon,
@@ -149,26 +147,6 @@ const HelpPolicyScreen = () => {
                                 <TermsIcon color="#3C87FF" size={24} />
                             </View>
                             <Text style={styles.itemLabel}>Terms & Conditions</Text>
-                        </View>
-                        <ChevronRightIcon size={20} color="#3C87FF" />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.policyCard} onPress={() => navigate('about')}>
-                        <View style={styles.itemLeft}>
-                            <View style={styles.iconContainer}>
-                                <AboutIcon color="#3C87FF" size={24} />
-                            </View>
-                            <Text style={styles.itemLabel}>About Us</Text>
-                        </View>
-                        <ChevronRightIcon size={20} color="#3C87FF" />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.policyCard}>
-                        <View style={styles.itemLeft}>
-                            <View style={styles.iconContainer}>
-                                <ContactIcon color="#3C87FF" size={24} />
-                            </View>
-                            <Text style={styles.itemLabel}>Contact Us</Text>
                         </View>
                         <ChevronRightIcon size={20} color="#3C87FF" />
                     </TouchableOpacity>
