@@ -126,7 +126,7 @@ const AiAssistantScreen = () => {
                             <TextInput
                                 style={styles.textInput}
                                 placeholder="Ask anything..."
-                                placeholderTextColor="rgba(0,0,0,0.5)"
+                                placeholderTextColor="rgba(0, 0, 0, 0.4)"
                                 value={inputText}
                                 onChangeText={setInputText}
                                 multiline
@@ -136,7 +136,7 @@ const AiAssistantScreen = () => {
                                     <AttachIcon size={24} color="#000000" />
                                 </TouchableOpacity>
                                 <TouchableOpacity style={styles.actionButton} onPress={handleSend}>
-                                    <SendIcon size={24} color="#000000" />
+                                    <SendIcon size={24} color="#0062FF" />
                                 </TouchableOpacity>
                             </View>
                         </View>

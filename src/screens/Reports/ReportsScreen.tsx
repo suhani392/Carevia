@@ -82,14 +82,11 @@ const ReportsScreen = () => {
 
         switch (action) {
             case 'View':
-                if (selectedReport.uri) {
-                    Linking.openURL(selectedReport.uri).catch(err => {
-                        console.error("Couldn't load page", err);
-                        Alert.alert('Error', 'Cannot open this file type');
-                    });
-                } else {
-                    Alert.alert('Notice', 'This is a sample report and does not have a real file attached.');
-                }
+                navigate('document_view', {
+                    docName: selectedReport.name,
+                    ownerName: 'Suhani Badhe',
+                    docUri: selectedReport.uri
+                });
                 break;
             case 'Rename':
                 setNewName(selectedReport.name);

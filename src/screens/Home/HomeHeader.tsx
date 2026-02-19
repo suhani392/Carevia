@@ -29,11 +29,12 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
     showRightIcon = true,
     centerTitle = false,
     title,
-    subtitle
+    subtitle = "Wednesday, 28 January"
 }) => {
+    const { navigate } = useNavigation();
+    const [isNotificationOpen, setIsNotificationOpen] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
     const animation = useRef(new Animated.Value(0)).current;
-    const { navigate } = useNavigation();
 
     const toggleExpand = () => {
         const toValue = isExpanded ? 0 : 1;

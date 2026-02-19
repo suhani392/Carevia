@@ -190,6 +190,7 @@ const ProfileScreen = () => {
 
                 <Text style={styles.sectionTitle}>My Details</Text>
 
+
                 <View style={styles.itemsList}>
                     <ProfileItem icon={NameIcon} label="Name" value={profile.name} field="name" />
                     <ProfileItem icon={AgeIcon} label="Age" value={profile.age} field="age" />

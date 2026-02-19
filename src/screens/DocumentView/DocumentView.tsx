@@ -17,7 +17,7 @@ import { useNavigation } from '../../context/NavigationContext';
 import HomeHeader from '../Home/HomeHeader';
 import AppStatusBar from '../../components/status-bar/status-bar';
 import { ShareIcon, DownloadIcon } from '../Home/Icons';
-import { WebView } from 'react-native-webview';
+import Pdf from 'react-native-pdf';
 import { FileCheckIcon } from '../Documents/Icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -28,6 +28,7 @@ const { width } = Dimensions.get('window');
 const DocumentView = () => {
     const { screenParams, goBack } = useNavigation();
     const [isLoading, setIsLoading] = React.useState(false);
+    const [isBusy, setIsBusy] = React.useState(false);
 
     const docName = screenParams?.docName || 'Document';
     const ownerName = screenParams?.ownerName || 'Suhani Badhe';
@@ -36,7 +37,8 @@ const DocumentView = () => {
     const isPdf = docName.toLowerCase().endsWith('.pdf') || docUri?.toLowerCase().endsWith('.pdf');
 
     const handleShare = async () => {
-        if (!docUri) return;
+        if (!docUri || isBusy) return;
+        setIsBusy(true);
         try {
             const isAvailable = await Sharing.isAvailableAsync();
             if (isAvailable) {
@@ -45,8 +47,13 @@ const DocumentView = () => {
                 Alert.alert('Error', 'Sharing is not available on this device');
             }
         } catch (error) {
-            console.error('Error sharing document:', error);
-            Alert.alert('Error', 'Failed to share the document');
+            // Only alert if it's not a cancellation by the user
+            if (error instanceof Error && !error.message.includes('rejected')) {
+                console.error('Error sharing document:', error);
+                Alert.alert('Error', 'Failed to share the document');
+            }
+        } finally {
+            setIsBusy(false);
         }
     };
 
@@ -61,16 +68,37 @@ const DocumentView = () => {
                 {
                     text: 'Download',
                     onPress: async () => {
+                        if (isBusy) return;
+                        setIsBusy(true);
                         try {
+                            // Specify writeOnly to avoid requesting READ_MEDIA_AUDIO and other unnecessary permissions
                             const { status } = await MediaLibrary.requestPermissionsAsync(true);
+
                             if (status === 'granted') {
+                                let finalUri = docUri;
+
+                                // If it's a base64 string, we must save it to a temporary file first
+                                if (docUri.startsWith('data:')) {
+                                    const [, base64Data] = docUri.split(';base64,');
+                                    const extension = isPdf ? '.pdf' : '.jpg';
+                                    const tempUri = `${FileSystem.cacheDirectory}${Date.now()}${extension}`;
+                                    await FileSystem.writeAsStringAsync(tempUri, base64Data, {
+                                        encoding: FileSystem.EncodingType.Base64,
+                                    });
+                                    finalUri = tempUri;
+                                }
+
                                 if (isPdf) {
-                                    // For PDFs, sharing is the best way to "Save to Files"
-                                    await Sharing.shareAsync(docUri);
+                                    // For PDFs, sharing/saving to files is the standard way
+                                    await Sharing.shareAsync(finalUri, {
+                                        mimeType: 'application/pdf',
+                                        UTI: 'com.adobe.pdf',
+                                    });
                                 } else {
-                                    // For images, save to gallery
-                                    await MediaLibrary.saveToLibraryAsync(docUri);
-                                    Alert.alert('Success', 'Document saved to your gallery!');
+                                    // For images, save to library
+                                    const asset = await MediaLibrary.createAssetAsync(finalUri);
+                                    await MediaLibrary.createAlbumAsync('Carevia Reports', asset, false);
+                                    Alert.alert('Success', 'Document saved to your Carevia Reports album!');
                                 }
                             } else {
                                 Alert.alert('Permission Denied', 'Need storage permission to save files');
@@ -78,6 +106,8 @@ const DocumentView = () => {
                         } catch (error) {
                             console.error('Error downloading:', error);
                             Alert.alert('Error', 'Failed to save the document');
+                        } finally {
+                            setIsBusy(false);
                         }
                     }
                 }
@@ -87,29 +117,50 @@ const DocumentView = () => {
 
     const openInNativeApp = async () => {
         if (!docUri) return;
+        setIsLoading(true);
         try {
+            let localUri = docUri;
+
+            // Handle base64 or web URLs by saving/downloading to cache
+            if (docUri.startsWith('data:') || docUri.startsWith('http')) {
+                const extension = isPdf ? '.pdf' : '.jpg';
+                const tempUri = `${FileSystem.cacheDirectory}view_${Date.now()}${extension}`;
+
+                if (docUri.startsWith('data:')) {
+                    const [, base64Data] = docUri.split(';base64,');
+                    await FileSystem.writeAsStringAsync(tempUri, base64Data, {
+                        encoding: FileSystem.EncodingType.Base64,
+                    });
+                } else {
+                    const downloadResult = await FileSystem.downloadAsync(docUri, tempUri);
+                    if (downloadResult.status !== 200) throw new Error('Download failed');
+                }
+                localUri = tempUri;
+            }
+
             if (Platform.OS === 'android') {
                 // For Android, we need a content:// URI to avoid security exceptions
-                // and we use IntentLauncher to open the PDF viewer directly
-                const contentUri = await FileSystem.getContentUriAsync(docUri);
+                const contentUri = await FileSystem.getContentUriAsync(localUri);
                 await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
                     data: contentUri,
                     flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
-                    type: 'application/pdf',
+                    type: isPdf ? 'application/pdf' : 'image/*',
                 });
             } else {
                 // For iOS, sharing is the standard way to "Open In..."
                 const isAvailable = await Sharing.isAvailableAsync();
                 if (isAvailable) {
-                    await Sharing.shareAsync(docUri, {
-                        mimeType: 'application/pdf',
+                    await Sharing.shareAsync(localUri, {
+                        mimeType: isPdf ? 'application/pdf' : 'image/jpeg',
                         dialogTitle: `Open ${docName}`,
                     });
                 }
             }
         } catch (error) {
-            console.error('Error opening PDF:', error);
-            Alert.alert('Error', 'Failed to open the document viewer');
+            console.error('Error opening document:', error);
+            Alert.alert('Error', 'Failed to open the document viewer. Please try downloading it instead.');
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -130,55 +181,26 @@ const DocumentView = () => {
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <Text style={styles.docTitle}>{docName}</Text>
 
-                <View style={[styles.imageContainer, isPdf && { padding: 0, height: 500, aspectRatio: undefined }]}>
+                <View style={[styles.imageContainer, isPdf && { padding: 0, height: 550, aspectRatio: undefined }]}>
                     <View style={styles.imageWrapper}>
                         {isPdf ? (
-                            Platform.OS === 'ios' ? (
-                                <WebView
-                                    source={{ uri: docUri }}
-                                    style={styles.documentImage}
-                                    scalesPageToFit={true}
-                                    startInLoadingState={true}
-                                    allowFileAccess={true}
-                                    allowUniversalAccessFromFileURLs={true}
-                                    originWhitelist={['*']}
-                                    renderLoading={() => (
-                                        <View style={styles.loadingContainer}>
-                                            <ActivityIndicator color="#0062FF" size="large" />
-                                        </View>
-                                    )}
-                                />
-                            ) : isLoading ? (
-                                <View style={styles.loadingContainer}>
-                                    <ActivityIndicator color="#0062FF" size="large" />
-                                </View>
-                            ) : (
-                                <View style={styles.pdfPlaceholder}>
-                                    <View style={styles.vaultCard}>
-                                        <View style={styles.pdfIconContainer}>
-                                            <FileCheckIcon size={60} color="#0062FF" />
-                                        </View>
-                                        <View style={styles.verifiedBadge}>
-                                            <Text style={styles.verifiedText}>✓ SECURE REPORT</Text>
-                                        </View>
-                                        <Text style={styles.pdfLabel} numberOfLines={1}>{docName}</Text>
-                                        <Text style={styles.pdfSublabel}>Medical document ready for viewing</Text>
-
-                                        <TouchableOpacity
-                                            style={styles.openPdfButton}
-                                            onPress={openInNativeApp}
-                                            activeOpacity={0.8}
-                                        >
-                                            <LinearGradient
-                                                colors={['#0062FF', '#004ecf']}
-                                                style={styles.openGradient}
-                                            >
-                                                <Text style={styles.openPdfText}>Open Secure Viewer</Text>
-                                            </LinearGradient>
-                                        </TouchableOpacity>
+                            <Pdf
+                                source={{ uri: docUri, cache: true }}
+                                style={styles.pdfViewer}
+                                onLoadProgress={(percent) => console.log('Loading...', percent)}
+                                onLoadComplete={(numberOfPages) => console.log(`Finished loading ${numberOfPages} pages`)}
+                                onPageChanged={(page, numberOfPages) => console.log(`Current page: ${page}`)}
+                                onError={(error) => {
+                                    console.error('PDF Error:', error);
+                                    Alert.alert('Error', 'Unable to display this PDF. It might be corrupted or protected.');
+                                }}
+                                trustAllCerts={false}
+                                renderActivityIndicator={() => (
+                                    <View style={styles.loadingContainer}>
+                                        <ActivityIndicator color="#0062FF" size="large" />
                                     </View>
-                                </View>
-                            )
+                                )}
+                            />
                         ) : (
                             <Image
                                 source={{ uri: docUri || 'https://img.freepik.com/free-vector/medical-report-template_23-2148509372.jpg' }}
@@ -196,12 +218,20 @@ const DocumentView = () => {
                 </View>
 
                 <View style={styles.buttonRow}>
-                    <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
+                    <TouchableOpacity
+                        style={[styles.actionButton, isBusy && { opacity: 0.5 }]}
+                        onPress={handleShare}
+                        disabled={isBusy}
+                    >
                         <ShareIcon color="#000000" size={22} />
                         <Text style={styles.actionButtonText}>Share</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.actionButton} onPress={handleDownload}>
+                    <TouchableOpacity
+                        style={[styles.actionButton, isBusy && { opacity: 0.5 }]}
+                        onPress={handleDownload}
+                        disabled={isBusy}
+                    >
                         <DownloadIcon color="#000000" size={22} />
                         <Text style={styles.actionButtonText}>Download</Text>
                     </TouchableOpacity>
@@ -249,6 +279,12 @@ const styles = StyleSheet.create({
         width: '100%',
         height: '100%',
     },
+    pdfViewer: {
+        flex: 1,
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#FFFFFF',
+    },
     pageIndicator: {
         position: 'absolute',
         bottom: 15,
@@ -292,77 +328,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: '#FFFFFF',
-    },
-    pdfPlaceholder: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#F8FAFC',
-        padding: 20,
-    },
-    vaultCard: {
-        width: '100%',
-        backgroundColor: '#FFFFFF',
-        borderRadius: 25,
-        padding: 25,
-        alignItems: 'center',
-        elevation: 4,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 10,
-    },
-    pdfIconContainer: {
-        width: 100,
-        height: 100,
-        backgroundColor: '#F0F7FF',
-        borderRadius: 50,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 15,
-    },
-    verifiedBadge: {
-        backgroundColor: '#E6F4EA',
-        paddingHorizontal: 12,
-        paddingVertical: 4,
-        borderRadius: 10,
-        marginBottom: 15,
-    },
-    verifiedText: {
-        fontFamily: 'Judson-Bold',
-        fontSize: 10,
-        color: '#1E7E34',
-        letterSpacing: 1,
-    },
-    pdfLabel: {
-        fontFamily: 'Judson-Bold',
-        fontSize: 18,
-        color: '#000000',
-        marginBottom: 6,
-        textAlign: 'center',
-    },
-    pdfSublabel: {
-        fontFamily: 'Judson-Regular',
-        fontSize: 14,
-        color: 'rgba(0,0,0,0.5)',
-        marginBottom: 25,
-        textAlign: 'center',
-    },
-    openPdfButton: {
-        width: '100%',
-        height: 55,
-        borderRadius: 15,
-        overflow: 'hidden',
-    },
-    openGradient: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    openPdfText: {
-        fontFamily: 'Judson-Bold',
-        fontSize: 16,
-        color: '#FFFFFF',
     },
 });
 

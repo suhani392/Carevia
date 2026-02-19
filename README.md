@@ -1,75 +1,91 @@
-# Carevia - Healthcare Assistant Mobile App
+# Carevia 🩺
 
-Carevia is a premium React Native mobile application built with Expo, focusing on seamless healthcare management, AI-driven analysis, and family health tracking.
+**Your Personal Healthcare Vault & AI Health Advisor.**
+
+Carevia is a premium mobile experience designed to bridge the gap between medical data and patient understanding. It combines high-performance document management with AI-driven insights, ensuring your health records are always accessible, secure, and understandable.
+
+## ✨ Why Carevia?
+
+- **Smart Medical Vault**: Store and view high-resolution PDF health reports with zero lag.
+- **AI-Powered Insights**: An integrated assistant to help decode complex medical jargon (Styling Ready).
+- **Family First**: Manage health profiles for your entire family and receive real-time health updates.
+- **Instant Security**: Export and share reports securely via native system protocols.
+
+---
+
+## 🚀 Getting Started
+
+### 1. Prerequisites
+Before you begin, ensure your machine is ready for **Native Android Development**:
+- **Node.js**: v20+ (LTS)
+- **Android Studio**: Required for the Local Build workflow.
+- **Java SDK (JDK)**: v17+ (Crucial for React Native 0.74+).
+
+### 2. Installation
+```bash
+# Clone the repository
+git clone https://github.com/suhani392/Carevia.git
+
+# Enter the project directory
+cd Carevia
+
+# Install dependencies
+npm install
+```
+
+### 3. The Workflow (Local First)
+Since Carevia uses high-performance native libraries (like `react-native-pdf`), **standard Expo Go cannot be used.** You have two choices for running the app:
+
+#### ✅ Choice A: Local Build (Better & Faster)
+If you have Android Studio installed, this is the best way. It compiles the app on your computer.
+```bash
+# Compile and install the app on your Emulator/Device
+npx expo run:android
+```
+*Use this whenever you add a new library with `npx expo install`.*
+
+#### ☁️ Choice B: Cloud Build (EAS)
+If your computer is slow or you don't have Android Studio, you can use Expo's servers.
+```bash
+# Install EAS CLI
+npm install -g eas-cli
+
+# Build in the cloud (requires Expo account)
+eas build --profile development --platform android
+```
+
+### 4. Daily Development
+Once the app is installed on your device (using either method above), simply run the dev server to start coding:
+```bash
+npx expo start --dev-client
+```
+
+---
+
+## 🛠️ Tech Stack & Key Features
+
+- **Professional PDF Engine**: Built with `react-native-pdf` & `react-native-blob-util`. It handles large medical files with ease.
+- **Media Library Sync**: Automatically saves filtered reports to a custom "Carevia Reports" album.
+- **Typography**: Features the **Judson** font family for a premium, editorial medical aesthetic.
+- **Navigation**: Custom `NavigationProvider` for fluid between-screen transitions.
+
+---
 
 ## 📂 Project Structure
 
 ```text
 Carevia/
-├── assets/                     # Expo static assets (splash, adaptives)
 ├── src/
-│   ├── assets/                 # App-specific local assets
-│   │   ├── fonts/              # Custom fonts (Judson family)
-│   │   ├── icons/              # SVG & PNG icon assets organized by category
-│   │   └── images/             # Static images (logos, illustrations)
-│   ├── components/             # Reusable UI components
-│   │   ├── common/             # Generic blocks (buttons, input fields)
-│   │   ├── header/             # Header variations
-│   │   └── navigation/         # Navbars, Sidebars, Drawers
-│   ├── screens/                # Full-page screen components
-│   │   ├── Login/              # Authentication screens
-│   │   ├── SignUp/
-│   │   ├── Home/
-│   │   ├── Splash/             # Initial branding screen
-│   │   └── ... (Contact, AI-Bot, Family, etc.)
-│   └── (store/hooks/utils)     # Logic and utility layers (forthcoming)
-├── App.tsx                     # Main entry point (Development testing focus)
-├── app.json                    # Expo configuration
-└── package.json                # Dependencies and scripts
+│   ├── assets/                 # Custom Fonts (Judson) & Category-specific Icons
+│   ├── components/             # Navigation, Drawers, and UI Blocks
+│   ├── context/                # AppContext (App Logic) & Navigation Context
+│   └── screens/                # DocumentView, Family, AI-Bot, Reports, Profile, etc.
+├── App.tsx                     # Entry point
+└── app.json                    # Expo & Permissions configuration
 ```
 
-## 🎨 Global Design Tokens
+## 🤖 AI Development Guidelines
 
-### 🔡 Typography
-The **Judson** font family is the primary typeface used throughout the project. It is loaded in `App.tsx` and should be applied to all text components.
-- `Judson-Regular`: Main body text, input fields.
-- `Judson-Bold`: Headings, labels, buttons.
-
-### 🌈 Colors
-- **Primary Gradient**: `#0062FF` (Top) → `#5C8EDF` (Bottom).
-- **Secondary Surfaces**: `#D9E8FF` (Light Blue blocks).
-- **Text**: `#FFFFFF` on gradients, `#000000` on white surfaces.
-- **Glassmorphism**: White/Gray with 30-60% opacity for overlays.
-
-## 🖼️ Icons
-Icons are organized in `src/assets/icons/` by feature. Always check the relative path before importing:
-- **Common**: `src/assets/icons/common/` (Menu, Profile, Cross, Back).
-- **Auth**: `src/assets/icons/login-signup/` (Google PNG).
-- **Navigation**: `src/assets/icons/bottom-navbar/` (SVG & PNG icons).
-
-## 🤖 Instructions for AI Development
-
-When first opening this project, follow these guidelines to maintain consistency:
-
-1.  **Development Workflow**: 
-    - The project uses a "Component-First" development approach. 
-    - `App.tsx` is frequently cleared to test individual components or screens in isolation. 
-2.  **Styling Standards**:
-    - Use `StyleSheet.create` for all styles.
-    - Prefer responsive dimensions using `Dimensions.get('window')` for widths.
-    - Elements inside blue containers often require high `zIndex` or `elevation` to be visible correctly on Android.
-3.  **UI Consistency**:
-    - Input Fields: Width `380`, Height `55`, Radius `20`, Opacity `0.6`.
-    - Main Buttons: Oval shape (`radius: 100`), White color, Black text.
-    - Drawer/Header Curves: Large radii (typically `60`).
-4.  **Dependencies**:
-    - Project uses `expo-linear-gradient` for all primary backgrounds.
-    - Project uses `react-native-svg` for most icons (except specific PNG assets).
-    - `react-native-reanimated` is installed but standard `Animated` API is sometimes preferred for simple, high-compatibility transitions.
-
-## 🚀 Getting Started
-
-1.  Clone the repository.
-2.  Install dependencies: `npm install`.
-3.  Start Expo: `npx expo start`.
-4.  Clear cache if UI artifacts appear: `npx expo start -c`.
+1.  **Strict Styling**: Adhere to the "Large Radius" design (20px to 60px) and primary gradient (#0062FF → #5C8EDF).
+2.  **Safety First**: Use the `isBusy` state on all native interactions (Sharing/Downloading) to prevent UI blocking.
+3.  **Local Dev Only**: Do not attempt to test new features in Expo Go; they will crash due to missing native modules.

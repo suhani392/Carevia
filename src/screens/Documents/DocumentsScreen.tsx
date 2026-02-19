@@ -120,14 +120,11 @@ const DocumentsScreen = () => {
 
         switch (action) {
             case 'View':
-                if (selectedDoc.uri) {
-                    Linking.openURL(selectedDoc.uri).catch(err => {
-                        console.error("Couldn't load page", err);
-                        Alert.alert('Error', 'Cannot open this file type');
-                    });
-                } else {
-                    Alert.alert('Notice', 'This is a sample document and does not have a real file attached.');
-                }
+                navigate('document_view', {
+                    docName: selectedDoc.name,
+                    ownerName: screenParams?.name || 'Suhani Badhe',
+                    docUri: selectedDoc.uri
+                });
                 break;
             case 'Rename':
                 setNewName(selectedDoc.name);
