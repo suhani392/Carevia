@@ -148,7 +148,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
                     <Text style={styles.promptText}>Want to understand you report?</Text>
 
                     <View style={styles.actionRow}>
-                        <View style={styles.actionItem}>
+                        <Pressable style={styles.actionItem} onPress={() => navigate('scan_report')}>
                             <View style={styles.actionBlock}>
                                 <Image
                                     source={require('../../assets/icons/home/scan.png')}
@@ -156,7 +156,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
                                 />
                             </View>
                             <Text style={styles.actionText}>Scan{"\n"}report</Text>
-                        </View>
+                        </Pressable>
 
                         <Text style={styles.orText}>or</Text>
 

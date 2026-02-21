@@ -23,6 +23,7 @@ import DocumentsScreen from './src/screens/Documents/DocumentsScreen';
 import ReportsScreen from './src/screens/Reports/ReportsScreen';
 import DocumentViewScreen from './src/screens/DocumentView/DocumentView';
 import ProfileScreen from './src/screens/Profile';
+import ScanReportScreen from './src/screens/ScanReport/ScanReportScreen';
 
 // Components
 import BottomNavbar from './src/components/navigation/bottom-navigation/bottom-navbar';
@@ -61,6 +62,8 @@ function AppContent() {
                 return <DocumentViewScreen />;
             case 'profile':
                 return <ProfileScreen />;
+            case 'scan_report':
+                return <ScanReportScreen />;
             default:
                 return <HomeScreen />;
         }

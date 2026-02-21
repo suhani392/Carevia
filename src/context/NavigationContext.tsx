@@ -13,7 +13,8 @@ export type ScreenName =
     | 'documents'
     | 'reports'
     | 'document_view'
-    | 'profile';
+    | 'profile'
+    | 'scan_report';
 
 interface NavigationContextType {
     currentScreen: ScreenName;
