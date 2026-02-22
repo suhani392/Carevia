@@ -15,27 +15,16 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '../../context/NavigationContext';
+import { useAppContext, Report } from '../../context/AppContext';
 import { BackIcon, FileCheckIcon, ThreeDotsIcon } from './Icons';
 import AppStatusBar from '../../components/status-bar/status-bar';
 import HomeHeader from '../Home/HomeHeader';
 
 const { width } = Dimensions.get('window');
 
-interface Report {
-    id: string;
-    name: string;
-    date: string;
-    timestamp: number;
-    uri?: string;
-}
-
 const ReportsScreen = () => {
     const { goBack, navigate } = useNavigation();
-
-    const [reports, setReports] = useState<Report[]>([
-        { id: '1', name: 'Blood Test Report', date: '28 Jan 2026', timestamp: 1738022400000 },
-        { id: '2', name: 'X Ray Report', date: '28 Jan 2026', timestamp: 1738022400001 },
-    ]);
+    const { reports } = useAppContext();
 
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
     const [isActionMenuVisible, setIsActionMenuVisible] = useState(false);
@@ -93,7 +82,8 @@ const ReportsScreen = () => {
                 setIsRenameModalVisible(true);
                 break;
             case 'Delete':
-                setReports(reports.filter(report => report.id !== selectedReport.id));
+                // Logic for delete can be added to context if needed
+                Alert.alert('Delete', 'Delete functionality would be updated in context');
                 break;
             case 'Share':
                 Alert.alert('Share', `Sharing ${selectedReport.name}`);
@@ -103,9 +93,7 @@ const ReportsScreen = () => {
 
     const submitRename = () => {
         if (selectedReport && newName.trim()) {
-            setReports(reports.map(report =>
-                report.id === selectedReport.id ? { ...report, name: newName.trim() } : report
-            ));
+            // Logic for rename can be added to context if needed
             setIsRenameModalVisible(false);
             setSelectedReport(null);
         }

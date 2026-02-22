@@ -94,7 +94,7 @@ export const FlashlightIcon = ({ color = '#FFFFFF', size = 24 }: IconProps) => (
 );
 
 export const ScanFrameIcon = ({ color = '#FFFFFF', size = 300 }: IconProps) => (
-    <Svg width={size} height={size * 2} viewBox="0 0 24 32" fill="none" stroke={color} strokeWidth="0.5" strokeLinecap="round" strokeLinejoin="round">
+    <Svg width={size} height={size * 1.33} viewBox="0 0 24 32" fill="none" stroke={color} strokeWidth="0.5" strokeLinecap="round" strokeLinejoin="round">
         <Path d="M3 8V5a2 2 0 0 1 2-2h3" />
         <Path d="M16 3h3a2 2 0 0 1 2 2v3" />
         <Path d="M21 24v3a2 2 0 0 1-2 2h-3" />

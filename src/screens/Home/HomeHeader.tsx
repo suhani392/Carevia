@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, Image, Dimensions, Platform, StatusBar, Pressable, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as DocumentPicker from 'expo-document-picker';
 import { MenuIcon, ProfileIcon, DropdownIcon, UploadIcon, BackIcon, CrossIcon } from './Icons';
 import { useNavigation } from '../../context/NavigationContext';
 
@@ -57,6 +58,27 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
         const date = new Date();
         const options: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' };
         return date.toLocaleDateString('en-US', options);
+    };
+
+    const handleUpload = async () => {
+        try {
+            const result = await DocumentPicker.getDocumentAsync({
+                type: ['image/*', 'application/pdf'],
+                copyToCacheDirectory: true,
+                multiple: true,
+            });
+
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                const uploadedAssets = result.assets.map(asset => ({
+                    uri: asset.uri,
+                    fileType: asset.mimeType || (asset.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg')
+                }));
+
+                navigate('scan_report', { uploadedAssets });
+            }
+        } catch (error) {
+            console.error('Error picking document:', error);
+        }
     };
 
     const blockHeight = animation.interpolate({
@@ -160,12 +182,12 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
 
                         <Text style={styles.orText}>or</Text>
 
-                        <View style={styles.actionItem}>
+                        <Pressable style={styles.actionItem} onPress={handleUpload}>
                             <View style={styles.actionBlock}>
                                 <UploadIcon size={35} color="#FFFFFF" />
                             </View>
                             <Text style={styles.actionText}>Upload{"\n"}report</Text>
-                        </View>
+                        </Pressable>
                     </View>
                 </>
             )}

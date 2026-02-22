@@ -1,18 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Dimensions, TouchableOpacity, StatusBar, Image, Animated, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Dimensions, TouchableOpacity, StatusBar, Image, Animated, Modal, TextInput, ScrollView } from 'react-native';
+import Pdf from 'react-native-pdf';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as Haptics from 'expo-haptics';
 import { BackIcon, FlashlightIcon, ScanFrameIcon, CrossIcon, DownloadIcon, BotIcon } from '../Home/Icons';
 import { useNavigation } from '../../context/NavigationContext';
+import { useAppContext } from '../../context/AppContext';
 
 const { width, height } = Dimensions.get('window');
 
 const ScanReportScreen = () => {
-    const { goBack, navigate } = useNavigation();
+    const { goBack, navigate, screenParams } = useNavigation();
+    const { addReport } = useAppContext();
     const [permission, requestPermission] = useCameraPermissions();
     const [torch, setTorch] = useState(false);
-    const [capturedImage, setCapturedImage] = useState<string | null>(null);
+    const [capturedImages, setCapturedImages] = useState<string[]>([]);
+    const [isAnalysisMode, setIsAnalysisMode] = useState(false);
+    const [isPdf, setIsPdf] = useState(false);
     const [showSaveModal, setShowSaveModal] = useState(false);
     const [reportName, setReportName] = useState('');
     const cameraRef = useRef<CameraView>(null);
@@ -23,6 +29,20 @@ const ScanReportScreen = () => {
             requestPermission();
         }
     }, [permission]);
+
+    useEffect(() => {
+        if (screenParams?.uploadedAssets && screenParams.uploadedAssets.length > 0) {
+            const uris = screenParams.uploadedAssets.map((a: any) => a.uri);
+            setCapturedImages(uris);
+            setIsPdf(screenParams.uploadedAssets[0].fileType === 'application/pdf');
+            setIsAnalysisMode(true);
+        } else if (screenParams?.uploadedUri) {
+            // Legacy support for single upload
+            setCapturedImages([screenParams.uploadedUri]);
+            setIsPdf(screenParams.fileType === 'application/pdf');
+            setIsAnalysisMode(true);
+        }
+    }, [screenParams]);
 
     const handleCapture = async () => {
         if (cameraRef.current) {
@@ -56,7 +76,8 @@ const ScanReportScreen = () => {
                         { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
                     );
 
-                    setCapturedImage(manipulatedImage.uri);
+                    setCapturedImages(prev => [...prev, manipulatedImage.uri]);
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 }
             } catch (error) {
                 console.error("Failed to take picture:", error);
@@ -93,7 +114,7 @@ const ScanReportScreen = () => {
         );
     }
 
-    if (capturedImage) {
+    if (isAnalysisMode && capturedImages.length > 0) {
         return (
             <View style={styles.analysisContainer}>
                 <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
@@ -104,7 +125,10 @@ const ScanReportScreen = () => {
                         style={StyleSheet.absoluteFill}
                     />
                     <View style={styles.analysisTopIcons}>
-                        <Pressable style={styles.analysisIconBlock} onPress={() => setCapturedImage(null)}>
+                        <Pressable style={styles.analysisIconBlock} onPress={() => {
+                            setIsAnalysisMode(false);
+                            if (isPdf) setCapturedImages([]); // Clear if it was an upload
+                        }}>
                             <BackIcon size={24} color="#FFFFFF" />
                         </Pressable>
                         <View style={styles.analysisHeaderText}>
@@ -129,13 +153,31 @@ const ScanReportScreen = () => {
                             colors={['#0062FF', '#5C8EDF']}
                             style={styles.analysisImageWrapper}
                         >
-                            <View style={styles.capturedImageContainer}>
-                                <Image
-                                    source={{ uri: capturedImage }}
-                                    style={styles.capturedImage}
-                                    resizeMode="cover"
-                                />
-                            </View>
+                            {isPdf ? (
+                                <View style={styles.capturedImageContainer}>
+                                    <Pdf
+                                        source={{ uri: capturedImages[0] || '' }}
+                                        style={styles.pdfView}
+                                        trustAllCerts={false}
+                                        onLoadComplete={(numberOfPages) => {
+                                            console.log(`Number of pages: ${numberOfPages}`);
+                                        }}
+                                    />
+                                </View>
+                            ) : (
+                                capturedImages.map((uri, index) => (
+                                    <View key={index} style={[styles.capturedImageContainer, index > 0 && { marginTop: 20 }]}>
+                                        <Image
+                                            source={{ uri: uri }}
+                                            style={styles.capturedImage}
+                                            resizeMode="cover"
+                                        />
+                                        <View style={styles.pageIndicator}>
+                                            <Text style={styles.pageIndicatorText}>{index + 1} / {capturedImages.length}</Text>
+                                        </View>
+                                    </View>
+                                ))
+                            )}
                         </LinearGradient>
                     </View>
 
@@ -218,9 +260,11 @@ const ScanReportScreen = () => {
                                 <TouchableOpacity
                                     style={styles.confirmButton}
                                     onPress={() => {
-                                        console.log('Saving report as:', reportName);
-                                        setShowSaveModal(false);
-                                        // Add actual save logic here if needed
+                                        if (reportName.trim()) {
+                                            addReport(reportName, capturedImages[0] || '');
+                                            setShowSaveModal(false);
+                                            navigate('reports');
+                                        }
                                     }}
                                 >
                                     <LinearGradient
@@ -250,7 +294,7 @@ const ScanReportScreen = () => {
             >
                 <View style={styles.overlay}>
                     <View style={styles.header}>
-                        <Pressable onPress={goBack}>
+                        <Pressable onPress={() => navigate('home')}>
                             <LinearGradient
                                 colors={['#0062FF', '#5C8EDF']}
                                 style={styles.iconBlock}
@@ -259,18 +303,23 @@ const ScanReportScreen = () => {
                             </LinearGradient>
                         </Pressable>
 
-                        <Pressable onPress={() => setTorch(!torch)}>
+                        <Pressable
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                setTorch(!torch);
+                            }}
+                        >
                             <LinearGradient
-                                colors={['#0062FF', '#5C8EDF']}
+                                colors={torch ? ['#FFD700', '#FFA500'] : ['#0062FF', '#5C8EDF']}
                                 style={styles.iconBlock}
                             >
-                                <FlashlightIcon size={24} color="#FFFFFF" />
+                                <FlashlightIcon size={24} color={torch ? "#000000" : "#FFFFFF"} />
                             </LinearGradient>
                         </Pressable>
                     </View>
 
-                    <View style={styles.scanFrameContainer}>
-                        <ScanFrameIcon color="#FFFFFF" size={width * 1} />
+                    <View style={styles.scanFrameContainer} pointerEvents="none">
+                        <ScanFrameIcon color="#FFFFFF" size={width * 0.85} />
                     </View>
 
                     <View style={styles.instructionContainer}>
@@ -280,14 +329,46 @@ const ScanReportScreen = () => {
                     </View>
 
                     <View style={styles.bottomContainer}>
-                        <TouchableOpacity style={styles.captureButton} onPress={handleCapture}>
-                            <LinearGradient
-                                colors={['#0062FF', '#5C8EDF']}
-                                style={styles.gradientCircle}
-                            >
-                                <View style={styles.whiteInnerCircle} />
-                            </LinearGradient>
-                        </TouchableOpacity>
+                        <View style={styles.captureControls}>
+                            <View style={styles.previewContainer}>
+                                {capturedImages.length > 0 && (
+                                    <View style={styles.thumbnailWrapper}>
+                                        <Image
+                                            source={{ uri: capturedImages[capturedImages.length - 1] }}
+                                            style={styles.thumbnail}
+                                        />
+                                        <View style={styles.countBadge}>
+                                            <Text style={styles.countText}>{capturedImages.length}</Text>
+                                        </View>
+                                    </View>
+                                )}
+                            </View>
+
+                            <TouchableOpacity style={styles.captureButton} onPress={handleCapture}>
+                                <LinearGradient
+                                    colors={['#0062FF', '#5C8EDF']}
+                                    style={styles.gradientCircle}
+                                >
+                                    <View style={styles.whiteInnerCircle} />
+                                </LinearGradient>
+                            </TouchableOpacity>
+
+                            <View style={styles.finishContainer}>
+                                {capturedImages.length > 0 && (
+                                    <TouchableOpacity
+                                        style={styles.finishButton}
+                                        onPress={() => setIsAnalysisMode(true)}
+                                    >
+                                        <LinearGradient
+                                            colors={['#4CAF50', '#2E7D32']}
+                                            style={styles.finishGradient}
+                                        >
+                                            <Text style={styles.finishText}>Finish</Text>
+                                        </LinearGradient>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        </View>
                     </View>
                 </View>
             </CameraView>
@@ -501,6 +582,90 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 5,
+    },
+    pdfView: {
+        flex: 1,
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#FFFFFF',
+    },
+    multiImageScroll: {
+        paddingHorizontal: (width - (width * 0.78)) / 2,
+        alignItems: 'center',
+    },
+    pageIndicator: {
+        position: 'absolute',
+        bottom: 15,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    pageIndicatorText: {
+        color: '#FFFFFF',
+        fontFamily: 'Judson-Bold',
+        fontSize: 12,
+    },
+    captureControls: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        width: '100%',
+        paddingHorizontal: 30,
+    },
+    previewContainer: {
+        width: 60,
+        height: 60,
+    },
+    thumbnailWrapper: {
+        width: 54,
+        height: 54,
+        borderRadius: 10,
+        borderWidth: 2,
+        borderColor: '#FFFFFF',
+        overflow: 'hidden',
+    },
+    thumbnail: {
+        width: '100%',
+        height: '100%',
+    },
+    countBadge: {
+        position: 'absolute',
+        top: -8,
+        right: -8,
+        backgroundColor: '#0062FF',
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: '#FFFFFF',
+    },
+    countText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontFamily: 'Judson-Bold',
+    },
+    finishContainer: {
+        width: 80,
+        height: 50,
+        justifyContent: 'center',
+    },
+    finishButton: {
+        width: '100%',
+        height: 44,
+    },
+    finishGradient: {
+        flex: 1,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    finishText: {
+        color: '#FFFFFF',
+        fontFamily: 'Judson-Bold',
+        fontSize: 15,
     },
     // Modal Styles
     modalOverlay: {
