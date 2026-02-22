@@ -1,9 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, Dimensions, Platform, StatusBar, Pressable, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import { MenuIcon, ProfileIcon, DropdownIcon, UploadIcon, BackIcon, CrossIcon } from './Icons';
 import { useNavigation } from '../../context/NavigationContext';
+import { supabase } from '../../lib/supabase';
 
 const { width } = Dimensions.get('window');
 
@@ -19,7 +20,6 @@ interface HomeHeaderProps {
     title?: string;
     subtitle?: string;
 }
-
 const HomeHeader: React.FC<HomeHeaderProps> = ({
     onMenuPress,
     onBackPress,
@@ -30,12 +30,37 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
     showRightIcon = true,
     centerTitle = false,
     title,
-    subtitle = "Wednesday, 28 January"
+    subtitle
 }) => {
     const { navigate } = useNavigation();
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
+    const [profile, setProfile] = useState<any>(null);
     const animation = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        if (showUserBlock) {
+            fetchProfile();
+        }
+    }, [showUserBlock]);
+
+    const fetchProfile = async () => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', user.id)
+                .single();
+
+            if (error) throw error;
+            setProfile({ ...data, email: user.email });
+        } catch (error) {
+            console.error('Error fetching profile in header:', error);
+        }
+    };
 
     const toggleExpand = () => {
         const toValue = isExpanded ? 0 : 1;
@@ -51,7 +76,8 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
         const hour = new Date().getHours();
         if (hour >= 5 && hour < 12) return 'Good Morning';
         if (hour >= 12 && hour < 17) return 'Good Afternoon';
-        return 'Good Evening';
+        if (hour >= 17 && hour < 21) return 'Good Evening';
+        return 'Good Night';
     };
 
     const getFormattedDate = () => {
@@ -146,8 +172,11 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
                                 style={styles.userImage}
                             />
                             <View style={styles.userInfo}>
-                                <Text style={styles.userName}>Suhani Badhe</Text>
-                                <Text style={styles.userDetails}>20 years • Female</Text>
+                                <Text style={styles.userName}>{profile?.full_name || 'Loading...'}</Text>
+                                <Text style={styles.userDetails}>
+                                    {profile?.dob ? `${new Date().getFullYear() - new Date(profile.dob).getFullYear()} years` : ''}
+                                    {profile?.gender ? ` • ${profile.gender}` : ''}
+                                </Text>
                             </View>
                             <Animated.View style={{ transform: [{ rotate }] }}>
                                 <DropdownIcon size={20} />
@@ -156,14 +185,15 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
 
                         {isExpanded && (
                             <View style={styles.expandedDetails}>
-                                <Text style={styles.detailText}>8767969148</Text>
-                                <Text style={styles.detailText}>suhanibadhe@gmail.com</Text>
-                                <Text style={styles.detailText}>Pune, Maharashtra</Text>
+                                <Text style={styles.detailText}>{profile?.phone || 'No phone'}</Text>
+                                <Text style={styles.detailText}>{profile?.email || ''}</Text>
+                                <Text style={styles.detailText}>{profile?.address || 'India'}</Text>
                             </View>
                         )}
                     </Animated.View>
                 </Pressable>
             )}
+
 
             {showActionRow && (
                 <>

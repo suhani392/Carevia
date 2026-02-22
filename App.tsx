@@ -3,6 +3,7 @@ import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Font from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
+import { supabase } from './src/lib/supabase';
 
 // Context
 import { NavigationProvider, useNavigation, ScreenName } from './src/context/NavigationContext';
@@ -33,6 +34,36 @@ SplashScreen.preventAutoHideAsync();
 
 function AppContent() {
     const { currentScreen, navigate } = useNavigation();
+    const [authChecked, setAuthChecked] = useState(false);
+
+    useEffect(() => {
+        // Check initial session
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session) {
+                navigate('home');
+            }
+            setAuthChecked(true);
+        });
+
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (session) {
+                navigate('home');
+            } else {
+                navigate('login');
+            }
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
+
+    if (!authChecked) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#0062FF" />
+            </View>
+        );
+    }
 
     const renderScreen = () => {
         switch (currentScreen) {
@@ -140,3 +171,4 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
     }
 });
+

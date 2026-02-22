@@ -17,9 +17,44 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import { useNavigation } from '../../context/NavigationContext';
 import { useAppContext } from '../../context/AppContext';
+import { supabase } from '../../lib/supabase';
 import { FileCheckIcon, ThreeDotsIcon } from './Icons';
+import * as FileSystem from 'expo-file-system/legacy';
 import AppStatusBar from '../../components/status-bar/status-bar';
 import HomeHeader from '../Home/HomeHeader';
+
+// Helper to convert base64 to ArrayBuffer (more reliable for RN uploads)
+const decodeBase64 = (base64: string) => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    const lookup = new Uint8Array(256);
+    for (let i = 0; i < chars.length; i++) {
+        lookup[chars.charCodeAt(i)] = i;
+    }
+
+    let bufferLength = base64.length * 0.75;
+    let len = base64.length, i, p = 0;
+    let encoded1, encoded2, encoded3, encoded4;
+
+    if (base64[base64.length - 1] === "=") {
+        bufferLength--;
+        if (base64[base64.length - 2] === "=") bufferLength--;
+    }
+
+    const arraybuffer = new ArrayBuffer(bufferLength);
+    const bytes = new Uint8Array(arraybuffer);
+
+    for (i = 0; i < len; i += 4) {
+        encoded1 = lookup[base64.charCodeAt(i)];
+        encoded2 = lookup[base64.charCodeAt(i + 1)];
+        encoded3 = lookup[base64.charCodeAt(i + 2)];
+        encoded4 = lookup[base64.charCodeAt(i + 3)];
+
+        bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
+        bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
+        bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
+    }
+    return arraybuffer;
+};
 
 const { width } = Dimensions.get('window');
 
@@ -33,23 +68,17 @@ interface Document {
 
 const DocumentsScreen = () => {
     const { screenParams, goBack, navigate } = useNavigation();
-    const { addUpdate } = useAppContext();
+    const { documents, addDocument, updateDocument, deleteDocument, addUpdate, userProfile } = useAppContext();
     const subTitleText = screenParams?.name ? `${screenParams.name}'s Documents` : 'My Documents';
     const isOwner = !screenParams?.name;
-
-    const [documents, setDocuments] = useState<Document[]>([
-        { id: '1', name: 'Blood Test Report', date: '28 Jan 2026', timestamp: 1738022400000 },
-        { id: '2', name: 'X Ray Chest', date: '28 Jan 2026', timestamp: 1738022400001 },
-        { id: '3', name: 'Prescription', date: '28 Jan 2026', timestamp: 1738022400002 },
-        { id: '4', name: 'Allergies Report', date: '28 Jan 2026', timestamp: 1738022400003 },
-    ]);
 
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
     const [isActionMenuVisible, setIsActionMenuVisible] = useState(false);
     const [isFilterDropdownVisible, setIsFilterDropdownVisible] = useState(false);
     const [isRenameModalVisible, setIsRenameModalVisible] = useState(false);
-    const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
+    const [selectedDoc, setSelectedDoc] = useState<any>(null);
     const [newName, setNewName] = useState('');
+    const [loading, setLoading] = useState(false);
 
     const dropdownAnim = useRef(new Animated.Value(0)).current;
     const actionMenuAnim = useRef(new Animated.Value(0)).current;
@@ -81,38 +110,56 @@ const DocumentsScreen = () => {
         return a.timestamp - b.timestamp;
     });
 
-    const addDocument = async () => {
+    const handleAddDocument = async () => {
         try {
             const result = await DocumentPicker.getDocumentAsync({
-                type: ['image/*', 'application/pdf'], // Restrict to image and pdf
+                type: ['image/*', 'application/pdf'],
                 copyToCacheDirectory: true,
             });
 
             if (!result.canceled && result.assets && result.assets.length > 0) {
+                setLoading(true);
                 const asset = result.assets[0];
-                const newDoc: Document = {
-                    id: Date.now().toString(),
-                    name: asset.name,
-                    date: new Date().toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric'
-                    }),
-                    timestamp: Date.now(),
-                    uri: asset.uri,
-                };
-                setDocuments([newDoc, ...documents]);
 
-                // Add to Family Updates
-                const userName = screenParams?.name || 'You';
-                const updateName = screenParams?.name || 'Me';
-                addUpdate(updateName, `${userName} added a new document: ${asset.name}`);
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) throw new Error('User not found');
+
+                const fileName = `${Date.now()}_${asset.name.replace(/\s+/g, '_')}`;
+                const filePath = `${user.id}/docs/${fileName}`;
+
+                // Read file as base64 - bypasses RN fetch/blob bugs for physical uploads
+                const base64 = await FileSystem.readAsStringAsync(asset.uri, {
+                    encoding: 'base64',
+                });
+
+                const arrayBuffer = decodeBase64(base64);
+                const contentType = asset.mimeType || 'application/octet-stream';
+
+                const { error: uploadError } = await supabase.storage
+                    .from('documents')
+                    .upload(filePath, arrayBuffer, {
+                        contentType,
+                        upsert: true
+                    });
+
+                if (uploadError) throw uploadError;
+
+                const { data: { publicUrl } } = supabase.storage
+                    .from('documents')
+                    .getPublicUrl(filePath);
+
+                await addDocument(asset.name, publicUrl);
+                Alert.alert('Success', 'Document added successfully');
             }
-        } catch (error) {
-            console.error('Error picking document:', error);
-            Alert.alert('Error', 'Failed to pick a document');
+        } catch (error: any) {
+            console.error('Error adding document:', error);
+            Alert.alert('Upload Failed', error.message || 'Failed to upload document');
+        } finally {
+            setLoading(false);
         }
     };
+
+
 
     const handleAction = (action: string) => {
         setIsActionMenuVisible(false);
@@ -120,18 +167,44 @@ const DocumentsScreen = () => {
 
         switch (action) {
             case 'View':
-                navigate('document_view', {
-                    docName: selectedDoc.name,
-                    ownerName: screenParams?.name || 'Suhani Badhe',
-                    docUri: selectedDoc.uri
-                });
+                const generateAndView = async () => {
+                    if (!selectedDoc.uri) return;
+                    try {
+                        const pathParts = selectedDoc.uri.split('/documents/');
+                        const filePath = pathParts[pathParts.length - 1];
+                        const { data, error } = await supabase.storage.from('documents').createSignedUrl(filePath, 3600);
+                        navigate('document_view', {
+                            docName: selectedDoc.name,
+                            ownerName: screenParams?.name || userProfile?.full_name || 'Me',
+                            docUri: data?.signedUrl || selectedDoc.uri
+                        });
+                    } catch (e) {
+                        navigate('document_view', {
+                            docName: selectedDoc.name,
+                            ownerName: screenParams?.name || userProfile?.full_name || 'Me',
+                            docUri: selectedDoc.uri
+                        });
+                    }
+                };
+                generateAndView();
                 break;
             case 'Rename':
                 setNewName(selectedDoc.name);
                 setIsRenameModalVisible(true);
                 break;
             case 'Delete':
-                setDocuments(documents.filter(doc => doc.id !== selectedDoc.id));
+                Alert.alert(
+                    'Delete Document',
+                    'Are you sure you want to delete this document?',
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                            text: 'Delete',
+                            style: 'destructive',
+                            onPress: () => deleteDocument(selectedDoc.id)
+                        },
+                    ]
+                );
                 break;
             case 'Share':
                 Alert.alert('Share', `Sharing ${selectedDoc.name}`);
@@ -139,21 +212,21 @@ const DocumentsScreen = () => {
         }
     };
 
-    const submitRename = () => {
+    const submitRename = async () => {
         if (selectedDoc && newName.trim()) {
-            setDocuments(documents.map(doc =>
-                doc.id === selectedDoc.id ? { ...doc, name: newName.trim() } : doc
-            ));
+            await updateDocument(selectedDoc.id, newName.trim());
             setIsRenameModalVisible(false);
             setSelectedDoc(null);
         }
     };
 
+
     const getGreeting = () => {
         const hour = new Date().getHours();
         if (hour < 12) return 'Good Morning';
         if (hour < 17) return 'Good Afternoon';
-        return 'Good Evening';
+        if (hour < 21) return 'Good Evening';
+        return 'Good Night';
     };
 
     const getCurrentDate = () => {
@@ -230,40 +303,72 @@ const DocumentsScreen = () => {
 
                 <View style={styles.documentsList}>
                     {sortedDocuments.length > 0 ? (
-                        sortedDocuments.map((doc) => (
-                            <TouchableOpacity
-                                key={doc.id}
-                                style={styles.docCard}
-                                onPress={() => navigate('document_view', {
-                                    docName: doc.name,
-                                    ownerName: screenParams?.name || 'Suhani Badhe',
-                                    docUri: doc.uri
-                                })}
-                                onLongPress={() => {
-                                    setSelectedDoc(doc);
-                                    setIsActionMenuVisible(true);
-                                }}
-                            >
-                                <View style={styles.docIconContainer}>
-                                    <View style={styles.whiteBox}>
-                                        <FileCheckIcon size={25} />
-                                    </View>
-                                </View>
-                                <View style={styles.docInfo}>
-                                    <Text style={styles.docName}>{doc.name}</Text>
-                                    <Text style={styles.docDate}>Uploaded on {doc.date}</Text>
-                                </View>
+                        sortedDocuments.map((doc) => {
+                            const handleDocPress = async () => {
+                                if (!doc.uri) return;
+                                try {
+                                    // Extract the relative path from the stored URL
+                                    // The URL looks like: .../storage/v1/object/public/documents/USER_ID/docs/FILE.pdf
+                                    // But since we use getPublicUrl, it might be the public one. 
+                                    // We need to pass the raw path to createSignedUrl.
+                                    // Actually, it's better if we store the path in AppContext, 
+                                    // but we can extract it if we know the bucket.
+                                    const pathParts = doc.uri.split('/documents/');
+                                    const filePath = pathParts[pathParts.length - 1];
+
+                                    const { data, error } = await supabase.storage
+                                        .from('documents')
+                                        .createSignedUrl(filePath, 3600);
+
+                                    if (error) throw error;
+
+                                    navigate('document_view', {
+                                        docName: doc.name,
+                                        ownerName: screenParams?.name || userProfile?.full_name || 'Me',
+                                        docUri: data.signedUrl
+                                    });
+                                } catch (error) {
+                                    console.error('Error generating signed URL:', error);
+                                    // Fallback to direct URI if signing fails (might be a public asset)
+                                    navigate('document_view', {
+                                        docName: doc.name,
+                                        ownerName: screenParams?.name || userProfile?.full_name || 'Me',
+                                        docUri: doc.uri
+                                    });
+                                }
+                            };
+
+                            return (
                                 <TouchableOpacity
-                                    onPress={() => {
+                                    key={doc.id}
+                                    style={styles.docCard}
+                                    onPress={handleDocPress}
+                                    onLongPress={() => {
                                         setSelectedDoc(doc);
                                         setIsActionMenuVisible(true);
                                     }}
-                                    style={styles.moreButton}
                                 >
-                                    <ThreeDotsIcon color="rgba(0,0,0,0.6)" />
+                                    <View style={styles.docIconContainer}>
+                                        <View style={styles.whiteBox}>
+                                            <FileCheckIcon size={25} />
+                                        </View>
+                                    </View>
+                                    <View style={styles.docInfo}>
+                                        <Text style={styles.docName}>{doc.name}</Text>
+                                        <Text style={styles.docDate}>Uploaded on {doc.date}</Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setSelectedDoc(doc);
+                                            setIsActionMenuVisible(true);
+                                        }}
+                                        style={styles.moreButton}
+                                    >
+                                        <ThreeDotsIcon color="rgba(0,0,0,0.6)" />
+                                    </TouchableOpacity>
                                 </TouchableOpacity>
-                            </TouchableOpacity>
-                        ))
+                            );
+                        })
                     ) : (
                         <Text style={styles.emptyText}>You haven’t added any documents yet.</Text>
                     )}
@@ -273,8 +378,8 @@ const DocumentsScreen = () => {
             </ScrollView>
 
             {/* FAB */}
-            <TouchableOpacity style={styles.fab} onPress={addDocument}>
-                <Text style={styles.fabIcon}>+</Text>
+            <TouchableOpacity style={styles.fab} onPress={handleAddDocument} disabled={loading}>
+                <Text style={styles.fabIcon}>{loading ? '...' : '+'}</Text>
             </TouchableOpacity>
 
             {/* Action Menu Modal - Gradient & Radius 50 */}

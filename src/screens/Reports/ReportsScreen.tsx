@@ -16,6 +16,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '../../context/NavigationContext';
 import { useAppContext, Report } from '../../context/AppContext';
+import { supabase } from '../../lib/supabase';
 import { BackIcon, FileCheckIcon, ThreeDotsIcon } from './Icons';
 import AppStatusBar from '../../components/status-bar/status-bar';
 import HomeHeader from '../Home/HomeHeader';
@@ -24,7 +25,7 @@ const { width } = Dimensions.get('window');
 
 const ReportsScreen = () => {
     const { goBack, navigate } = useNavigation();
-    const { reports } = useAppContext();
+    const { reports, updateReport, deleteReport, userProfile } = useAppContext();
 
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
     const [isActionMenuVisible, setIsActionMenuVisible] = useState(false);
@@ -71,19 +72,44 @@ const ReportsScreen = () => {
 
         switch (action) {
             case 'View':
-                navigate('document_view', {
-                    docName: selectedReport.name,
-                    ownerName: 'Suhani Badhe',
-                    docUri: selectedReport.uri
-                });
+                const generateAndView = async () => {
+                    if (!selectedReport.uri) return;
+                    try {
+                        const pathParts = selectedReport.uri.split('/reports/');
+                        const filePath = pathParts[pathParts.length - 1];
+                        const { data, error } = await supabase.storage.from('reports').createSignedUrl(filePath, 3600);
+                        navigate('document_view', {
+                            docName: selectedReport.name,
+                            ownerName: userProfile?.full_name || 'Me',
+                            docUri: data?.signedUrl || selectedReport.uri
+                        });
+                    } catch (e) {
+                        navigate('document_view', {
+                            docName: selectedReport.name,
+                            ownerName: userProfile?.full_name || 'Me',
+                            docUri: selectedReport.uri
+                        });
+                    }
+                };
+                generateAndView();
                 break;
             case 'Rename':
                 setNewName(selectedReport.name);
                 setIsRenameModalVisible(true);
                 break;
             case 'Delete':
-                // Logic for delete can be added to context if needed
-                Alert.alert('Delete', 'Delete functionality would be updated in context');
+                Alert.alert(
+                    'Delete Report',
+                    'Are you sure you want to delete this report?',
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                            text: 'Delete',
+                            style: 'destructive',
+                            onPress: () => deleteReport(selectedReport.id)
+                        },
+                    ]
+                );
                 break;
             case 'Share':
                 Alert.alert('Share', `Sharing ${selectedReport.name}`);
@@ -91,13 +117,14 @@ const ReportsScreen = () => {
         }
     };
 
-    const submitRename = () => {
+    const submitRename = async () => {
         if (selectedReport && newName.trim()) {
-            // Logic for rename can be added to context if needed
+            await updateReport(selectedReport.id, newName.trim());
             setIsRenameModalVisible(false);
             setSelectedReport(null);
         }
     };
+
 
     return (
         <View style={styles.container}>
@@ -163,40 +190,66 @@ const ReportsScreen = () => {
 
                 <View style={styles.reportsList}>
                     {sortedReports.length > 0 ? (
-                        sortedReports.map((report) => (
-                            <TouchableOpacity
-                                key={report.id}
-                                style={styles.reportCard}
-                                onPress={() => navigate('document_view', {
-                                    docName: report.name,
-                                    ownerName: 'Suhani Badhe',
-                                    docUri: report.uri
-                                })}
-                                onLongPress={() => {
-                                    setSelectedReport(report);
-                                    setIsActionMenuVisible(true);
-                                }}
-                            >
-                                <View style={styles.reportIconContainer}>
-                                    <View style={styles.whiteBox}>
-                                        <FileCheckIcon size={25} />
-                                    </View>
-                                </View>
-                                <View style={styles.reportInfo}>
-                                    <Text style={styles.reportName}>{report.name}</Text>
-                                    <Text style={styles.reportDate}>Uploaded on {report.date}</Text>
-                                </View>
+                        sortedReports.map((report) => {
+                            const handleReportPress = async () => {
+                                if (!report.uri) return;
+                                try {
+                                    // Extract path from public URL
+                                    const pathParts = report.uri.split('/reports/');
+                                    const filePath = pathParts[pathParts.length - 1];
+
+                                    const { data, error } = await supabase.storage
+                                        .from('reports')
+                                        .createSignedUrl(filePath, 3600);
+
+                                    if (error) throw error;
+
+                                    navigate('document_view', {
+                                        docName: report.name,
+                                        ownerName: userProfile?.full_name || 'Me',
+                                        docUri: data.signedUrl
+                                    });
+                                } catch (error) {
+                                    console.error('Error signing report URL:', error);
+                                    navigate('document_view', {
+                                        docName: report.name,
+                                        ownerName: userProfile?.full_name || 'Me',
+                                        docUri: report.uri
+                                    });
+                                }
+                            };
+
+                            return (
                                 <TouchableOpacity
-                                    onPress={() => {
+                                    key={report.id}
+                                    style={styles.reportCard}
+                                    onPress={handleReportPress}
+                                    onLongPress={() => {
                                         setSelectedReport(report);
                                         setIsActionMenuVisible(true);
                                     }}
-                                    style={styles.moreButton}
                                 >
-                                    <ThreeDotsIcon color="rgba(0,0,0,0.6)" />
+                                    <View style={styles.reportIconContainer}>
+                                        <View style={styles.whiteBox}>
+                                            <FileCheckIcon size={25} />
+                                        </View>
+                                    </View>
+                                    <View style={styles.reportInfo}>
+                                        <Text style={styles.reportName}>{report.name}</Text>
+                                        <Text style={styles.reportDate}>Uploaded on {report.date}</Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setSelectedReport(report);
+                                            setIsActionMenuVisible(true);
+                                        }}
+                                        style={styles.moreButton}
+                                    >
+                                        <ThreeDotsIcon color="rgba(0,0,0,0.6)" />
+                                    </TouchableOpacity>
                                 </TouchableOpacity>
-                            </TouchableOpacity>
-                        ))
+                            );
+                        })
                     ) : (
                         <Text style={styles.emptyText}>You haven’t added any reports yet.</Text>
                     )}

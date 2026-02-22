@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -10,13 +10,16 @@ import {
     Modal,
     Platform,
     Dimensions,
-    KeyboardAvoidingView
+    KeyboardAvoidingView,
+    Alert,
+    ActivityIndicator
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '../../context/NavigationContext';
 import AppStatusBar from '../../components/status-bar/status-bar';
 import HomeHeader from '../Home/HomeHeader';
 import Menu from '../../components/navigation/menu-drawer/menu';
+import { supabase } from '../../lib/supabase';
 import {
     NameIcon,
     AgeIcon,
@@ -42,21 +45,67 @@ interface ProfileData {
 }
 
 const ProfileScreen = () => {
-    const { goBack } = useNavigation();
+    const { goBack, navigate } = useNavigation();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
     const [profile, setProfile] = useState<ProfileData>({
-        name: 'Suhani Badhe',
-        age: '20 years',
-        gender: 'Female',
-        contactNumber: '87679 69148',
-        address: 'S3 Lifestyle Apartments',
-        bloodGroup: 'A+',
-        emergencyContact: '87679 69148'
+        name: 'Guest User',
+        age: 'N/A',
+        gender: 'N/A',
+        contactNumber: 'N/A',
+        address: 'N/A',
+        bloodGroup: 'N/A',
+        emergencyContact: 'N/A'
     });
 
     const [editingField, setEditingField] = useState<keyof ProfileData | null>(null);
     const [tempValue, setTempValue] = useState('');
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+
+    useEffect(() => {
+        fetchProfile();
+    }, []);
+
+    const fetchProfile = async () => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', user.id)
+                .single();
+
+            if (error) throw error;
+
+            if (data) {
+                setProfile({
+                    name: data.full_name || 'N/A',
+                    age: data.dob || 'N/A', // Using DOB as age for now or we could calculate
+                    gender: data.gender || 'N/A',
+                    contactNumber: data.phone || 'N/A',
+                    address: data.address || 'N/A',
+                    bloodGroup: data.blood_group || 'N/A',
+                    emergencyContact: data.emergency_contact || 'N/A'
+                });
+            }
+        } catch (error: any) {
+            console.error('Error fetching profile:', error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleLogout = async () => {
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+            Alert.alert('Error', error.message);
+        } else {
+            navigate('login');
+        }
+    };
 
     const openEdit = (field: keyof ProfileData) => {
         setEditingField(field);
@@ -64,11 +113,38 @@ const ProfileScreen = () => {
         setIsEditModalVisible(true);
     };
 
-    const handleSave = () => {
-        if (editingField) {
+    const handleSave = async () => {
+        if (!editingField) return;
+
+        setSaving(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('Not authenticated');
+
+            const fieldMapping: any = {
+                name: 'full_name',
+                age: 'dob',
+                gender: 'gender',
+                contactNumber: 'phone',
+                address: 'address',
+                bloodGroup: 'blood_group',
+                emergencyContact: 'emergency_contact'
+            };
+
+            const { error } = await supabase
+                .from('profiles')
+                .update({ [fieldMapping[editingField]]: tempValue })
+                .eq('id', user.id);
+
+            if (error) throw error;
+
             setProfile({ ...profile, [editingField]: tempValue });
             setIsEditModalVisible(false);
             setEditingField(null);
+        } catch (error: any) {
+            Alert.alert('Error', error.message);
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -119,11 +195,11 @@ const ProfileScreen = () => {
                 )}
 
                 <View style={styles.editButtons}>
-                    <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
+                    <TouchableOpacity style={styles.cancelButton} onPress={handleCancel} disabled={saving}>
                         <Text style={styles.cancelButtonText}>Don't Save</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-                        <Text style={styles.saveButtonText}>Save</Text>
+                    <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
+                        {saving ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveButtonText}>Save</Text>}
                     </TouchableOpacity>
                 </View>
             </View>
@@ -144,6 +220,14 @@ const ProfileScreen = () => {
             <ChevronRightIcon color="#0062FF" size={20} />
         </TouchableOpacity>
     );
+
+    if (loading) {
+        return (
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color="#0062FF" />
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
@@ -200,6 +284,11 @@ const ProfileScreen = () => {
                     <ProfileItem icon={BloodGroupIcon} label="Blood Group" value={profile.bloodGroup} field="bloodGroup" />
                     <ProfileItem icon={EmergencyContactIcon} label="Emergency Contact" value={profile.emergencyContact} field="emergencyContact" />
                 </View>
+
+                {/* Logout Button */}
+                <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+                    <Text style={styles.logoutText}>Logout</Text>
+                </TouchableOpacity>
 
                 <View style={{ height: 40 }} />
             </ScrollView>
@@ -341,6 +430,20 @@ const styles = StyleSheet.create({
         fontSize: 15,
         color: 'rgba(60, 135, 255, 0.8)',
     },
+    logoutBtn: {
+        width: '100%',
+        height: 60,
+        backgroundColor: '#FF4C4C',
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 20,
+    },
+    logoutText: {
+        fontFamily: 'Judson-Bold',
+        fontSize: 18,
+        color: '#FFFFFF',
+    },
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -454,3 +557,4 @@ const styles = StyleSheet.create({
 });
 
 export default ProfileScreen;
+

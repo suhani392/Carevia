@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -8,8 +8,10 @@ import {
     TextInput,
     KeyboardAvoidingView,
     Platform,
-    Dimensions
+    Dimensions,
+    Alert
 } from 'react-native';
+import { supabase } from '../../lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '../../context/NavigationContext';
 import AppStatusBar from '../../components/status-bar/status-bar';
@@ -29,6 +31,42 @@ const ContactUsScreen = () => {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [message, setMessage] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        const prefillInfo = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                setEmail(user.email || '');
+                const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
+                if (profile) setName(profile.full_name);
+            }
+        };
+        prefillInfo();
+    }, []);
+
+    const handleSendMessage = async () => {
+        if (!name.trim() || !email.trim() || !message.trim()) {
+            Alert.alert('Error', 'Please fill in all fields');
+            return;
+        }
+
+        try {
+            setLoading(true);
+            const { error } = await supabase
+                .from('contact_messages')
+                .insert({ name, email, message });
+
+            if (error) throw error;
+            Alert.alert('Success', 'Your message has been sent!');
+            setMessage('');
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'Failed to send message');
+        } finally {
+            setLoading(false);
+        }
+    };
+
 
     const SupportCard = ({ icon: Icon, title, subtitle, onPress }: any) => (
         <TouchableOpacity style={styles.supportCard} onPress={onPress}>
@@ -99,6 +137,7 @@ const ContactUsScreen = () => {
                             value={name}
                             onChangeText={setName}
                             placeholderTextColor="#A0A0A0"
+                            editable={!loading}
                         />
 
                         <TextInput
@@ -109,6 +148,7 @@ const ContactUsScreen = () => {
                             keyboardType="email-address"
                             autoCapitalize="none"
                             placeholderTextColor="#A0A0A0"
+                            editable={!loading}
                         />
 
                         <TextInput
@@ -120,16 +160,23 @@ const ContactUsScreen = () => {
                             numberOfLines={4}
                             textAlignVertical="top"
                             placeholderTextColor="#A0A0A0"
+                            editable={!loading}
                         />
 
-                        <TouchableOpacity style={styles.sendButtonContainer}>
+                        <TouchableOpacity
+                            style={styles.sendButtonContainer}
+                            onPress={handleSendMessage}
+                            disabled={loading}
+                        >
                             <LinearGradient
                                 colors={['#8EBDFF', '#4C8DFF']}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
                                 style={styles.sendButton}
                             >
-                                <Text style={styles.sendButtonText}>Send Message</Text>
+                                <Text style={styles.sendButtonText}>
+                                    {loading ? 'Sending...' : 'Send Message'}
+                                </Text>
                             </LinearGradient>
                         </TouchableOpacity>
                     </View>

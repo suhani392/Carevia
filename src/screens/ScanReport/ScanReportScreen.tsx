@@ -6,8 +6,44 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as Haptics from 'expo-haptics';
 import { BackIcon, FlashlightIcon, ScanFrameIcon, CrossIcon, DownloadIcon, BotIcon } from '../Home/Icons';
+import { Alert } from 'react-native';
 import { useNavigation } from '../../context/NavigationContext';
 import { useAppContext } from '../../context/AppContext';
+import { supabase } from '../../lib/supabase';
+import * as FileSystem from 'expo-file-system/legacy';
+
+// Helper to convert base64 to ArrayBuffer (more reliable for RN uploads)
+const decodeBase64 = (base64: string) => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    const lookup = new Uint8Array(256);
+    for (let i = 0; i < chars.length; i++) {
+        lookup[chars.charCodeAt(i)] = i;
+    }
+
+    let bufferLength = base64.length * 0.75;
+    let len = base64.length, i, p = 0;
+    let encoded1, encoded2, encoded3, encoded4;
+
+    if (base64[base64.length - 1] === "=") {
+        bufferLength--;
+        if (base64[base64.length - 2] === "=") bufferLength--;
+    }
+
+    const arraybuffer = new ArrayBuffer(bufferLength);
+    const bytes = new Uint8Array(arraybuffer);
+
+    for (i = 0; i < len; i += 4) {
+        encoded1 = lookup[base64.charCodeAt(i)];
+        encoded2 = lookup[base64.charCodeAt(i + 1)];
+        encoded3 = lookup[base64.charCodeAt(i + 2)];
+        encoded4 = lookup[base64.charCodeAt(i + 3)];
+
+        bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
+        bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
+        bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
+    }
+    return arraybuffer;
+};
 
 const { width, height } = Dimensions.get('window');
 
@@ -21,6 +57,7 @@ const ScanReportScreen = () => {
     const [isPdf, setIsPdf] = useState(false);
     const [showSaveModal, setShowSaveModal] = useState(false);
     const [reportName, setReportName] = useState('');
+    const [loading, setLoading] = useState(false);
     const cameraRef = useRef<CameraView>(null);
     const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -154,7 +191,7 @@ const ScanReportScreen = () => {
                             style={styles.analysisImageWrapper}
                         >
                             {isPdf ? (
-                                <View style={styles.capturedImageContainer}>
+                                <View style={[styles.capturedImageContainer, { alignSelf: 'center', marginRight: 0 }]}>
                                     <Pdf
                                         source={{ uri: capturedImages[0] || '' }}
                                         style={styles.pdfView}
@@ -165,18 +202,32 @@ const ScanReportScreen = () => {
                                     />
                                 </View>
                             ) : (
-                                capturedImages.map((uri, index) => (
-                                    <View key={index} style={[styles.capturedImageContainer, index > 0 && { marginTop: 20 }]}>
-                                        <Image
-                                            source={{ uri: uri }}
-                                            style={styles.capturedImage}
-                                            resizeMode="cover"
-                                        />
-                                        <View style={styles.pageIndicator}>
-                                            <Text style={styles.pageIndicatorText}>{index + 1} / {capturedImages.length}</Text>
+                                <ScrollView
+                                    horizontal
+                                    showsHorizontalScrollIndicator={false}
+                                    snapToInterval={width * 0.7 + 20}
+                                    decelerationRate="fast"
+                                    contentContainerStyle={styles.multiImageScroll}
+                                >
+                                    {capturedImages.map((uri, index) => (
+                                        <View
+                                            key={index}
+                                            style={[
+                                                styles.capturedImageContainer,
+                                                index === capturedImages.length - 1 && { marginRight: 0 }
+                                            ]}
+                                        >
+                                            <Image
+                                                source={{ uri: uri }}
+                                                style={styles.capturedImage}
+                                                resizeMode="cover"
+                                            />
+                                            <View style={styles.pageIndicator}>
+                                                <Text style={styles.pageIndicatorText}>{index + 1} / {capturedImages.length}</Text>
+                                            </View>
                                         </View>
-                                    </View>
-                                ))
+                                    ))}
+                                </ScrollView>
                             )}
                         </LinearGradient>
                     </View>
@@ -259,22 +310,74 @@ const ScanReportScreen = () => {
 
                                 <TouchableOpacity
                                     style={styles.confirmButton}
-                                    onPress={() => {
-                                        if (reportName.trim()) {
-                                            addReport(reportName, capturedImages[0] || '');
-                                            setShowSaveModal(false);
-                                            navigate('reports');
+                                    onPress={async () => {
+                                        if (reportName.trim() && capturedImages.length > 0) {
+                                            try {
+                                                setLoading(true);
+                                                const uri = capturedImages[0];
+                                                const extension = isPdf ? '.pdf' : '.jpg';
+                                                const contentType = isPdf ? 'application/pdf' : 'image/jpeg';
+                                                const fileName = `${Date.now()}${extension}`;
+
+                                                const { data: { user } } = await supabase.auth.getUser();
+                                                if (!user) throw new Error('User not found');
+
+                                                const filePath = `${user.id}/${fileName}`;
+
+                                                // Read file as base64
+                                                const base64 = await FileSystem.readAsStringAsync(uri, {
+                                                    encoding: 'base64'
+                                                });
+
+                                                const arrayBuffer = decodeBase64(base64);
+
+                                                const { data: uploadData, error: uploadError } = await supabase.storage
+                                                    .from('reports')
+                                                    .upload(filePath, arrayBuffer, {
+                                                        contentType: contentType,
+                                                        upsert: true
+                                                    });
+
+                                                if (uploadError) throw uploadError;
+
+                                                const { data: { publicUrl } } = supabase.storage
+                                                    .from('reports')
+                                                    .getPublicUrl(filePath);
+
+                                                // Append extension to name if not present to help viewer
+                                                let finalName = reportName.trim();
+                                                if (isPdf && !finalName.toLowerCase().endsWith('.pdf')) {
+                                                    finalName += '.pdf';
+                                                }
+
+                                                await addReport(
+                                                    finalName,
+                                                    publicUrl,
+                                                    "Report saved for analysis."
+                                                );
+
+                                                setShowSaveModal(false);
+                                                navigate('reports');
+                                            } catch (error: any) {
+                                                Alert.alert('Upload Error', error.message);
+                                            } finally {
+                                                setLoading(false);
+                                            }
                                         }
                                     }}
+                                    disabled={loading}
                                 >
                                     <LinearGradient
                                         colors={['#0062FF', '#5C8EDF']}
                                         style={styles.confirmButtonGradient}
                                     >
-                                        <Text style={styles.confirmButtonText}>Save Now</Text>
+                                        <Text style={styles.confirmButtonText}>
+                                            {loading ? 'Uploading...' : 'Save Now'}
+                                        </Text>
                                     </LinearGradient>
                                 </TouchableOpacity>
                             </View>
+
                         </View>
                     </View>
                 </Modal>
@@ -332,11 +435,13 @@ const ScanReportScreen = () => {
                         <View style={styles.captureControls}>
                             <View style={styles.previewContainer}>
                                 {capturedImages.length > 0 && (
-                                    <View style={styles.thumbnailWrapper}>
-                                        <Image
-                                            source={{ uri: capturedImages[capturedImages.length - 1] }}
-                                            style={styles.thumbnail}
-                                        />
+                                    <View style={styles.previewContainer}>
+                                        <View style={styles.thumbnailWrapper}>
+                                            <Image
+                                                source={{ uri: capturedImages[capturedImages.length - 1] }}
+                                                style={styles.thumbnail}
+                                            />
+                                        </View>
                                         <View style={styles.countBadge}>
                                             <Text style={styles.countText}>{capturedImages.length}</Text>
                                         </View>
@@ -360,7 +465,7 @@ const ScanReportScreen = () => {
                                         onPress={() => setIsAnalysisMode(true)}
                                     >
                                         <LinearGradient
-                                            colors={['#4CAF50', '#2E7D32']}
+                                            colors={['#0062FF', '#5C8EDF']}
                                             style={styles.finishGradient}
                                         >
                                             <Text style={styles.finishText}>Finish</Text>
@@ -487,7 +592,6 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
         borderBottomLeftRadius: 50,
         borderBottomRightRadius: 50,
-        alignItems: 'center',
     },
     analysisTopIcons: {
         flexDirection: 'row',
@@ -514,16 +618,17 @@ const styles = StyleSheet.create({
         display: 'none',
     },
     capturedImageContainer: {
-        width: '78%',
-        height: 380,
+        width: width * 0.7,
+        height: width * 0.7 * 1.4, // A4 Aspect Ratio (approx 1:1.4)
         backgroundColor: '#FFFFFF',
-        borderRadius: 10,
+        borderRadius: 20,
         elevation: 10,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 5 },
         shadowOpacity: 0.3,
         shadowRadius: 10,
         overflow: 'hidden',
+        marginRight: 20,
     },
     capturedImage: {
         width: '100%',
@@ -590,12 +695,13 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
     },
     multiImageScroll: {
-        paddingHorizontal: (width - (width * 0.78)) / 2,
-        alignItems: 'center',
+        paddingHorizontal: (width - (width * 0.7)) / 2,
+        paddingTop: 10,
     },
     pageIndicator: {
         position: 'absolute',
         bottom: 15,
+        alignSelf: 'center',
         backgroundColor: 'rgba(0,0,0,0.5)',
         paddingHorizontal: 12,
         paddingVertical: 4,

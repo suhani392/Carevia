@@ -30,11 +30,18 @@ const DocumentView = () => {
     const [isLoading, setIsLoading] = React.useState(false);
     const [isBusy, setIsBusy] = React.useState(false);
 
+    const [currentPage, setCurrentPage] = React.useState(1);
+    const [totalPages, setTotalPages] = React.useState(1);
+
     const docName = screenParams?.docName || 'Document';
     const ownerName = screenParams?.ownerName || 'Suhani Badhe';
     const docUri = screenParams?.docUri;
 
-    const isPdf = docName.toLowerCase().endsWith('.pdf') || docUri?.toLowerCase().endsWith('.pdf');
+    React.useEffect(() => {
+        console.log('DocumentView - Incoming URI:', docUri);
+    }, [docUri]);
+
+    const isPdf = docName.toLowerCase().endsWith('.pdf') || (docUri && docUri.toLowerCase().split('?')[0].endsWith('.pdf'));
 
     const handleShare = async () => {
         if (!docUri || isBusy) return;
@@ -178,21 +185,33 @@ const DocumentView = () => {
                 title={ownerName}
             />
 
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                <Text style={styles.docTitle}>{docName}</Text>
-
-                <View style={[styles.imageContainer, isPdf && { padding: 0, height: 550, aspectRatio: undefined }]}>
-                    <View style={styles.imageWrapper}>
-                        {isPdf ? (
+            {isPdf ? (
+                <View style={styles.pdfContainer}>
+                    <Text style={styles.docTitle}>{docName}</Text>
+                    <View style={[styles.imageContainer, { flex: 1, aspectRatio: undefined }]}>
+                        <View style={[styles.imageWrapper, { height: '100%', borderRadius: 15 }]}>
+                            {isLoading && (
+                                <View style={styles.loadingContainer}>
+                                    <ActivityIndicator color="#0062FF" size="large" />
+                                </View>
+                            )}
                             <Pdf
                                 source={{ uri: docUri, cache: true }}
                                 style={styles.pdfViewer}
-                                onLoadProgress={(percent) => console.log('Loading...', percent)}
-                                onLoadComplete={(numberOfPages) => console.log(`Finished loading ${numberOfPages} pages`)}
-                                onPageChanged={(page, numberOfPages) => console.log(`Current page: ${page}`)}
-                                onError={(error) => {
+                                onLoadProgress={(percent) => console.log('PDF Loading...', percent)}
+                                onLoadComplete={(numberOfPages) => {
+                                    console.log(`Finished loading ${numberOfPages} pages`);
+                                    setTotalPages(numberOfPages);
+                                    setIsLoading(false);
+                                }}
+                                onPageChanged={(page) => {
+                                    console.log(`Current page: ${page}`);
+                                    setCurrentPage(page);
+                                }}
+                                onError={(error: any) => {
                                     console.error('PDF Error:', error);
-                                    Alert.alert('Error', 'Unable to display this PDF. It might be corrupted or protected.');
+                                    setIsLoading(false);
+                                    Alert.alert('PDF Error', error?.message || 'Unable to display this PDF.');
                                 }}
                                 trustAllCerts={false}
                                 renderActivityIndicator={() => (
@@ -201,44 +220,81 @@ const DocumentView = () => {
                                     </View>
                                 )}
                             />
-                        ) : (
+                        </View>
+                        <View style={styles.pageIndicator}>
+                            <Text style={styles.pageIndicatorText}>
+                                Page {currentPage}/{totalPages}
+                            </Text>
+                        </View>
+                    </View>
+                    <View style={styles.buttonRow}>
+                        <TouchableOpacity
+                            style={[styles.actionButton, isBusy && { opacity: 0.5 }]}
+                            onPress={handleShare}
+                            disabled={isBusy}
+                        >
+                            <ShareIcon color="#000000" size={22} />
+                            <Text style={styles.actionButtonText}>Share</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.actionButton, isBusy && { opacity: 0.5 }]}
+                            onPress={handleDownload}
+                            disabled={isBusy}
+                        >
+                            <DownloadIcon color="#000000" size={22} />
+                            <Text style={styles.actionButtonText}>Download</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            ) : (
+                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                    <Text style={styles.docTitle}>{docName}</Text>
+
+                    <View style={styles.imageContainer}>
+                        <View style={styles.imageWrapper}>
                             <Image
                                 source={{ uri: docUri || 'https://img.freepik.com/free-vector/medical-report-template_23-2148509372.jpg' }}
                                 style={styles.documentImage}
                                 resizeMode="contain"
+                                onLoadStart={() => setIsLoading(true)}
+                                onLoadEnd={() => setIsLoading(false)}
+                                onError={(e) => {
+                                    console.error('Image Error:', e.nativeEvent.error);
+                                    setIsLoading(false);
+                                }}
                             />
-                        )}
-                    </View>
+                        </View>
 
-                    {!isPdf && (
                         <View style={styles.pageIndicator}>
                             <Text style={styles.pageIndicatorText}>Page 1/1</Text>
                         </View>
-                    )}
-                </View>
+                    </View>
 
-                <View style={styles.buttonRow}>
-                    <TouchableOpacity
-                        style={[styles.actionButton, isBusy && { opacity: 0.5 }]}
-                        onPress={handleShare}
-                        disabled={isBusy}
-                    >
-                        <ShareIcon color="#000000" size={22} />
-                        <Text style={styles.actionButtonText}>Share</Text>
-                    </TouchableOpacity>
+                    <View style={styles.buttonRow}>
+                        <TouchableOpacity
+                            style={[styles.actionButton, isBusy && { opacity: 0.5 }]}
+                            onPress={handleShare}
+                            disabled={isBusy}
+                        >
+                            <ShareIcon color="#000000" size={22} />
+                            <Text style={styles.actionButtonText}>Share</Text>
+                        </TouchableOpacity>
 
-                    <TouchableOpacity
-                        style={[styles.actionButton, isBusy && { opacity: 0.5 }]}
-                        onPress={handleDownload}
-                        disabled={isBusy}
-                    >
-                        <DownloadIcon color="#000000" size={22} />
-                        <Text style={styles.actionButtonText}>Download</Text>
-                    </TouchableOpacity>
-                </View>
+                        <TouchableOpacity
+                            style={[styles.actionButton, isBusy && { opacity: 0.5 }]}
+                            onPress={handleDownload}
+                            disabled={isBusy}
+                        >
+                            <DownloadIcon color="#000000" size={22} />
+                            <Text style={styles.actionButtonText}>Download</Text>
+                        </TouchableOpacity>
+                    </View>
 
-                <View style={{ height: 40 }} />
-            </ScrollView>
+                    <View style={{ height: 40 }} />
+                </ScrollView>
+            )}
+
         </View>
     );
 };
@@ -328,7 +384,21 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: '#FFFFFF',
+        zIndex: 10,
+    },
+    pdfContainer: {
+        flex: 1,
+        paddingHorizontal: 25,
+        paddingTop: 30,
+        paddingBottom: 20,
+    },
+    pdfWrapper: {
+        flex: 1,
+        backgroundColor: '#F5F5F5',
+        borderRadius: 20,
+        overflow: 'hidden',
     },
 });
+
 
 export default DocumentView;

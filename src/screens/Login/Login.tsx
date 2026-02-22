@@ -1,12 +1,42 @@
-import React from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, Dimensions, Platform, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, Dimensions, Platform, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '../../context/NavigationContext';
+import { supabase } from '../../lib/supabase';
 
 const { width } = Dimensions.get('window');
 
 const Login = () => {
     const { navigate } = useNavigation();
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const handleLogin = async () => {
+        if (!email || !password) {
+            Alert.alert('Error', 'Please fill in all fields');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
+
+            if (error) throw error;
+
+            if (data.session) {
+                navigate('home');
+            }
+        } catch (error: any) {
+            Alert.alert('Login Error', error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <LinearGradient
             colors={['#0062FF', '#5C8EDF']}
@@ -15,7 +45,7 @@ const Login = () => {
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <View style={styles.header}>
                     <Text style={styles.title}>Login to your account</Text>
-                    <Text style={styles.subtitle}>Enter your credentials to access you account</Text>
+                    <Text style={styles.subtitle}>Enter your credentials to access your account</Text>
                 </View>
 
                 <View style={styles.form}>
@@ -25,6 +55,10 @@ const Login = () => {
                             style={styles.input}
                             placeholderTextColor="rgba(0,0,0,0.5)"
                             placeholder=""
+                            value={email}
+                            onChangeText={setEmail}
+                            autoCapitalize="none"
+                            keyboardType="email-address"
                         />
                     </View>
 
@@ -35,14 +69,21 @@ const Login = () => {
                             placeholderTextColor="rgba(0,0,0,0.5)"
                             secureTextEntry={true}
                             placeholder=""
+                            value={password}
+                            onChangeText={setPassword}
                         />
                     </View>
 
                     <TouchableOpacity
                         style={styles.loginBtn}
-                        onPress={() => navigate('home')}
+                        onPress={handleLogin}
+                        disabled={loading}
                     >
-                        <Text style={styles.loginBtnText}>Login</Text>
+                        {loading ? (
+                            <ActivityIndicator color="#000" />
+                        ) : (
+                            <Text style={styles.loginBtnText}>Login</Text>
+                        )}
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.forgotBtn}>
@@ -52,19 +93,10 @@ const Login = () => {
                     <View style={styles.dividerContainer}>
                         <View style={styles.divider} />
                     </View>
-
-                    <TouchableOpacity style={styles.googleBtn}>
-                        <Image
-                            source={require('../../assets/icons/login-signup/google.png')}
-                            style={styles.googleIcon}
-                            resizeMode="contain"
-                        />
-                        <Text style={styles.googleBtnText}>Login using Google</Text>
-                    </TouchableOpacity>
                 </View>
 
                 <View style={styles.footer}>
-                    <Text style={styles.footerText}>Don’t have an account?</Text>
+                    <Text style={styles.footerText}>Don't have an account?</Text>
                     <TouchableOpacity onPress={() => navigate('signup')}>
                         <Text style={styles.createBtnText}>Create new account</Text>
                     </TouchableOpacity>
@@ -80,7 +112,7 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         paddingHorizontal: 25,
-        paddingTop: Platform.OS === 'ios' ? 140 : 120, // Increased for vertical centering
+        paddingTop: Platform.OS === 'ios' ? 140 : 120,
         paddingBottom: 40,
         alignItems: 'center',
     },
@@ -145,7 +177,7 @@ const styles = StyleSheet.create({
         fontFamily: 'Judson-Bold',
     },
     forgotBtn: {
-        width: 330, // Aligns with the further increased input block width
+        width: 330,
         alignItems: 'flex-end',
         marginTop: -10,
         marginBottom: 20,
@@ -159,36 +191,17 @@ const styles = StyleSheet.create({
     dividerContainer: {
         width: 330,
         alignItems: 'center',
-        marginVertical: 40,
+        marginTop: 40,
+        marginBottom: 30,
     },
     divider: {
         width: 330,
         height: 1,
         backgroundColor: '#FFFFFF',
     },
-    googleBtn: {
-        width: 300,
-        height: 70,
-        backgroundColor: '#FFFFFF',
-        borderRadius: 100,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 40,
-    },
-    googleIcon: {
-        width: 30,
-        height: 30,
-        marginRight: 10,
-    },
-    googleBtnText: {
-        color: '#000000',
-        fontSize: 18,
-        fontFamily: 'Judson-Bold',
-    },
     footer: {
         alignItems: 'center',
-        marginTop: 20,
+        marginTop: 10,
     },
     footerText: {
         color: '#FFFFFF',
@@ -204,3 +217,4 @@ const styles = StyleSheet.create({
 });
 
 export default Login;
+

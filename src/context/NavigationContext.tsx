@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
+import { BackHandler } from 'react-native';
 
 export type ScreenName =
     | 'login'
@@ -19,7 +20,7 @@ export type ScreenName =
 interface NavigationContextType {
     currentScreen: ScreenName;
     screenParams: any;
-    navigate: (screen: ScreenName, params?: any) => void;
+    navigate: (screen: ScreenName, params?: any, reset?: boolean) => void;
     goBack: () => void;
 }
 
@@ -30,20 +31,42 @@ export const NavigationProvider = ({ children }: { children: ReactNode }) => {
     const [screenParams, setScreenParams] = useState<any>(null);
     const [history, setHistory] = useState<{ screen: ScreenName, params: any }[]>([]);
 
-    const navigate = (screen: ScreenName, params?: any) => {
-        setHistory(prev => [...prev, { screen: currentScreen, params: screenParams }]);
+    const navigate = useCallback((screen: ScreenName, params?: any, reset?: boolean) => {
+        if (reset || screen === 'home' || screen === 'login') {
+            setHistory([]);
+        } else {
+            setHistory(prev => [...prev, { screen: currentScreen, params: screenParams }]);
+        }
         setCurrentScreen(screen);
         setScreenParams(params || null);
-    };
+    }, [currentScreen, screenParams]);
 
-    const goBack = () => {
+    const goBack = useCallback(() => {
         if (history.length > 0) {
             const lastEntry = history[history.length - 1];
             setHistory(prev => prev.slice(0, -1));
             setCurrentScreen(lastEntry.screen);
             setScreenParams(lastEntry.params);
         }
-    };
+    }, [history]);
+
+
+    useEffect(() => {
+        const backAction = () => {
+            if (history.length > 0) {
+                goBack();
+                return true;
+            }
+            return false;
+        };
+
+        const backHandler = BackHandler.addEventListener(
+            'hardwareBackPress',
+            backAction
+        );
+
+        return () => backHandler.remove();
+    }, [history, goBack]);
 
     return (
         <NavigationContext.Provider value={{ currentScreen, screenParams, navigate, goBack }}>

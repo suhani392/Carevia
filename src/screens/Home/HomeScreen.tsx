@@ -67,13 +67,20 @@ const HomeScreen = () => {
                 {/* Family Updates Section */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Family Updates</Text>
-                    {updates.map((update, index) => (
-                        <View key={update.id} style={[styles.familyCard, index > 0 && { marginTop: 15 }]}>
-                            <Text style={styles.familyName}>{update.name === 'Me' ? 'You' : update.name}</Text>
-                            <Text style={styles.familyText}>{update.text}</Text>
+                    {updates.length > 0 ? (
+                        updates.map((update, index) => (
+                            <View key={update.id} style={[styles.familyCard, index > 0 && { marginTop: 15 }]}>
+                                <Text style={styles.familyName}>{update.name === 'Me' ? 'You' : update.name}</Text>
+                                <Text style={styles.familyText}>{update.text}</Text>
+                            </View>
+                        ))
+                    ) : (
+                        <View style={styles.emptyUpdatesCard}>
+                            <Text style={styles.emptyUpdatesText}>No recent family updates</Text>
                         </View>
-                    ))}
+                    )}
                 </View>
+
 
                 <View style={{ height: 120 }} />
             </ScrollView>
@@ -182,6 +189,21 @@ const styles = StyleSheet.create({
         color: '#000000',
         lineHeight: 20,
     },
+    emptyUpdatesCard: {
+        backgroundColor: '#F5F9FF',
+        borderRadius: 20,
+        padding: 25,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E1EEFF',
+        borderStyle: 'dashed',
+    },
+    emptyUpdatesText: {
+        fontFamily: 'Judson-Regular',
+        fontSize: 15,
+        color: 'rgba(0,0,0,0.5)',
+    },
 });
+
 
 export default HomeScreen;

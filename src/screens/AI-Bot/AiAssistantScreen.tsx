@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Platform, Dimensions, Pressable, KeyboardAvoidingView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '../../context/NavigationContext';
+import { useAppContext } from '../../context/AppContext';
+import { supabase } from '../../lib/supabase';
 import { MenuIcon, CrossIcon, AttachIcon, SendIcon, LinkIcon } from './Icons';
 import Menu from '../../components/navigation/menu-drawer/menu';
 import AppStatusBar from '../../components/status-bar/status-bar';
@@ -10,30 +12,52 @@ const { width, height } = Dimensions.get('window');
 
 const AiAssistantScreen = () => {
     const { navigate } = useNavigation();
+    const { reports, documents } = useAppContext();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [inputText, setInputText] = useState('');
     const [isAttachmentMenuOpen, setIsAttachmentMenuOpen] = useState(false);
     const [selectedAttachment, setSelectedAttachment] = useState<string | null>(null);
+    const [profile, setProfile] = useState<any>(null);
 
     // Mock messages
     const [messages, setMessages] = useState([
-        { id: 1, type: 'bot', text: 'Hello! I am your AI Assistant. How can I help you today?' },
-        { id: 2, type: 'user', text: 'Can you analyze my blood report?' },
-        { id: 3, type: 'bot', text: 'Sure! Please link the report you want me to analyze.' },
-        { id: 4, type: 'user', text: 'I have linked it below.' },
-        { id: 5, type: 'bot', text: 'Thank you. Let me take a look at it.' },
+        { id: 1, type: 'bot', text: `Hello! I am your AI Assistant. How can I help you today?` },
     ]);
+
+    useEffect(() => {
+        fetchProfile();
+    }, []);
+
+    const fetchProfile = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            const { data } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
+            if (data) {
+                setProfile(data);
+                setMessages([{ id: 1, type: 'bot', text: `Hello ${data.full_name}! I am your AI Assistant. How can I help you today?` }]);
+            }
+        }
+    };
 
     const handleSend = () => {
         if (inputText.trim() || selectedAttachment) {
             const newMessage = {
                 id: messages.length + 1,
                 type: 'user',
-                text: inputText.trim(),
+                text: selectedAttachment ? `[Linked: ${selectedAttachment}] ${inputText.trim()}` : inputText.trim(),
             };
             setMessages([...messages, newMessage]);
             setInputText('');
             setSelectedAttachment(null);
+
+            // Mock bot response
+            setTimeout(() => {
+                setMessages(prev => [...prev, {
+                    id: prev.length + 1,
+                    type: 'bot',
+                    text: selectedAttachment ? "I've received the file. Let me analyze it for you..." : "I'm processing your request."
+                }]);
+            }, 1000);
         }
     };
 
@@ -41,14 +65,11 @@ const AiAssistantScreen = () => {
         setIsAttachmentMenuOpen(!isAttachmentMenuOpen);
     };
 
-    const handleSelectAttachment = (type: string) => {
-        if (type === 'report') {
-            setSelectedAttachment('Blood Report 26 Jan 2026');
-        } else {
-            setSelectedAttachment('Health Certificate.pdf');
-        }
+    const handleSelectAttachment = (name: string) => {
+        setSelectedAttachment(name);
         setIsAttachmentMenuOpen(false);
     };
+
 
     return (
         <View style={styles.container}>
@@ -72,7 +93,7 @@ const AiAssistantScreen = () => {
 
                         <View style={styles.titleContainer}>
                             <Text style={styles.title}>Your AI Assistant</Text>
-                            <Text style={styles.date}>Wednesday, 28 January</Text>
+                            <Text style={styles.date}>{new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
                         </View>
 
                         <TouchableOpacity
@@ -149,19 +170,30 @@ const AiAssistantScreen = () => {
                 <View style={styles.attachmentOverlay}>
                     <Pressable style={styles.overlayPressable} onPress={() => setIsAttachmentMenuOpen(false)} />
                     <View style={styles.attachmentPopup}>
-                        <TouchableOpacity
-                            style={styles.attachmentOption}
-                            onPress={() => handleSelectAttachment('report')}
-                        >
-                            <Text style={styles.attachmentOptionText}>Link previous report</Text>
-                        </TouchableOpacity>
-                        <View style={styles.attachmentDivider} />
-                        <TouchableOpacity
-                            style={styles.attachmentOption}
-                            onPress={() => handleSelectAttachment('document')}
-                        >
-                            <Text style={styles.attachmentOptionText}>Link my document</Text>
-                        </TouchableOpacity>
+                        <Text style={styles.attachmentPopupTitle}>Link a File</Text>
+                        <ScrollView style={{ maxHeight: 200 }}>
+                            {reports.length === 0 && documents.length === 0 && (
+                                <Text style={styles.noAttachmentsText}>No files found to link</Text>
+                            )}
+                            {reports.map((report) => (
+                                <TouchableOpacity
+                                    key={`report-${report.id}`}
+                                    style={styles.attachmentOption}
+                                    onPress={() => handleSelectAttachment(report.name)}
+                                >
+                                    <Text style={styles.attachmentOptionText}>{report.name} (Report)</Text>
+                                </TouchableOpacity>
+                            ))}
+                            {documents.map((doc) => (
+                                <TouchableOpacity
+                                    key={`doc-${doc.id}`}
+                                    style={styles.attachmentOption}
+                                    onPress={() => handleSelectAttachment(doc.name)}
+                                >
+                                    <Text style={styles.attachmentOptionText}>{doc.name} (Document)</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
                     </View>
                 </View>
             )}
@@ -315,7 +347,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.1)',
     },
     attachmentPopup: {
-        width: width * 0.8,
+        width: width * 0.85,
         backgroundColor: '#FFFFFF',
         borderRadius: 20,
         marginBottom: 100, // Position above input bar
@@ -324,23 +356,34 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 5,
         elevation: 5,
-        paddingVertical: 10,
+        paddingVertical: 15,
+    },
+    attachmentPopupTitle: {
+        fontFamily: 'Judson-Bold',
+        fontSize: 18,
+        color: '#0062FF',
+        textAlign: 'center',
+        marginBottom: 10,
+    },
+    noAttachmentsText: {
+        fontFamily: 'Judson-Regular',
+        fontSize: 14,
+        color: '#999',
+        textAlign: 'center',
+        paddingVertical: 20,
     },
     attachmentOption: {
-        paddingVertical: 15,
+        paddingVertical: 12,
         paddingHorizontal: 20,
-        alignItems: 'center',
+        borderBottomWidth: 0.5,
+        borderBottomColor: 'rgba(0,0,0,0.05)',
     },
     attachmentOptionText: {
         fontFamily: 'Judson-Regular',
-        fontSize: 16,
+        fontSize: 15,
         color: '#000000',
     },
-    attachmentDivider: {
-        height: 1,
-        backgroundColor: 'rgba(0,0,0,0.1)',
-        marginHorizontal: 20,
-    },
 });
+
 
 export default AiAssistantScreen;

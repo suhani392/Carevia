@@ -1,26 +1,97 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, Dimensions, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, Dimensions, Platform, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from '../../context/NavigationContext';
+import { supabase } from '../../lib/supabase';
 
 const { width } = Dimensions.get('window');
 
 const SignUp = () => {
     const { navigate } = useNavigation();
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [phone, setPhone] = useState('');
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [dob, setDob] = useState(new Date());
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [dobText, setDobText] = useState('');
+    const [loading, setLoading] = useState(false);
 
     const onDateChange = (event: any, selectedDate?: Date) => {
         const currentDate = selectedDate || dob;
         setShowDatePicker(Platform.OS === 'ios');
         setDob(currentDate);
 
-        let tempDate = new Date(currentDate);
-        let fDate = tempDate.getDate() + '/' + (tempDate.getMonth() + 1) + '/' + tempDate.getFullYear();
-        setDobText(fDate);
+        // Display format for UI
+        let displayDate = currentDate.getDate() + '/' + (currentDate.getMonth() + 1) + '/' + currentDate.getFullYear();
+        setDobText(displayDate);
     };
+
+    const handleSignUp = async () => {
+        if (!email || !password || !name || !dobText || !phone) {
+            Alert.alert('Error', 'Please fill in all fields');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            Alert.alert('Error', 'Passwords do not match');
+            return;
+        }
+
+        setLoading(true);
+
+        try {
+            // 1. Sign up the user
+            const { data, error: signUpError } = await supabase.auth.signUp({
+                email,
+                password,
+            });
+
+            if (signUpError) {
+                // Check if user already exists
+                if (signUpError.message.includes('already registered')) {
+                    Alert.alert('Note', 'This email is already registered. Try logging in.');
+                    navigate('login');
+                    return;
+                }
+                throw signUpError;
+            }
+
+            if (data.user) {
+                // 2. Format date for Postgres (YYYY-MM-DD)
+                const pgDate = dob.toISOString().split('T')[0];
+
+                // 3. Insert profile row
+                const { error: profileError } = await supabase
+                    .from('profiles')
+                    .upsert({ // Using upsert in case the record exists
+                        id: data.user.id,
+                        full_name: name,
+                        dob: pgDate,
+                        phone: phone,
+                    });
+
+                if (profileError) throw profileError;
+
+                Alert.alert('Success', 'Account created successfully!');
+
+                // If email confirmation is off, we might already have a session
+                if (data.session) {
+                    navigate('home');
+                } else {
+                    navigate('login');
+                }
+            }
+        } catch (error: any) {
+            Alert.alert('Error', error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+
     return (
         <LinearGradient
             colors={['#0062FF', '#5C8EDF']}
@@ -39,6 +110,8 @@ const SignUp = () => {
                             style={styles.input}
                             placeholderTextColor="rgba(0,0,0,0.5)"
                             placeholder=""
+                            value={name}
+                            onChangeText={setName}
                         />
                     </View>
 
@@ -49,6 +122,9 @@ const SignUp = () => {
                             placeholderTextColor="rgba(0,0,0,0.5)"
                             keyboardType="email-address"
                             placeholder=""
+                            autoCapitalize="none"
+                            value={email}
+                            onChangeText={setEmail}
                         />
                     </View>
 
@@ -68,7 +144,7 @@ const SignUp = () => {
                                 mode="date"
                                 display="default"
                                 onChange={onDateChange}
-                                maximumDate={new Date()} // DOB cannot be in future
+                                maximumDate={new Date()}
                             />
                         )}
                     </View>
@@ -80,6 +156,8 @@ const SignUp = () => {
                             placeholderTextColor="rgba(0,0,0,0.5)"
                             keyboardType="phone-pad"
                             placeholder=""
+                            value={phone}
+                            onChangeText={setPhone}
                         />
                     </View>
 
@@ -90,6 +168,8 @@ const SignUp = () => {
                             placeholderTextColor="rgba(0,0,0,0.5)"
                             secureTextEntry={true}
                             placeholder=""
+                            value={password}
+                            onChangeText={setPassword}
                         />
                     </View>
 
@@ -100,28 +180,26 @@ const SignUp = () => {
                             placeholderTextColor="rgba(0,0,0,0.5)"
                             secureTextEntry={true}
                             placeholder=""
+                            value={confirmPassword}
+                            onChangeText={setConfirmPassword}
                         />
                     </View>
 
                     <TouchableOpacity
                         style={styles.signUpBtn}
-                        onPress={() => navigate('home')}
+                        onPress={handleSignUp}
+                        disabled={loading}
                     >
-                        <Text style={styles.signUpBtnText}>Sign Up</Text>
+                        {loading ? (
+                            <ActivityIndicator color="#000" />
+                        ) : (
+                            <Text style={styles.signUpBtnText}>Sign Up</Text>
+                        )}
                     </TouchableOpacity>
 
                     <View style={styles.dividerContainer}>
                         <View style={styles.divider} />
                     </View>
-
-                    <TouchableOpacity style={styles.googleBtn}>
-                        <Image
-                            source={require('../../assets/icons/login-signup/google.png')}
-                            style={styles.googleIcon}
-                            resizeMode="contain"
-                        />
-                        <Text style={styles.googleBtnText}>Sign Up using Google</Text>
-                    </TouchableOpacity>
                 </View>
 
                 <View style={styles.footer}>
@@ -189,7 +267,7 @@ const styles = StyleSheet.create({
         color: '#000000',
         borderWidth: 1,
         borderColor: '#FFFFFF',
-        justifyContent: 'center', // Added for date text centering
+        justifyContent: 'center',
     },
     dateText: {
         fontSize: 16,
@@ -214,36 +292,17 @@ const styles = StyleSheet.create({
     dividerContainer: {
         width: 330,
         alignItems: 'center',
-        marginVertical: 30,
+        marginTop: 30,
+        marginBottom: 20,
     },
     divider: {
         width: 330,
         height: 1,
         backgroundColor: '#FFFFFF',
     },
-    googleBtn: {
-        width: 300,
-        height: 70,
-        backgroundColor: '#FFFFFF',
-        borderRadius: 100,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 30,
-    },
-    googleIcon: {
-        width: 30,
-        height: 30,
-        marginRight: 10,
-    },
-    googleBtnText: {
-        color: '#000000',
-        fontSize: 18,
-        fontFamily: 'Judson-Bold',
-    },
     footer: {
         alignItems: 'center',
-        marginTop: 10,
+        marginTop: 5,
     },
     footerText: {
         color: '#FFFFFF',
@@ -259,3 +318,4 @@ const styles = StyleSheet.create({
 });
 
 export default SignUp;
+
