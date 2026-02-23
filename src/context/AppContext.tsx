@@ -32,11 +32,22 @@ export interface FamilyMember {
     email?: string;
 }
 
+export interface Invitation {
+    id: string;
+    sender_id: string;
+    family_id: string;
+    receiver_email: string;
+    status: 'pending' | 'accepted' | 'rejected';
+    created_at: string;
+    sender_name?: string;
+}
+
 interface AppContextType {
     updates: Update[];
     reports: Report[];
     documents: Document[];
     familyMembers: FamilyMember[];
+    invitations: Invitation[];
     userProfile: any | null;
     loading: boolean;
     refreshData: () => Promise<void>;
@@ -48,6 +59,8 @@ interface AppContextType {
     updateDocument: (id: string, name: string) => Promise<void>;
     deleteDocument: (id: string) => Promise<void>;
     sendInvitation: (email: string) => Promise<void>;
+    acceptInvitation: (invitationId: string) => Promise<void>;
+    rejectInvitation: (invitationId: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -57,6 +70,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const [reports, setReports] = useState<Report[]>([]);
     const [documents, setDocuments] = useState<Document[]>([]);
     const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
+    const [invitations, setInvitations] = useState<Invitation[]>([]);
     const [userProfile, setUserProfile] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -140,31 +154,36 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 setFamilyMembers([]);
             }
 
-            // Check for pending invitations for this user (by email)
+            // Fetch pending invitations for this user (by email)
             if (user.email) {
-                const { data: invite } = await supabase
+                const { data: invitationsData } = await supabase
                     .from('invitations')
                     .select('*')
                     .eq('receiver_email', user.email)
-                    .eq('status', 'pending')
-                    .single();
+                    .eq('status', 'pending');
 
-                if (invite) {
-                    // Automatically accept or could prompt - for now, we accept to demonstrate flow
-                    await supabase.from('profiles').update({ family_id: invite.family_id }).eq('id', user.id);
-                    await supabase.from('invitations').update({ status: 'accepted' }).eq('id', invite.id);
+                if (invitationsData) {
+                    // Fetch sender names separately to be more robust
+                    const invitesWithNames = await Promise.all(invitationsData.map(async (inv) => {
+                        const { data: profile } = await supabase
+                            .from('profiles')
+                            .select('full_name')
+                            .eq('id', inv.sender_id)
+                            .single();
 
-                    // Add as a family member record if not already there
-                    await supabase.from('family_members').insert({
-                        user_id: user.id,
-                        family_id: invite.family_id,
-                        name: profile?.full_name || user.email.split('@')[0],
-                        email: user.email,
-                        image: `https://avatar.iran.liara.run/public/${Math.floor(Math.random() * 100)}`
-                    });
-
-                    // Re-fetch family data
-                    fetchInitialData();
+                        return {
+                            id: inv.id,
+                            sender_id: inv.sender_id,
+                            family_id: inv.family_id,
+                            receiver_email: inv.receiver_email,
+                            status: inv.status,
+                            created_at: inv.created_at,
+                            sender_name: profile?.full_name || 'Someone'
+                        };
+                    }));
+                    setInvitations(invitesWithNames);
+                } else {
+                    setInvitations([]);
                 }
             }
         } catch (error) {
@@ -185,6 +204,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 setDocuments([]);
                 setUpdates([]);
                 setFamilyMembers([]);
+                setInvitations([]);
             }
         });
 
@@ -368,12 +388,62 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
+    const acceptInvitation = async (invitationId: string) => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const invite = invitations.find(i => i.id === invitationId);
+            if (!invite) return;
+
+            // 1. Update user profile with family_id
+            await supabase.from('profiles').update({ family_id: invite.family_id }).eq('id', user.id);
+
+            // 2. Update invitation status
+            await supabase.from('invitations').update({ status: 'accepted' }).eq('id', invitationId);
+
+            // 3. Add as/update family member record
+            const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+
+            await supabase.from('family_members').upsert({
+                user_id: user.id,
+                family_id: invite.family_id,
+                name: profile?.full_name || user.email?.split('@')[0] || 'User',
+                email: user.email,
+                image: profile?.avatar_url || `https://avatar.iran.liara.run/public/${Math.floor(Math.random() * 100)}`
+            });
+
+            setInvitations(prev => prev.filter(i => i.id !== invitationId));
+            await fetchInitialData();
+            await addUpdate("Me", `You joined a new family!`);
+        } catch (error) {
+            console.error('Error accepting invitation:', error);
+            throw error;
+        }
+    };
+
+    const rejectInvitation = async (invitationId: string) => {
+        try {
+            const { error } = await supabase
+                .from('invitations')
+                .update({ status: 'rejected' })
+                .eq('id', invitationId);
+
+            if (error) throw error;
+            setInvitations(prev => prev.filter(i => i.id !== invitationId));
+        } catch (error) {
+            console.error('Error rejecting invitation:', error);
+            throw error;
+        }
+    };
+
     return (
         <AppContext.Provider value={{
             updates,
             reports,
             documents,
             familyMembers,
+            invitations,
             loading,
             userProfile, // Added userProfile to the context value
             refreshData: fetchInitialData,
@@ -384,7 +454,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             deleteReport,
             updateDocument,
             deleteDocument,
-            sendInvitation
+            sendInvitation,
+            acceptInvitation,
+            rejectInvitation
         }}>
             {children}
         </AppContext.Provider>

@@ -14,7 +14,7 @@ const FamilyScreen = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [memberEmail, setMemberEmail] = useState('');
     const { navigate } = useNavigation();
-    const { familyMembers, sendInvitation } = useAppContext();
+    const { familyMembers, invitations, sendInvitation, acceptInvitation, rejectInvitation } = useAppContext();
 
     const handleSendInvitation = async () => {
         if (!memberEmail.trim()) return;
@@ -42,6 +42,48 @@ const FamilyScreen = () => {
                 showsVerticalScrollIndicator={false}
             >
                 <HomeHeader onMenuPress={() => setIsMenuOpen(true)} showActionRow={false} />
+
+                <View style={[styles.section, { marginBottom: 10 }]}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Family Invites</Text>
+                    </View>
+
+                    {invitations.length > 0 ? (
+                        <View style={styles.invitesContainer}>
+                            {invitations.map((invite) => (
+                                <View key={invite.id} style={styles.inviteCard}>
+                                    <View style={styles.inviteInfo}>
+                                        <Text style={styles.inviteSender}>{invite.sender_name}</Text>
+                                        <Text style={styles.inviteText}>invited you to join their family group</Text>
+                                    </View>
+                                    <View style={styles.inviteActions}>
+                                        <TouchableOpacity
+                                            style={styles.rejectButton}
+                                            onPress={() => rejectInvitation(invite.id)}
+                                        >
+                                            <Text style={styles.rejectButtonText}>Reject</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={styles.acceptButton}
+                                            onPress={() => acceptInvitation(invite.id)}
+                                        >
+                                            <LinearGradient
+                                                colors={['#0062FF', '#5C8EDF']}
+                                                style={styles.acceptButtonGradient}
+                                            >
+                                                <Text style={styles.acceptButtonText}>Accept</Text>
+                                            </LinearGradient>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            ))}
+                        </View>
+                    ) : (
+                        <View style={styles.emptyInvitesCard}>
+                            <Text style={styles.emptyInvitesText}>No pending family invitations</Text>
+                        </View>
+                    )}
+                </View>
 
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
@@ -306,7 +348,87 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontFamily: 'Judson-Bold',
         fontSize: 16,
-    }
+    },
+    // Invites Styles
+    invitesContainer: {
+        paddingHorizontal: 10,
+    },
+    inviteCard: {
+        backgroundColor: '#F5F9FF',
+        borderRadius: 20,
+        padding: 16,
+        marginBottom: 15,
+        borderWidth: 1,
+        borderColor: '#E6F0FF',
+        elevation: 1,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 5,
+    },
+    inviteInfo: {
+        marginBottom: 15,
+    },
+    inviteSender: {
+        fontFamily: 'Judson-Bold',
+        fontSize: 18,
+        color: '#0062FF',
+    },
+    inviteText: {
+        fontFamily: 'Judson-Regular',
+        fontSize: 14,
+        color: '#666666',
+        marginTop: 2,
+    },
+    inviteActions: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+    },
+    acceptButton: {
+        width: 100,
+        height: 38,
+    },
+    acceptButtonGradient: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 19,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    acceptButtonText: {
+        fontFamily: 'Judson-Bold',
+        fontSize: 14,
+        color: '#FFFFFF',
+    },
+    rejectButton: {
+        width: 100,
+        height: 38,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 10,
+        borderRadius: 19,
+        backgroundColor: '#F0F0F0',
+    },
+    rejectButtonText: {
+        fontFamily: 'Judson-Bold',
+        fontSize: 14,
+        color: '#666666',
+    },
+    emptyInvitesCard: {
+        backgroundColor: '#F9FBFF',
+        borderRadius: 20,
+        padding: 20,
+        marginHorizontal: 10,
+        borderWidth: 1,
+        borderColor: '#E6F0FF',
+        borderStyle: 'dashed',
+        alignItems: 'center',
+    },
+    emptyInvitesText: {
+        fontFamily: 'Judson-Regular',
+        fontSize: 14,
+        color: '#999999',
+    },
 });
 
 

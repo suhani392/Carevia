@@ -49,7 +49,27 @@ const DocumentView = () => {
         try {
             const isAvailable = await Sharing.isAvailableAsync();
             if (isAvailable) {
-                await Sharing.shareAsync(docUri);
+                let localUri = docUri;
+
+                // For remote URLs or base64, we must have a local file to share on Android
+                if (docUri.startsWith('data:') || docUri.startsWith('http')) {
+                    const extension = isPdf ? '.pdf' : '.jpg';
+                    const tempUri = `${FileSystem.cacheDirectory}share_${Date.now()}${extension}`;
+
+                    if (docUri.startsWith('data:')) {
+                        const [, base64Data] = docUri.split(';base64,');
+                        await FileSystem.writeAsStringAsync(tempUri, base64Data, {
+                            encoding: FileSystem.EncodingType.Base64,
+                        });
+                        localUri = tempUri;
+                    } else {
+                        const downloadResult = await FileSystem.downloadAsync(docUri, tempUri);
+                        if (downloadResult.status !== 200) throw new Error('Download failed');
+                        localUri = downloadResult.uri;
+                    }
+                }
+
+                await Sharing.shareAsync(localUri);
             } else {
                 Alert.alert('Error', 'Sharing is not available on this device');
             }
@@ -84,15 +104,23 @@ const DocumentView = () => {
                             if (status === 'granted') {
                                 let finalUri = docUri;
 
-                                // If it's a base64 string, we must save it to a temporary file first
-                                if (docUri.startsWith('data:')) {
-                                    const [, base64Data] = docUri.split(';base64,');
+                                // For remote URLs or base64, we must download to a temporary file first
+                                // as MediaLibrary.createAssetAsync requires a local URI
+                                if (docUri.startsWith('data:') || docUri.startsWith('http')) {
                                     const extension = isPdf ? '.pdf' : '.jpg';
-                                    const tempUri = `${FileSystem.cacheDirectory}${Date.now()}${extension}`;
-                                    await FileSystem.writeAsStringAsync(tempUri, base64Data, {
-                                        encoding: FileSystem.EncodingType.Base64,
-                                    });
-                                    finalUri = tempUri;
+                                    const tempUri = `${FileSystem.cacheDirectory}download_${Date.now()}${extension}`;
+
+                                    if (docUri.startsWith('data:')) {
+                                        const [, base64Data] = docUri.split(';base64,');
+                                        await FileSystem.writeAsStringAsync(tempUri, base64Data, {
+                                            encoding: FileSystem.EncodingType.Base64,
+                                        });
+                                        finalUri = tempUri;
+                                    } else {
+                                        const downloadResult = await FileSystem.downloadAsync(docUri, tempUri);
+                                        if (downloadResult.status !== 200) throw new Error('Download failed');
+                                        finalUri = downloadResult.uri;
+                                    }
                                 }
 
                                 if (isPdf) {
