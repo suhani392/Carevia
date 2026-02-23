@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Text, Image, Dimensions, TouchableOpacity, Modal, TextInput, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, Text, Image, Dimensions, TouchableOpacity, Modal, TextInput, Alert, RefreshControl } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import HomeHeader from '../Home/HomeHeader';
 import AppStatusBar from '../../components/status-bar/status-bar';
@@ -13,8 +13,26 @@ const FamilyScreen = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
     const [memberEmail, setMemberEmail] = useState('');
+    const [refreshing, setRefreshing] = useState(false);
+
     const { navigate } = useNavigation();
-    const { familyMembers, invitations, sendInvitation, acceptInvitation, rejectInvitation } = useAppContext();
+    const {
+        familyMembers,
+        invitations,
+        sendInvitation,
+        acceptInvitation,
+        rejectInvitation,
+        refreshData,
+        loading,
+        userEmail,
+        invitationError
+    } = useAppContext();
+
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await refreshData();
+        setRefreshing(false);
+    };
 
     const handleSendInvitation = async () => {
         if (!memberEmail.trim()) return;
@@ -29,8 +47,6 @@ const FamilyScreen = () => {
         }
     };
 
-
-
     return (
         <View style={styles.container}>
             <AppStatusBar />
@@ -40,6 +56,9 @@ const FamilyScreen = () => {
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0062FF']} />
+                }
             >
                 <HomeHeader onMenuPress={() => setIsMenuOpen(true)} showActionRow={false} />
 
@@ -80,7 +99,15 @@ const FamilyScreen = () => {
                         </View>
                     ) : (
                         <View style={styles.emptyInvitesCard}>
-                            <Text style={styles.emptyInvitesText}>No pending family invitations</Text>
+                            <Text style={styles.emptyInvitesText}>
+                                {invitationError ? "Database Permission Issue" : "No pending family invitations"}
+                            </Text>
+                            {invitationError && (
+                                <Text style={[styles.debugEmailText, { color: '#FF4C4C', textAlign: 'center' }]}>
+                                    Your Supabase RLS policy might be blocking this. Please check your "invitations" table permissions.
+                                </Text>
+                            )}
+                            <Text style={styles.debugEmailText}>Checking for: {userEmail || 'your email'}</Text>
                         </View>
                     )}
                 </View>
@@ -100,34 +127,46 @@ const FamilyScreen = () => {
                     <View style={styles.memberGrid}>
                         {familyMembers.length > 0 ? (
                             familyMembers.map((member, index) => (
-                                <TouchableOpacity
-                                    key={index}
-                                    style={styles.memberCard}
-                                    onPress={() => navigate('documents', { name: member.name })}
-                                >
-                                    <Image source={{ uri: member.image }} style={styles.memberAvatar} />
-                                    <Text style={styles.memberName}>{member.name}</Text>
-                                </TouchableOpacity>
+                                <View key={index} style={styles.memberCard}>
+                                    <View style={styles.memberInfoRow}>
+                                        <Image source={{ uri: member.image }} style={styles.memberAvatar} />
+                                        <View style={styles.memberMeta}>
+                                            <Text style={styles.memberName}>{member.name}</Text>
+                                            <Text style={styles.memberEmail}>{member.email || 'Family Member'}</Text>
+                                        </View>
+                                    </View>
+                                    <View style={styles.memberActions}>
+                                        <TouchableOpacity
+                                            style={styles.actionSubButton}
+                                            onPress={() => navigate('reports', { name: member.name, memberId: member.id })}
+                                        >
+                                            <Text style={styles.actionSubButtonText}>Reports</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={styles.actionSubButton}
+                                            onPress={() => navigate('documents', { name: member.name, memberId: member.id })}
+                                        >
+                                            <Text style={styles.actionSubButtonText}>Documents</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
                             ))
                         ) : (
                             <View style={styles.emptyMembersContainer}>
-                                <Text style={styles.emptyMembersText}>You haven’t added any family members yet.</Text>
+                                <Text style={styles.emptyText}>You haven’t added any family members yet.</Text>
                                 <TouchableOpacity
-                                    style={styles.emptyMembersButton}
+                                    style={styles.emptyAddButton}
                                     onPress={() => setShowAddModal(true)}
                                 >
-                                    <Text style={styles.emptyMembersButtonText}>+ Add Member</Text>
+                                    <Text style={styles.emptyAddButtonText}>+ Add Member</Text>
                                 </TouchableOpacity>
                             </View>
                         )}
                     </View>
-
                 </View>
-
-                <View style={{ height: 120 }} />
+                <View style={{ height: 100 }} />
             </ScrollView>
 
-            {/* Add Member Modal */}
             <Modal
                 visible={showAddModal}
                 transparent={true}
@@ -137,26 +176,23 @@ const FamilyScreen = () => {
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <Text style={styles.modalTitle}>Add Family Member</Text>
-                        <Text style={styles.modalSubtitle}>Enter the email address of the person you'd like to invite to your family group.</Text>
+                        <Text style={styles.modalSubtitle}>Enter their email address to send a family invitation.</Text>
 
                         <TextInput
                             style={styles.modalInput}
-                            placeholder="member@example.com"
+                            placeholder="Email Address"
                             placeholderTextColor="#999"
                             value={memberEmail}
                             onChangeText={setMemberEmail}
-                            autoFocus={true}
                             keyboardType="email-address"
                             autoCapitalize="none"
+                            autoFocus={true}
                         />
 
                         <View style={styles.modalButtons}>
                             <TouchableOpacity
                                 style={styles.cancelButton}
-                                onPress={() => {
-                                    setShowAddModal(false);
-                                    setMemberEmail('');
-                                }}
+                                onPress={() => setShowAddModal(false)}
                             >
                                 <Text style={styles.cancelButtonText}>Cancel</Text>
                             </TouchableOpacity>
@@ -192,15 +228,14 @@ const styles = StyleSheet.create({
         paddingBottom: 20,
     },
     section: {
-        paddingHorizontal: 15, // Slightly less padding to fit 177px cards
-        marginTop: 30,
+        paddingHorizontal: 25,
+        marginTop: 20,
     },
     sectionHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 20,
-        paddingHorizontal: 10,
+        marginBottom: 15,
     },
     sectionTitle: {
         fontFamily: 'Judson-Bold',
@@ -211,147 +246,101 @@ const styles = StyleSheet.create({
         backgroundColor: '#0062FF',
         paddingHorizontal: 15,
         paddingVertical: 8,
-        borderRadius: 25,
-        elevation: 2,
-    },
-    addMemberText: {
-        color: '#FFFFFF',
-        fontFamily: 'Judson-Bold',
-        fontSize: 14,
-    },
-    memberGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-evenly', // Balanced spacing
-    },
-    memberCard: {
-        width: 170,
-        height: 127,
-        backgroundColor: '#D9E8FF',
-        borderRadius: 15,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    memberAvatar: {
-        width: 70,
-        height: 70,
-        borderRadius: 35,
-        marginBottom: 8,
-        backgroundColor: '#FFFFFF',
-    },
-    memberName: {
-        fontFamily: 'Judson-Regular',
-        fontSize: 15,
-        color: '#000000',
-        textAlign: 'center',
-    },
-    // Modal Styles
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 25,
-    },
-    modalContent: {
-        width: '100%',
-        backgroundColor: '#FFFFFF',
-        borderRadius: 25,
-        padding: 25,
-        alignItems: 'center',
-        elevation: 15,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.25,
-        shadowRadius: 10,
-    },
-    modalTitle: {
-        fontFamily: 'Judson-Bold',
-        fontSize: 22,
-        color: '#000000',
-        marginBottom: 10,
-    },
-    modalSubtitle: {
-        fontFamily: 'Judson-Regular',
-        fontSize: 15,
-        color: '#666666',
-        textAlign: 'center',
-        marginBottom: 20,
-    },
-    modalInput: {
-        width: '100%',
-        height: 55,
-        backgroundColor: '#F5F9FF',
-        borderRadius: 15,
-        borderWidth: 1,
-        borderColor: '#0062FF',
-        paddingHorizontal: 15,
-        fontFamily: 'Judson-Regular',
-        fontSize: 16,
-        color: '#333333',
-        marginBottom: 25,
-    },
-    modalButtons: {
-        flexDirection: 'row',
-        width: '100%',
-        justifyContent: 'space-between',
-    },
-    cancelButton: {
-        flex: 1,
-        height: 50,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 10,
-    },
-    cancelButtonText: {
-        fontFamily: 'Judson-Bold',
-        fontSize: 16,
-        color: '#666666',
-    },
-    confirmButton: {
-        flex: 1.5,
-        height: 50,
-    },
-    confirmButtonGradient: {
-        width: '100%',
-        height: '100%',
-        borderRadius: 15,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    confirmButtonText: {
-        fontFamily: 'Judson-Bold',
-        fontSize: 16,
-        color: '#FFFFFF',
-    },
-    emptyMembersContainer: {
-        flex: 1,
-        padding: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    emptyMembersText: {
-        fontFamily: 'Judson-Regular',
-        fontSize: 16,
-        color: '#666666',
-        textAlign: 'center',
-        marginBottom: 20,
-    },
-    emptyMembersButton: {
-        backgroundColor: '#0062FF',
-        paddingHorizontal: 20,
-        paddingVertical: 10,
         borderRadius: 20,
     },
-    emptyMembersButtonText: {
+    addMemberText: {
+        fontFamily: 'Judson-Bold',
+        fontSize: 14,
         color: '#FFFFFF',
+    },
+    memberGrid: {
+        width: '100%',
+    },
+    memberCard: {
+        width: '100%',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 20,
+        padding: 15,
+        marginBottom: 15,
+        borderWidth: 1,
+        borderColor: '#E6F0FF',
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+    },
+    memberInfoRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    memberAvatar: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        marginRight: 15,
+    },
+    memberMeta: {
+        flex: 1,
+    },
+    memberName: {
+        fontFamily: 'Judson-Bold',
+        fontSize: 18,
+        color: '#000000',
+    },
+    memberEmail: {
+        fontFamily: 'Judson-Regular',
+        fontSize: 14,
+        color: '#666666',
+        marginTop: 2,
+    },
+    memberActions: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        borderTopWidth: 1,
+        borderTopColor: '#F0F5FF',
+        paddingTop: 12,
+    },
+    actionSubButton: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 12,
+        backgroundColor: '#F5F9FF',
+        marginLeft: 10,
+        borderWidth: 1,
+        borderColor: '#E6F0FF',
+    },
+    actionSubButtonText: {
+        fontFamily: 'Judson-Bold',
+        fontSize: 13,
+        color: '#0062FF',
+    },
+    emptyMembersContainer: {
+        alignItems: 'center',
+        marginTop: 40,
+    },
+    emptyText: {
+        fontFamily: 'Judson-Regular',
+        fontSize: 16,
+        color: '#666666',
+        textAlign: 'center',
+        marginBottom: 20,
+    },
+    emptyAddButton: {
+        backgroundColor: '#0062FF',
+        paddingHorizontal: 30,
+        paddingVertical: 12,
+        borderRadius: 25,
+    },
+    emptyAddButtonText: {
         fontFamily: 'Judson-Bold',
         fontSize: 16,
+        color: '#FFFFFF',
     },
     // Invites Styles
     invitesContainer: {
-        paddingHorizontal: 10,
+        paddingHorizontal: 0,
     },
     inviteCard: {
         backgroundColor: '#F5F9FF',
@@ -418,7 +407,6 @@ const styles = StyleSheet.create({
         backgroundColor: '#F9FBFF',
         borderRadius: 20,
         padding: 20,
-        marginHorizontal: 10,
         borderWidth: 1,
         borderColor: '#E6F0FF',
         borderStyle: 'dashed',
@@ -429,7 +417,92 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#999999',
     },
+    debugEmailText: {
+        fontFamily: 'Judson-Regular',
+        fontSize: 11,
+        color: '#CCCCCC',
+        marginTop: 5,
+    },
+    // Modal Styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 25,
+    },
+    modalContent: {
+        width: '100%',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 25,
+        padding: 25,
+        alignItems: 'center',
+        elevation: 15,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.25,
+        shadowRadius: 10,
+    },
+    modalTitle: {
+        fontFamily: 'Judson-Bold',
+        fontSize: 22,
+        color: '#000000',
+        marginBottom: 10,
+    },
+    modalSubtitle: {
+        fontFamily: 'Judson-Regular',
+        fontSize: 16,
+        color: '#666666',
+        textAlign: 'center',
+        marginBottom: 20,
+    },
+    modalInput: {
+        width: '100%',
+        height: 55,
+        backgroundColor: '#F5F9FF',
+        borderRadius: 15,
+        paddingHorizontal: 20,
+        fontFamily: 'Judson-Regular',
+        fontSize: 16,
+        color: '#000000',
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#E6F0FF',
+    },
+    modalButtons: {
+        flexDirection: 'row',
+        width: '100%',
+    },
+    cancelButton: {
+        flex: 1,
+        height: 50,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 10,
+        borderRadius: 15,
+        backgroundColor: '#F0F0F0',
+    },
+    cancelButtonText: {
+        fontFamily: 'Judson-Bold',
+        fontSize: 16,
+        color: '#666666',
+    },
+    confirmButton: {
+        flex: 2,
+        height: 50,
+    },
+    confirmButtonGradient: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 15,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    confirmButtonText: {
+        fontFamily: 'Judson-Bold',
+        fontSize: 16,
+        color: '#FFFFFF',
+    }
 });
-
 
 export default FamilyScreen;

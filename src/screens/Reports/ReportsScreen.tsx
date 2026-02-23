@@ -24,8 +24,14 @@ import HomeHeader from '../Home/HomeHeader';
 const { width } = Dimensions.get('window');
 
 const ReportsScreen = () => {
-    const { goBack, navigate } = useNavigation();
-    const { reports, updateReport, deleteReport, userProfile } = useAppContext();
+    const { screenParams, goBack, navigate } = useNavigation();
+    const { reports, updateReport, deleteReport, userProfile, addUpdate } = useAppContext();
+    const [memberReports, setMemberReports] = useState<Report[]>([]);
+    const [isFetchingMember, setIsFetchingMember] = useState(false);
+
+    const memberId = screenParams?.memberId;
+    const currentReports = memberId ? memberReports : reports;
+    const pageTitle = memberId ? `${screenParams.name}'s Reports` : 'Your Saved Reports';
 
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
     const [isActionMenuVisible, setIsActionMenuVisible] = useState(false);
@@ -59,7 +65,41 @@ const ReportsScreen = () => {
         }
     }, [isActionMenuVisible]);
 
-    const sortedReports = [...reports].sort((a, b) => {
+    useEffect(() => {
+        if (memberId) {
+            fetchMemberReports();
+        }
+    }, [memberId]);
+
+    const fetchMemberReports = async () => {
+        if (!memberId) return;
+        setIsFetchingMember(true);
+        try {
+            const { data, error } = await supabase
+                .from('reports')
+                .select('*')
+                .eq('user_id', memberId)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            if (data) {
+                setMemberReports(data.map(r => ({
+                    id: r.id,
+                    name: r.name,
+                    date: new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+                    timestamp: new Date(r.created_at).getTime(),
+                    uri: r.uri,
+                    analysis: r.analysis
+                })));
+            }
+        } catch (error) {
+            console.error('Error fetching member reports:', error);
+        } finally {
+            setIsFetchingMember(false);
+        }
+    };
+
+    const sortedReports = [...currentReports].sort((a, b) => {
         if (sortOrder === 'newest') return b.timestamp - a.timestamp;
         return a.timestamp - b.timestamp;
     });
@@ -143,7 +183,7 @@ const ReportsScreen = () => {
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <View style={styles.titleRow}>
-                    <Text style={styles.pageTitle}>Your Saved Reports</Text>
+                    <Text style={styles.pageTitle}>{pageTitle}</Text>
                     <View>
                         <TouchableOpacity
                             style={styles.filterButton}

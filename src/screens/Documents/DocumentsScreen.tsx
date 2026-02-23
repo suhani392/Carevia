@@ -79,6 +79,11 @@ const DocumentsScreen = () => {
     const [selectedDoc, setSelectedDoc] = useState<any>(null);
     const [newName, setNewName] = useState('');
     const [loading, setLoading] = useState(false);
+    const [memberDocuments, setMemberDocuments] = useState<Document[]>([]);
+    const [isFetchingMember, setIsFetchingMember] = useState(false);
+
+    const memberId = screenParams?.memberId;
+    const currentDocs = memberId ? memberDocuments : documents;
 
     const dropdownAnim = useRef(new Animated.Value(0)).current;
     const actionMenuAnim = useRef(new Animated.Value(0)).current;
@@ -105,7 +110,40 @@ const DocumentsScreen = () => {
         }
     }, [isActionMenuVisible]);
 
-    const sortedDocuments = [...documents].sort((a, b) => {
+    useEffect(() => {
+        if (memberId) {
+            fetchMemberDocuments();
+        }
+    }, [memberId]);
+
+    const fetchMemberDocuments = async () => {
+        if (!memberId) return;
+        setIsFetchingMember(true);
+        try {
+            const { data, error } = await supabase
+                .from('documents')
+                .select('*')
+                .eq('user_id', memberId)
+                .order('uploaded_at', { ascending: false });
+
+            if (error) throw error;
+            if (data) {
+                setMemberDocuments(data.map(d => ({
+                    id: d.id,
+                    name: d.original_name,
+                    date: new Date(d.uploaded_at || d.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+                    timestamp: new Date(d.uploaded_at || d.created_at).getTime(),
+                    uri: d.file_path
+                })));
+            }
+        } catch (error) {
+            console.error('Error fetching member documents:', error);
+        } finally {
+            setIsFetchingMember(false);
+        }
+    };
+
+    const sortedDocuments = [...currentDocs].sort((a, b) => {
         if (sortOrder === 'newest') return b.timestamp - a.timestamp;
         return a.timestamp - b.timestamp;
     });
@@ -124,8 +162,9 @@ const DocumentsScreen = () => {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!user) throw new Error('User not found');
 
+                const targetUserId = memberId || user.id;
                 const fileName = `${Date.now()}_${asset.name.replace(/\s+/g, '_')}`;
-                const filePath = `${user.id}/docs/${fileName}`;
+                const filePath = `${targetUserId}/docs/${fileName}`;
 
                 // Read file as base64 - bypasses RN fetch/blob bugs for physical uploads
                 const base64 = await FileSystem.readAsStringAsync(asset.uri, {
@@ -148,7 +187,34 @@ const DocumentsScreen = () => {
                     .from('documents')
                     .getPublicUrl(filePath);
 
-                await addDocument(asset.name, publicUrl);
+                // If adding to my own docs, use the global function
+                if (!memberId) {
+                    await addDocument(asset.name, publicUrl);
+                } else {
+                    // For member docs, we update locally and the creator is logged user
+                    const { data: dbEntry, error: dbError } = await supabase
+                        .from('documents')
+                        .insert({
+                            user_id: memberId,
+                            original_name: asset.name,
+                            file_path: publicUrl,
+                            file_type: asset.name.split('.').pop() || 'unknown'
+                        })
+                        .select()
+                        .single();
+
+                    if (dbError) throw dbError;
+
+                    const newDoc: Document = {
+                        id: dbEntry.id,
+                        name: dbEntry.original_name,
+                        date: new Date(dbEntry.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+                        timestamp: new Date(dbEntry.created_at).getTime(),
+                        uri: dbEntry.file_path
+                    };
+                    setMemberDocuments(prev => [newDoc, ...prev]);
+                    await addUpdate("Me", `You added a new document to ${screenParams.name}'s section: ${asset.name}`);
+                }
                 Alert.alert('Success', 'Document added successfully');
             }
         } catch (error: any) {

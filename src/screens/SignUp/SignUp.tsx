@@ -69,6 +69,7 @@ const SignUp = () => {
                     .upsert({ // Using upsert in case the record exists
                         id: data.user.id,
                         full_name: name,
+                        email: email.toLowerCase().trim(),
                         dob: pgDate,
                         phone: phone,
                     });

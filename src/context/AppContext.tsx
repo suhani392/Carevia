@@ -49,6 +49,8 @@ interface AppContextType {
     familyMembers: FamilyMember[];
     invitations: Invitation[];
     userProfile: any | null;
+    userEmail: string | null;
+    invitationError: boolean;
     loading: boolean;
     refreshData: () => Promise<void>;
     addUpdate: (name: string, text: string) => Promise<void>;
@@ -72,6 +74,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
     const [invitations, setInvitations] = useState<Invitation[]>([]);
     const [userProfile, setUserProfile] = useState<any | null>(null);
+    const [userEmail, setUserEmail] = useState<string | null>(null);
+    const [invitationError, setInvitationError] = useState(false);
     const [loading, setLoading] = useState(true);
 
     const fetchInitialData = async () => {
@@ -79,6 +83,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             setLoading(true);
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
+            setUserEmail(user.email || null);
 
             // Fetch profile to get family_id
             const { data: profile } = await supabase
@@ -89,6 +94,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
             if (profile) {
                 setUserProfile(profile);
+                // Aggressively sync email to ensure discoverability
+                if (user.email && profile.email !== user.email.toLowerCase().trim()) {
+                    try {
+                        await supabase.from('profiles').update({ email: user.email.toLowerCase().trim() }).eq('id', user.id);
+                        console.log("Profile email synced successfully.");
+                    } catch (syncError) {
+                        console.warn("Failed to sync email to profile. The 'email' column might be missing from the 'profiles' table.", syncError);
+                    }
+                }
             }
 
             const familyId = profile?.family_id || user.id;
@@ -143,43 +157,60 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             }
 
             // Fetch family members (family-wide)
-            const { data: familyData } = await supabase
-                .from('family_members')
-                .select('*')
-                .or(`user_id.eq.${user.id},family_id.eq.${familyId}`);
+            if (familyId) {
+                const { data: familyProfiles, error: famError } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, photo_url, email')
+                    .eq('family_id', familyId);
 
-            if (familyData) {
-                setFamilyMembers(familyData);
+                if (famError) console.error("Error fetching family members:", famError.message);
+                console.log("Current familyId:", familyId);
+                console.log("Family profiles found:", familyProfiles?.length || 0);
+
+                if (familyProfiles) {
+                    setFamilyMembers(familyProfiles.map(p => ({
+                        id: p.id,
+                        name: p.full_name || p.email?.split('@')[0] || 'Unknown',
+                        image: p.photo_url || `https://avatar.iran.liara.run/public/${Math.floor(Math.random() * 100)}`,
+                        email: p.email
+                    })).filter(p => p.id !== user.id)); // Don't show myself in family list
+                }
             } else {
                 setFamilyMembers([]);
             }
 
             // Fetch pending invitations for this user (by email)
             if (user.email) {
-                const { data: invitationsData } = await supabase
+                const { data: invitationsData, error: invError } = await supabase
                     .from('invitations')
                     .select('*')
-                    .eq('receiver_email', user.email)
+                    .ilike('receiver_email', user.email.trim())
                     .eq('status', 'pending');
 
-                if (invitationsData) {
+                if (invError) {
+                    console.error('Error fetching invitations:', invError);
+                    setInvitationError(true);
+                } else {
+                    setInvitationError(false);
+                }
+
+                if (invitationsData && invitationsData.length > 0) {
                     // Fetch sender names separately to be more robust
                     const invitesWithNames = await Promise.all(invitationsData.map(async (inv) => {
-                        const { data: profile } = await supabase
-                            .from('profiles')
-                            .select('full_name')
-                            .eq('id', inv.sender_id)
-                            .single();
+                        try {
+                            const { data: profile } = await supabase
+                                .from('profiles')
+                                .select('full_name')
+                                .eq('id', inv.sender_id)
+                                .single();
 
-                        return {
-                            id: inv.id,
-                            sender_id: inv.sender_id,
-                            family_id: inv.family_id,
-                            receiver_email: inv.receiver_email,
-                            status: inv.status,
-                            created_at: inv.created_at,
-                            sender_name: profile?.full_name || 'Someone'
-                        };
+                            return {
+                                ...inv,
+                                sender_name: profile?.full_name || 'Someone'
+                            };
+                        } catch (e) {
+                            return { ...inv, sender_name: 'Someone' };
+                        }
                     }));
                     setInvitations(invitesWithNames);
                 } else {
@@ -362,24 +393,52 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            const { data: profile } = await supabase.from('profiles').select('family_id').eq('id', user.id).single();
-            const family_id = profile?.family_id || user.id;
+            const targetEmail = email.toLowerCase().trim();
 
-            // Update profile with family_id if it's currently null
-            if (!profile?.family_id) {
+            // Check if the user exists in profiles first
+            let targetProfile = null;
+            console.log(`Checking for Carevia user with email: "${targetEmail}"`);
+
+            try {
+                const { data: profiles, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('id')
+                    .ilike('email', targetEmail);
+
+                if (profileError) {
+                    console.warn("Database check failed:", profileError.message);
+                }
+
+                if (profiles && profiles.length > 0) {
+                    targetProfile = profiles[0];
+                    console.log("User found!");
+                }
+            } catch (e) {
+                console.error("Profile check exception:", e);
+            }
+
+            if (!targetProfile) {
+                throw new Error('This user does not have a Carevia account, or they need to log in once to sync their profile.');
+            }
+
+            const { data: myProfile } = await supabase.from('profiles').select('family_id').eq('id', user.id).single();
+            const family_id = myProfile?.family_id || user.id;
+
+            // Update my profile with family_id if it's currently null
+            if (!myProfile?.family_id) {
                 await supabase.from('profiles').update({ family_id }).eq('id', user.id);
             }
 
-            const { error } = await supabase
+            const { error: inviteError } = await supabase
                 .from('invitations')
                 .insert({
                     sender_id: user.id,
                     family_id,
-                    receiver_email: email.toLowerCase().trim(),
+                    receiver_email: targetEmail,
                     status: 'pending'
                 });
 
-            if (error) throw error;
+            if (inviteError) throw inviteError;
 
             await addUpdate("Me", `You sent a family invitation to ${email}`);
         } catch (error) {
@@ -396,23 +455,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             const invite = invitations.find(i => i.id === invitationId);
             if (!invite) return;
 
-            // 1. Update user profile with family_id
-            await supabase.from('profiles').update({ family_id: invite.family_id }).eq('id', user.id);
+            // Use the invitation's family_id. This effectively joins the receiver (current user)
+            // to the sender's family group.
+            const family_id = invite.family_id;
+
+            // 1. Update receiver's profile with family_id
+            await supabase.from('profiles').update({ family_id }).eq('id', user.id);
 
             // 2. Update invitation status
             await supabase.from('invitations').update({ status: 'accepted' }).eq('id', invitationId);
 
-            // 3. Add as/update family member record
-            const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-
-            await supabase.from('family_members').upsert({
-                user_id: user.id,
-                family_id: invite.family_id,
-                name: profile?.full_name || user.email?.split('@')[0] || 'User',
-                email: user.email,
-                image: profile?.avatar_url || `https://avatar.iran.liara.run/public/${Math.floor(Math.random() * 100)}`
-            });
-
+            // 3. Clear invitations and refresh
             setInvitations(prev => prev.filter(i => i.id !== invitationId));
             await fetchInitialData();
             await addUpdate("Me", `You joined a new family!`);
@@ -445,7 +498,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             familyMembers,
             invitations,
             loading,
-            userProfile, // Added userProfile to the context value
+            userProfile,
+            userEmail,
+            invitationError,
             refreshData: fetchInitialData,
             addUpdate,
             addReport,

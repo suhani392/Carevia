@@ -322,7 +322,8 @@ const ScanReportScreen = () => {
                                                 const { data: { user } } = await supabase.auth.getUser();
                                                 if (!user) throw new Error('User not found');
 
-                                                const filePath = `${user.id}/${fileName}`;
+                                                const targetUserId = screenParams?.memberId || user.id;
+                                                const filePath = `${targetUserId}/${fileName}`;
 
                                                 // Read file as base64
                                                 const base64 = await FileSystem.readAsStringAsync(uri, {
@@ -350,11 +351,25 @@ const ScanReportScreen = () => {
                                                     finalName += '.pdf';
                                                 }
 
-                                                await addReport(
-                                                    finalName,
-                                                    publicUrl,
-                                                    "Report saved for analysis."
-                                                );
+                                                if (!screenParams?.memberId) {
+                                                    await addReport(
+                                                        finalName,
+                                                        publicUrl,
+                                                        "Report saved for analysis."
+                                                    );
+                                                } else {
+                                                    // Manual insert for family members to bypass local state management for now
+                                                    const { error: dbError } = await supabase
+                                                        .from('reports')
+                                                        .insert({
+                                                            user_id: screenParams.memberId,
+                                                            name: finalName,
+                                                            uri: publicUrl,
+                                                            analysis: "Report saved for analysis."
+                                                        });
+
+                                                    if (dbError) throw dbError;
+                                                }
 
                                                 setShowSaveModal(false);
                                                 navigate('reports');
