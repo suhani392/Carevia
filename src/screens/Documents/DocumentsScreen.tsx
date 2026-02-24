@@ -69,7 +69,8 @@ interface Document {
 const DocumentsScreen = () => {
     const { screenParams, goBack, navigate } = useNavigation();
     const { documents, addDocument, updateDocument, deleteDocument, addUpdate, userProfile } = useAppContext();
-    const subTitleText = screenParams?.name ? `${screenParams.name}'s Documents` : 'My Documents';
+    const firstName = screenParams?.name ? screenParams.name.split(' ')[0] : '';
+    const subTitleText = screenParams?.name ? `${firstName}'s Documents` : 'My Documents';
     const isOwner = !screenParams?.name;
 
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
@@ -364,7 +365,7 @@ const DocumentsScreen = () => {
                 </View>
 
                 <Text style={styles.subtitle}>
-                    {isOwner ? 'Your uploaded medical documents' : `${screenParams.name}'s uploaded documents`}
+                    {isOwner ? 'Your uploaded medical documents' : `${firstName}'s uploaded documents`}
                 </Text>
 
                 <View style={styles.documentsList}>

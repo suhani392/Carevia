@@ -1,3 +1,4 @@
+import 'react-native-url-polyfill/auto';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -38,15 +39,23 @@ function AppContent() {
 
     useEffect(() => {
         // Check initial session
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            if (session) {
+        supabase.auth.getSession().then(({ data, error }) => {
+            if (error) {
+                console.warn("Session check error:", error.message);
+                setAuthChecked(true);
+                return;
+            }
+            if (data?.session) {
                 navigate('home');
             }
+            setAuthChecked(true);
+        }).catch(err => {
+            console.warn("Initial session check failed:", err.message || err);
             setAuthChecked(true);
         });
 
         // Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        const authListener = supabase.auth.onAuthStateChange((_event, session) => {
             if (session) {
                 navigate('home');
             } else {
@@ -54,7 +63,11 @@ function AppContent() {
             }
         });
 
-        return () => subscription.unsubscribe();
+        const subscription = authListener?.data?.subscription;
+
+        return () => {
+            if (subscription) subscription.unsubscribe();
+        };
     }, []);
 
     if (!authChecked) {

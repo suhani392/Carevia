@@ -14,6 +14,7 @@ const FamilyScreen = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [memberEmail, setMemberEmail] = useState('');
     const [refreshing, setRefreshing] = useState(false);
+    const [activeMemberId, setActiveMemberId] = useState<string | null>(null);
 
     const { navigate } = useNavigation();
     const {
@@ -25,7 +26,9 @@ const FamilyScreen = () => {
         refreshData,
         loading,
         userEmail,
-        invitationError
+        invitationError,
+        cancelInvitation,
+        removeFamilyMember
     } = useAppContext();
 
     const onRefresh = async () => {
@@ -62,6 +65,12 @@ const FamilyScreen = () => {
             >
                 <HomeHeader onMenuPress={() => setIsMenuOpen(true)} showActionRow={false} />
 
+                {loading && (
+                    <View style={styles.loadingContainer}>
+                        <Text style={styles.loadingText}>Loading Family Data...</Text>
+                    </View>
+                )}
+
                 <View style={[styles.section, { marginBottom: 10 }]}>
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>Family Invites</Text>
@@ -72,27 +81,53 @@ const FamilyScreen = () => {
                             {invitations.map((invite) => (
                                 <View key={invite.id} style={styles.inviteCard}>
                                     <View style={styles.inviteInfo}>
-                                        <Text style={styles.inviteSender}>{invite.sender_name}</Text>
-                                        <Text style={styles.inviteText}>invited you to join their family group</Text>
+                                        <Text style={styles.inviteSender}>
+                                            {invite.type === 'received' ? invite.sender_name : `Sent to ${invite.receiver_email}`}
+                                        </Text>
+                                        <Text style={styles.inviteText}>
+                                            {invite.type === 'received'
+                                                ? 'invited you to join their family group'
+                                                : 'Waiting for their acceptance...'}
+                                        </Text>
                                     </View>
                                     <View style={styles.inviteActions}>
-                                        <TouchableOpacity
-                                            style={styles.rejectButton}
-                                            onPress={() => rejectInvitation(invite.id)}
-                                        >
-                                            <Text style={styles.rejectButtonText}>Reject</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity
-                                            style={styles.acceptButton}
-                                            onPress={() => acceptInvitation(invite.id)}
-                                        >
-                                            <LinearGradient
-                                                colors={['#0062FF', '#5C8EDF']}
-                                                style={styles.acceptButtonGradient}
+                                        {invite.type === 'received' ? (
+                                            <>
+                                                <TouchableOpacity
+                                                    style={styles.rejectButton}
+                                                    onPress={() => rejectInvitation(invite.id)}
+                                                >
+                                                    <Text style={styles.rejectButtonText}>Reject</Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    style={styles.acceptButton}
+                                                    onPress={() => acceptInvitation(invite.id)}
+                                                >
+                                                    <LinearGradient
+                                                        colors={['#0062FF', '#5C8EDF']}
+                                                        style={styles.acceptButtonGradient}
+                                                    >
+                                                        <Text style={styles.acceptButtonText}>Accept</Text>
+                                                    </LinearGradient>
+                                                </TouchableOpacity>
+                                            </>
+                                        ) : (
+                                            <TouchableOpacity
+                                                style={styles.rejectButton}
+                                                onPress={() => {
+                                                    Alert.alert(
+                                                        "Cancel Invitation",
+                                                        "Are you sure you want to cancel this invitation?",
+                                                        [
+                                                            { text: "No", style: "cancel" },
+                                                            { text: "Yes, Cancel", onPress: () => cancelInvitation(invite.id), style: "destructive" }
+                                                        ]
+                                                    );
+                                                }}
                                             >
-                                                <Text style={styles.acceptButtonText}>Accept</Text>
-                                            </LinearGradient>
-                                        </TouchableOpacity>
+                                                <Text style={styles.rejectButtonText}>Cancel Request</Text>
+                                            </TouchableOpacity>
+                                        )}
                                     </View>
                                 </View>
                             ))}
@@ -125,17 +160,46 @@ const FamilyScreen = () => {
                     </View>
 
                     <View style={styles.memberGrid}>
-                        {familyMembers.length > 0 ? (
+                        {!loading && familyMembers.length > 0 ? (
                             familyMembers.map((member, index) => (
                                 <View key={index} style={styles.memberCard}>
-                                    <View style={styles.memberInfoRow}>
-                                        <Image source={{ uri: member.image }} style={styles.memberAvatar} />
+                                    <TouchableOpacity
+                                        activeOpacity={0.7}
+                                        onPress={() => setActiveMemberId(activeMemberId === member.id ? null : member.id)}
+                                        style={styles.memberInfoRow}
+                                    >
+                                        {member.image ? (
+                                            <Image source={{ uri: member.image }} style={styles.memberAvatar} />
+                                        ) : (
+                                            <View style={[styles.memberAvatar, styles.avatarPlaceholder]}>
+                                                <Text style={styles.avatarPlaceholderText}>
+                                                    {(member.name || 'U').charAt(0).toUpperCase()}
+                                                </Text>
+                                            </View>
+                                        )}
                                         <View style={styles.memberMeta}>
                                             <Text style={styles.memberName}>{member.name}</Text>
                                             <Text style={styles.memberEmail}>{member.email || 'Family Member'}</Text>
                                         </View>
-                                    </View>
+                                    </TouchableOpacity>
                                     <View style={styles.memberActions}>
+                                        {activeMemberId === member.id && (
+                                            <TouchableOpacity
+                                                style={[styles.actionSubButton, { backgroundColor: '#FFF0F0', borderColor: '#FFE0E0' }]}
+                                                onPress={() => {
+                                                    Alert.alert(
+                                                        "Remove Family Member",
+                                                        `Are you sure you want to remove ${member.name} from your family group? They will no longer have access to your shared space.`,
+                                                        [
+                                                            { text: "Cancel", style: "cancel" },
+                                                            { text: "Remove", onPress: () => removeFamilyMember(member.id), style: "destructive" }
+                                                        ]
+                                                    );
+                                                }}
+                                            >
+                                                <Text style={[styles.actionSubButtonText, { color: '#FF4C4C' }]}>Remove</Text>
+                                            </TouchableOpacity>
+                                        )}
                                         <TouchableOpacity
                                             style={styles.actionSubButton}
                                             onPress={() => navigate('reports', { name: member.name, memberId: member.id })}
@@ -151,7 +215,7 @@ const FamilyScreen = () => {
                                     </View>
                                 </View>
                             ))
-                        ) : (
+                        ) : !loading ? (
                             <View style={styles.emptyMembersContainer}>
                                 <Text style={styles.emptyText}>You haven’t added any family members yet.</Text>
                                 <TouchableOpacity
@@ -161,9 +225,10 @@ const FamilyScreen = () => {
                                     <Text style={styles.emptyAddButtonText}>+ Add Member</Text>
                                 </TouchableOpacity>
                             </View>
-                        )}
+                        ) : null}
                     </View>
                 </View>
+
                 <View style={{ height: 100 }} />
             </ScrollView>
 
@@ -280,6 +345,18 @@ const styles = StyleSheet.create({
         height: 60,
         borderRadius: 30,
         marginRight: 15,
+    },
+    avatarPlaceholder: {
+        backgroundColor: '#F0F7FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E6F0FF',
+    },
+    avatarPlaceholderText: {
+        fontFamily: 'Judson-Bold',
+        fontSize: 24,
+        color: '#0062FF',
     },
     memberMeta: {
         flex: 1,
@@ -502,6 +579,15 @@ const styles = StyleSheet.create({
         fontFamily: 'Judson-Bold',
         fontSize: 16,
         color: '#FFFFFF',
+    },
+    loadingContainer: {
+        padding: 20,
+        alignItems: 'center',
+    },
+    loadingText: {
+        fontFamily: 'Judson-Regular',
+        fontSize: 14,
+        color: '#0062FF',
     }
 });
 

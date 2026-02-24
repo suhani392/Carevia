@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Text, Image, Pressable } from 'react-native';
+import { View, StyleSheet, ScrollView, Text, Image, Pressable, RefreshControl } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import HomeHeader from './HomeHeader';
 import { ReportIcon, BotIcon } from './Icons';
 import AppStatusBar from '../../components/status-bar/status-bar';
@@ -10,7 +11,14 @@ import { useAppContext } from '../../context/AppContext';
 const HomeScreen = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const { navigate } = useNavigation();
-    const { updates } = useAppContext();
+    const { updates, userProfile, familyMembers, refreshData } = useAppContext();
+    const [refreshing, setRefreshing] = useState(false);
+
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await refreshData();
+        setRefreshing(false);
+    };
 
     return (
         <View style={styles.container}>
@@ -21,6 +29,9 @@ const HomeScreen = () => {
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                }
             >
                 <HomeHeader onMenuPress={() => setIsMenuOpen(true)} />
 
@@ -29,36 +40,51 @@ const HomeScreen = () => {
                     <Text style={styles.sectionTitle}>Emergency Access</Text>
                     <View style={styles.emergencyRow}>
                         <Pressable
-                            style={styles.largeCard}
+                            style={styles.modernLargeCard}
                             onPress={() => navigate('documents')}
                         >
-                            <Text style={styles.cardTitle}>My Documents</Text>
-                            <View style={styles.docIconContainer}>
-                                <Image
-                                    source={require('../../assets/icons/home/documents.png')}
-                                    style={styles.docIcon}
-                                    resizeMode="contain"
-                                />
-                            </View>
+                            <LinearGradient
+                                colors={['#E6F0FF', '#C7DFFF']}
+                                style={styles.cardGradient}
+                            >
+                                <Text style={styles.modernCardTitle}>My Documents</Text>
+                                <View style={styles.modernDocIconContainer}>
+                                    <Image
+                                        source={require('../../assets/icons/home/documents.png')}
+                                        style={styles.modernDocIcon}
+                                        resizeMode="contain"
+                                    />
+                                </View>
+                            </LinearGradient>
                         </Pressable>
-                        <View style={styles.smallCardColumn}>
+                        <View style={styles.modernSmallCardColumn}>
                             <Pressable
-                                style={styles.smallCard}
+                                style={styles.modernSmallCard}
                                 onPress={() => navigate('reports')}
                             >
-                                <View style={styles.reportIconContainer}>
-                                    <ReportIcon size={28} color="#3C87FF" />
-                                </View>
-                                <Text style={styles.smallCardText} numberOfLines={1}>View Reports</Text>
+                                <LinearGradient
+                                    colors={['#F0F7FF', '#D8E9FF']}
+                                    style={styles.cardGradientSmall}
+                                >
+                                    <View style={styles.modernIconContainer}>
+                                        <ReportIcon size={24} color="#0062FF" />
+                                    </View>
+                                    <Text style={styles.modernSmallCardText}>View{"\n"}Reports</Text>
+                                </LinearGradient>
                             </Pressable>
                             <Pressable
-                                style={styles.smallCard}
+                                style={styles.modernSmallCard}
                                 onPress={() => navigate('ai_assistant')}
                             >
-                                <View style={styles.questionIconContainer}>
-                                    <BotIcon size={28} color="#3C87FF" />
-                                </View>
-                                <Text style={styles.smallCardText} numberOfLines={1}>Ask Question</Text>
+                                <LinearGradient
+                                    colors={['#F0F7FF', '#D8E9FF']}
+                                    style={styles.cardGradientSmall}
+                                >
+                                    <View style={styles.modernIconContainer}>
+                                        <BotIcon size={24} color="#0062FF" />
+                                    </View>
+                                    <Text style={styles.modernSmallCardText}>Ask{"\n"}Question</Text>
+                                </LinearGradient>
                             </Pressable>
                         </View>
                     </View>
@@ -68,12 +94,47 @@ const HomeScreen = () => {
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Family Updates</Text>
                     {updates.length > 0 ? (
-                        updates.map((update, index) => (
-                            <View key={update.id} style={[styles.familyCard, index > 0 && { marginTop: 15 }]}>
-                                <Text style={styles.familyName}>{update.name === 'Me' ? 'You' : update.name}</Text>
-                                <Text style={styles.familyText}>{update.text}</Text>
-                            </View>
-                        ))
+                        updates.map((update, index) => {
+                            // Resolve sender's photo and name locally
+                            let senderPhoto = update.photo_url; // Fallback to recorded URL if it exists
+                            let senderName = update.name;
+
+                            if (userProfile?.id === update.user_id) {
+                                senderPhoto = userProfile.photo_url;
+                                senderName = 'You';
+                            } else {
+                                const member = familyMembers.find(m => m.id === update.user_id);
+                                if (member) {
+                                    senderPhoto = member.image;
+                                    senderName = member.name;
+                                }
+                            }
+
+                            return (
+                                <View key={update.id} style={styles.familyCard}>
+                                    <View style={styles.updateInfoRow}>
+                                        {senderPhoto ? (
+                                            <Image
+                                                source={{ uri: senderPhoto }}
+                                                style={styles.updateAvatar}
+                                            />
+                                        ) : (
+                                            <View style={[styles.updateAvatar, styles.updateAvatarPlaceholder]}>
+                                                <Text style={styles.updateAvatarPlaceholderText}>
+                                                    {(senderName || 'U').charAt(0).toUpperCase()}
+                                                </Text>
+                                            </View>
+                                        )}
+                                        <View style={styles.updateMeta}>
+                                            <Text style={styles.updateName}>
+                                                {senderName}
+                                            </Text>
+                                            <Text style={styles.updateText}>{update.text}</Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            );
+                        })
                     ) : (
                         <View style={styles.emptyUpdatesCard}>
                             <Text style={styles.emptyUpdatesText}>No recent family updates</Text>
@@ -113,81 +174,132 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
     },
-    largeCard: {
+    modernLargeCard: {
         width: '48%',
         height: 220,
-        backgroundColor: '#E6F0FF',
-        borderRadius: 20,
-        padding: 12,
+        borderRadius: 25,
+        overflow: 'hidden',
+        elevation: 5,
+        shadowColor: '#0062FF',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+    },
+    cardGradient: {
+        flex: 1,
+        padding: 18,
         alignItems: 'center',
     },
-    cardTitle: {
-        fontFamily: 'Judson-Regular',
-        fontSize: 16,
-        color: '#000000',
-        marginBottom: 12,
-        marginTop: 5,
+    modernCardTitle: {
+        fontFamily: 'Judson-Bold',
+        fontSize: 18,
+        color: '#0047BA',
+        marginBottom: 15,
     },
-    docIconContainer: {
+    modernDocIconContainer: {
         flex: 1,
+        width: '100%',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 20,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#FFFFFF',
-        width: '100%',
-        borderRadius: 15,
-        marginBottom: 5,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.4)',
     },
-    docIcon: {
-        width: '70%',
-        height: '70%',
+    modernDocIcon: {
+        width: '65%',
+        height: '65%',
     },
-    smallCardColumn: {
+    modernSmallCardColumn: {
         width: '48%',
         justifyContent: 'space-between',
     },
-    smallCard: {
+    modernSmallCard: {
         height: 105,
-        backgroundColor: '#E6F0FF',
+        borderRadius: 25,
+        overflow: 'hidden',
+        elevation: 4,
+        shadowColor: '#0062FF',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.1,
+        shadowRadius: 6,
+    },
+    cardGradientSmall: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 15,
+    },
+    modernIconContainer: {
+        width: 44,
+        height: 44,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 15,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 3,
+        elevation: 2,
+    },
+    modernSmallCardText: {
+        fontFamily: 'Judson-Bold',
+        fontSize: 15,
+        color: '#0047BA',
+        marginLeft: 12,
+        flex: 1,
+        lineHeight: 18,
+    },
+    familyCard: {
+        backgroundColor: '#FFFFFF',
         borderRadius: 20,
         padding: 15,
+        marginBottom: 15,
+        borderWidth: 1,
+        borderColor: '#E6F0FF',
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+    },
+    updateInfoRow: {
         flexDirection: 'row',
         alignItems: 'center',
     },
-    smallCardText: {
-        fontFamily: 'Judson-Regular',
-        fontSize: 15.5,
-        color: '#000000',
-        marginLeft: 10,
+    updateAvatar: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        marginRight: 15,
+    },
+    updateAvatarPlaceholder: {
+        backgroundColor: '#E6F0FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#C7DFFF',
+    },
+    updateAvatarPlaceholderText: {
+        fontFamily: 'Judson-Bold',
+        fontSize: 18,
+        color: '#0062FF',
+    },
+    updateMeta: {
         flex: 1,
     },
-    reportIconContainer: {
-        width: 32,
-        height: 32,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    questionIconContainer: {
-        width: 32,
-        height: 32,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    familyCard: {
-        backgroundColor: '#E1EEFF',
-        borderRadius: 20,
-        padding: 20,
-    },
-    familyName: {
+    updateName: {
         fontFamily: 'Judson-Bold',
-        fontSize: 16,
+        fontSize: 17,
         color: '#000000',
-        marginBottom: 5,
     },
-    familyText: {
+    updateText: {
         fontFamily: 'Judson-Regular',
         fontSize: 14,
-        color: '#000000',
-        lineHeight: 20,
+        color: '#666666',
+        lineHeight: 18,
+        marginTop: 2,
     },
     emptyUpdatesCard: {
         backgroundColor: '#F5F9FF',

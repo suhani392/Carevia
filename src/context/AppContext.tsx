@@ -20,8 +20,10 @@ export interface Document {
 
 export interface Update {
     id: string;
+    user_id: string;
     name: string;
     text: string;
+    photo_url?: string;
     created_at?: string;
 }
 
@@ -40,6 +42,7 @@ export interface Invitation {
     status: 'pending' | 'accepted' | 'rejected';
     created_at: string;
     sender_name?: string;
+    type?: 'sent' | 'received';
 }
 
 interface AppContextType {
@@ -63,6 +66,9 @@ interface AppContextType {
     sendInvitation: (email: string) => Promise<void>;
     acceptInvitation: (invitationId: string) => Promise<void>;
     rejectInvitation: (invitationId: string) => Promise<void>;
+    cancelInvitation: (invitationId: string) => Promise<void>;
+    removeFamilyMember: (memberId: string) => Promise<void>;
+    familyId: string | null;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -77,148 +83,203 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const [userEmail, setUserEmail] = useState<string | null>(null);
     const [invitationError, setInvitationError] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [currentFamilyId, setCurrentFamilyId] = useState<string | null>(null);
 
     const fetchInitialData = async () => {
         try {
             setLoading(true);
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
+            const { data, error: userError } = await supabase.auth.getUser();
+            const user = data?.user;
+
+            if (userError || !user) {
+                console.warn("User fetch error or no user:", userError?.message);
+                setLoading(false);
+                return;
+            }
             setUserEmail(user.email || null);
 
-            // Fetch profile to get family_id
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', user.id)
-                .single();
+            // 1. Fetch profile to get family_id
+            let profile = null;
+            try {
+                const { data, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', user.id)
+                    .single();
 
-            if (profile) {
-                setUserProfile(profile);
-                // Aggressively sync email to ensure discoverability
-                if (user.email && profile.email !== user.email.toLowerCase().trim()) {
-                    try {
+                if (profileError) throw profileError;
+                profile = data;
+
+                if (profile) {
+                    setUserProfile(profile);
+                    // Aggressively sync email to ensure discoverability
+                    if (user.email && profile.email !== user.email.toLowerCase().trim()) {
                         await supabase.from('profiles').update({ email: user.email.toLowerCase().trim() }).eq('id', user.id);
-                        console.log("Profile email synced successfully.");
-                    } catch (syncError) {
-                        console.warn("Failed to sync email to profile. The 'email' column might be missing from the 'profiles' table.", syncError);
                     }
                 }
+            } catch (err) {
+                console.warn("Profile fetch error:", err);
             }
 
             const familyId = profile?.family_id || user.id;
+            setCurrentFamilyId(familyId);
 
-            // Fetch reports (always private)
-            const { data: reportsData } = await supabase
-                .from('reports')
-                .select('*')
-                .eq('user_id', user.id)
-                .order('created_at', { ascending: false });
-
-            if (reportsData) {
-                setReports(reportsData.map(r => ({
-                    id: r.id,
-                    name: r.name,
-                    date: new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-                    timestamp: new Date(r.created_at).getTime(),
-                    uri: r.uri,
-                    analysis: r.analysis
-                })));
+            // Self-healing: If family_id is missing in DB, set it to their own ID
+            if (profile && !profile.family_id) {
+                await supabase.from('profiles').update({ family_id: user.id }).eq('id', user.id);
             }
 
-            // Fetch documents
-            const { data: docsData } = await supabase
-                .from('documents')
-                .select('*')
-                .eq('user_id', user.id)
-                .order('uploaded_at', { ascending: false });
-
-            if (docsData) {
-                setDocuments(docsData.map(d => ({
-                    id: d.id,
-                    name: d.original_name,
-                    date: new Date(d.uploaded_at || d.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-                    timestamp: new Date(d.uploaded_at || d.created_at).getTime(),
-                    uri: d.file_path
-                })));
-            }
-
-
-            // Fetch updates (family-wide)
-            const { data: updatesData } = await supabase
-                .from('family_updates')
-                .select('*')
-                .or(`user_id.eq.${user.id},family_id.eq.${familyId}`)
-                .order('created_at', { ascending: false });
-
-            if (updatesData) {
-                setUpdates(updatesData);
-            } else {
-                setUpdates([]);
-            }
-
-            // Fetch family members (family-wide)
-            if (familyId) {
-                const { data: familyProfiles, error: famError } = await supabase
-                    .from('profiles')
-                    .select('id, full_name, photo_url, email')
-                    .eq('family_id', familyId);
-
-                if (famError) console.error("Error fetching family members:", famError.message);
-                console.log("Current familyId:", familyId);
-                console.log("Family profiles found:", familyProfiles?.length || 0);
-
-                if (familyProfiles) {
-                    setFamilyMembers(familyProfiles.map(p => ({
-                        id: p.id,
-                        name: p.full_name || p.email?.split('@')[0] || 'Unknown',
-                        image: p.photo_url || `https://avatar.iran.liara.run/public/${Math.floor(Math.random() * 100)}`,
-                        email: p.email
-                    })).filter(p => p.id !== user.id)); // Don't show myself in family list
-                }
-            } else {
-                setFamilyMembers([]);
-            }
-
-            // Fetch pending invitations for this user (by email)
-            if (user.email) {
-                const { data: invitationsData, error: invError } = await supabase
-                    .from('invitations')
+            // 2. Fetch reports (always private)
+            try {
+                const { data: reportsData } = await supabase
+                    .from('reports')
                     .select('*')
-                    .ilike('receiver_email', user.email.trim())
-                    .eq('status', 'pending');
+                    .eq('user_id', user.id)
+                    .order('created_at', { ascending: false });
 
-                if (invError) {
-                    console.error('Error fetching invitations:', invError);
-                    setInvitationError(true);
-                } else {
-                    setInvitationError(false);
+                if (reportsData) {
+                    setReports(reportsData.map(r => ({
+                        id: r.id,
+                        name: r.name,
+                        date: new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+                        timestamp: new Date(r.created_at).getTime(),
+                        uri: r.uri,
+                        analysis: r.analysis
+                    })));
                 }
+            } catch (err) {
+                console.warn("Reports fetch error:", err);
+            }
 
-                if (invitationsData && invitationsData.length > 0) {
-                    // Fetch sender names separately to be more robust
-                    const invitesWithNames = await Promise.all(invitationsData.map(async (inv) => {
-                        try {
-                            const { data: profile } = await supabase
-                                .from('profiles')
-                                .select('full_name')
-                                .eq('id', inv.sender_id)
-                                .single();
+            // 3. Fetch documents
+            try {
+                const { data: docsData } = await supabase
+                    .from('documents')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .order('uploaded_at', { ascending: false });
 
-                            return {
-                                ...inv,
-                                sender_name: profile?.full_name || 'Someone'
-                            };
-                        } catch (e) {
-                            return { ...inv, sender_name: 'Someone' };
-                        }
-                    }));
-                    setInvitations(invitesWithNames);
-                } else {
-                    setInvitations([]);
+                if (docsData) {
+                    setDocuments(docsData.map(d => ({
+                        id: d.id,
+                        name: d.original_name,
+                        date: new Date(d.uploaded_at || d.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+                        timestamp: new Date(d.uploaded_at || d.created_at).getTime(),
+                        uri: d.file_path
+                    })));
+                }
+            } catch (err) {
+                console.warn("Documents fetch error:", err);
+            }
+
+            // 4. Fetch updates (family-wide) - Only last 24 hours
+            const activeFamilyId = profile?.family_id || user.id;
+
+            const fetchUpdatesFromServer = async () => {
+                try {
+                    // Fetch updates without the join to avoid schema relationship errors
+                    const { data: updatesData, error: fetchErr } = await supabase
+                        .from('family_updates')
+                        .select('*')
+                        .or(`family_id.eq.${activeFamilyId},user_id.eq.${user.id}`)
+                        .order('created_at', { ascending: false })
+                        .limit(20);
+
+                    if (fetchErr) {
+                        console.warn("Updates fetch from server error:", fetchErr);
+                        return;
+                    }
+
+                    if (updatesData) {
+                        setUpdates(updatesData);
+                    }
+                } catch (err) {
+                    console.warn("Updates fetch error:", err);
+                }
+            };
+
+            await fetchUpdatesFromServer();
+
+            // Set up Realtime subscription for family updates
+            supabase
+                .channel(`family_updates_${activeFamilyId}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: 'INSERT',
+                        schema: 'public',
+                        table: 'family_updates',
+                        filter: `family_id=eq.${activeFamilyId}`
+                    },
+                    () => fetchUpdatesFromServer()
+                )
+                .subscribe();
+
+            // Background cleanup
+            const cleanup = async () => {
+                try {
+                    await supabase.from('family_updates')
+                        .delete()
+                        .lt('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+                } catch (err) {
+                    console.warn("Cleanup error:", err);
+                }
+            };
+            cleanup();
+
+            // 5. Fetch family members (family-wide)
+            try {
+                if (activeFamilyId) {
+                    const { data: familyProfiles, error: famError } = await supabase
+                        .from('profiles')
+                        .select('id, full_name, photo_url, email')
+                        .or(`family_id.eq.${activeFamilyId},id.eq.${activeFamilyId}`);
+
+                    if (famError) {
+                        console.warn("Family members fetch from server error:", famError);
+                        return;
+                    }
+
+                    if (familyProfiles) {
+                        setFamilyMembers(familyProfiles.map(p => ({
+                            id: p.id,
+                            name: p.full_name || p.email?.split('@')[0] || 'Unknown',
+                            image: p.photo_url || '',
+                            email: p.email
+                        })).filter(p => p.id !== user.id));
+                    }
+                }
+            } catch (err) {
+                console.warn("Family members fetch error:", err);
+            }
+
+            // 6. Fetch invitations
+            if (user.email) {
+                try {
+                    const [{ data: receivedData }, { data: sentData }] = await Promise.all([
+                        supabase.from('invitations').select('*').ilike('receiver_email', user.email.trim()).eq('status', 'pending'),
+                        supabase.from('invitations').select('*').eq('sender_id', user.id).eq('status', 'pending')
+                    ]);
+
+                    const allInvites: Invitation[] = [];
+                    if (receivedData) {
+                        const receivedWithNames = await Promise.all(receivedData.map(async (inv) => {
+                            const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', inv.sender_id).single();
+                            return { ...inv, sender_name: profile?.full_name || 'Someone', type: 'received' as const };
+                        }));
+                        allInvites.push(...receivedWithNames);
+                    }
+                    if (sentData) {
+                        allInvites.push(...sentData.map(inv => ({ ...inv, type: 'sent' as const })));
+                    }
+                    setInvitations(allInvites);
+                } catch (err) {
+                    console.warn("Invitations fetch error:", err);
+                    setInvitationError(true);
                 }
             }
         } catch (error) {
-            console.error('Error fetching initial data:', error);
+            console.error('Critical data fetch error:', error);
         } finally {
             setLoading(false);
         }
@@ -242,22 +303,33 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return () => subscription.unsubscribe();
     }, []);
 
-    const addUpdate = async (name: string, text: string) => {
+    const addUpdate = async (text: string) => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            const { data: profile } = await supabase.from('profiles').select('family_id').eq('id', user.id).single();
-            const family_id = profile?.family_id || user.id;
-
-            const { data, error } = await supabase
-                .from('family_updates')
-                .insert({ user_id: user.id, family_id, name, text })
-                .select()
+            // Fetch the most up-to-date name and family_id from the profile
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('full_name, family_id')
+                .eq('id', user.id)
                 .single();
 
+            const family_id = profile?.family_id || user.id;
+            const senderName = profile?.full_name || user.email?.split('@')[0] || 'A family member';
+
+            const { error } = await supabase
+                .from('family_updates')
+                .insert({
+                    user_id: user.id,
+                    family_id,
+                    name: senderName,
+                    text
+                });
+
             if (error) throw error;
-            setUpdates(prev => [data, ...prev]);
+            // Force a refresh to ensure immediate visibility
+            await fetchInitialData();
         } catch (error) {
             console.error('Error adding update:', error);
         }
@@ -291,7 +363,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             };
 
             setReports(prev => [newReport, ...prev]);
-            await addUpdate("Me", `You added a new report: ${name}`);
+            await addUpdate(`Added a new report: ${name}`);
         } catch (error) {
             console.error('Error adding report:', error);
         }
@@ -324,7 +396,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             };
 
             setDocuments(prev => [newDoc, ...prev]);
-            await addUpdate("Me", `You added a new document: ${name}`);
+            await addUpdate(`Uploaded a document: ${name}`);
         } catch (error) {
             console.error('Error adding document:', error);
             throw error;
@@ -440,7 +512,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
             if (inviteError) throw inviteError;
 
-            await addUpdate("Me", `You sent a family invitation to ${email}`);
+            await addUpdate(`Sent a family invitation to ${email}`);
         } catch (error) {
             console.error('Error sending invitation:', error);
             throw error;
@@ -468,7 +540,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             // 3. Clear invitations and refresh
             setInvitations(prev => prev.filter(i => i.id !== invitationId));
             await fetchInitialData();
-            await addUpdate("Me", `You joined a new family!`);
+            await addUpdate(`Joined a new family!`);
         } catch (error) {
             console.error('Error accepting invitation:', error);
             throw error;
@@ -486,6 +558,44 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             setInvitations(prev => prev.filter(i => i.id !== invitationId));
         } catch (error) {
             console.error('Error rejecting invitation:', error);
+            throw error;
+        }
+    };
+
+    const cancelInvitation = async (invitationId: string) => {
+        try {
+            const { error } = await supabase
+                .from('invitations')
+                .update({ status: 'rejected' })
+                .eq('id', invitationId);
+
+            if (error) throw error;
+            setInvitations(prev => prev.filter(i => i.id !== invitationId));
+            await addUpdate("Cancelled a sent invitation.");
+        } catch (error) {
+            console.error('Error cancelling invitation:', error);
+            throw error;
+        }
+    };
+
+    const removeFamilyMember = async (memberId: string) => {
+        try {
+            // Setting family_id to their own ID makes them part of a single-person family (private)
+            const { error } = await supabase
+                .from('profiles')
+                .update({ family_id: memberId })
+                .eq('id', memberId);
+
+            if (error) throw error;
+
+            const removedMember = familyMembers.find(m => m.id === memberId);
+            setFamilyMembers(prev => prev.filter(m => m.id !== memberId));
+
+            if (removedMember) {
+                await addUpdate(`Removed ${removedMember.name} from the family.`);
+            }
+        } catch (error) {
+            console.error('Error removing family member:', error);
             throw error;
         }
     };
@@ -511,7 +621,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             deleteDocument,
             sendInvitation,
             acceptInvitation,
-            rejectInvitation
+            rejectInvitation,
+            cancelInvitation,
+            removeFamilyMember,
+            familyId: currentFamilyId
         }}>
             {children}
         </AppContext.Provider>

@@ -5,6 +5,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { MenuIcon, ProfileIcon, DropdownIcon, UploadIcon, BackIcon, CrossIcon } from './Icons';
 import { useNavigation } from '../../context/NavigationContext';
 import { supabase } from '../../lib/supabase';
+import { useAppContext } from '../../context/AppContext';
 
 const { width } = Dimensions.get('window');
 
@@ -33,34 +34,13 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
     subtitle
 }) => {
     const { navigate } = useNavigation();
+    const { userProfile, userEmail } = useAppContext();
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
-    const [profile, setProfile] = useState<any>(null);
     const animation = useRef(new Animated.Value(0)).current;
 
-    useEffect(() => {
-        if (showUserBlock) {
-            fetchProfile();
-        }
-    }, [showUserBlock]);
-
-    const fetchProfile = async () => {
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', user.id)
-                .single();
-
-            if (error) throw error;
-            setProfile({ ...data, email: user.email });
-        } catch (error) {
-            console.error('Error fetching profile in header:', error);
-        }
-    };
+    // Use context profile instead of local fetch
+    const profile = userProfile ? { ...userProfile, email: userEmail } : null;
 
     const toggleExpand = () => {
         const toValue = isExpanded ? 0 : 1;
@@ -167,10 +147,18 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
                 <Pressable onPress={toggleExpand}>
                     <Animated.View style={[styles.userBlock, { height: blockHeight }]}>
                         <View style={styles.userMainRow}>
-                            <Image
-                                source={{ uri: 'https://avatar.iran.liara.run/public/70' }}
-                                style={styles.userImage}
-                            />
+                            {profile?.photo_url ? (
+                                <Image
+                                    source={{ uri: profile.photo_url }}
+                                    style={styles.userImage}
+                                />
+                            ) : (
+                                <View style={[styles.userImage, styles.avatarPlaceholder]}>
+                                    <Text style={styles.avatarPlaceholderText}>
+                                        {(profile?.full_name || 'U').charAt(0).toUpperCase()}
+                                    </Text>
+                                </View>
+                            )}
                             <View style={styles.userInfo}>
                                 <Text style={styles.userName}>{profile?.full_name || 'Loading...'}</Text>
                                 <Text style={styles.userDetails}>
@@ -197,7 +185,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
 
             {showActionRow && (
                 <>
-                    <Text style={styles.promptText}>Want to understand you report?</Text>
+                    <Text style={styles.promptText}>Want to understand your report?</Text>
 
                     <View style={styles.actionRow}>
                         <Pressable style={styles.actionItem} onPress={() => navigate('scan_report')}>
@@ -298,6 +286,16 @@ const styles = StyleSheet.create({
         borderRadius: 25,
         borderWidth: 2,
         borderColor: '#FFFFFF',
+    },
+    avatarPlaceholder: {
+        backgroundColor: 'rgba(255, 255, 255, 0.3)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    avatarPlaceholderText: {
+        fontFamily: 'Judson-Bold',
+        fontSize: 20,
+        color: '#FFFFFF',
     },
     userInfo: {
         flex: 1,

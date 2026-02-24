@@ -14,12 +14,45 @@ import {
     Alert,
     ActivityIndicator
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '../../context/NavigationContext';
 import AppStatusBar from '../../components/status-bar/status-bar';
 import HomeHeader from '../Home/HomeHeader';
 import Menu from '../../components/navigation/menu-drawer/menu';
+import AlertBox from '../../components/common/alert-box';
 import { supabase } from '../../lib/supabase';
+import { useAppContext } from '../../context/AppContext';
+
+// Helper to convert base64 to ArrayBuffer
+const decodeBase64 = (base64: string) => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    const lookup = new Uint8Array(256);
+    for (let i = 0; i < chars.length; i++) lookup[chars.charCodeAt(i)] = i;
+
+    let bufferLength = base64.length * 0.75;
+    let len = base64.length, i, p = 0;
+    if (base64[base64.length - 1] === "=") {
+        bufferLength--;
+        if (base64[base64.length - 2] === "=") bufferLength--;
+    }
+
+    const arraybuffer = new ArrayBuffer(bufferLength);
+    const bytes = new Uint8Array(arraybuffer);
+
+    for (i = 0; i < len; i += 4) {
+        let encoded1 = lookup[base64.charCodeAt(i)];
+        let encoded2 = lookup[base64.charCodeAt(i + 1)];
+        let encoded3 = lookup[base64.charCodeAt(i + 2)];
+        let encoded4 = lookup[base64.charCodeAt(i + 3)];
+
+        bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
+        bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
+        bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
+    }
+    return arraybuffer;
+};
 import {
     NameIcon,
     AgeIcon,
@@ -42,10 +75,12 @@ interface ProfileData {
     address: string;
     bloodGroup: string;
     emergencyContact: string;
+    photo_url?: string;
 }
 
 const ProfileScreen = () => {
     const { goBack, navigate } = useNavigation();
+    const { updates, userProfile, refreshData } = useAppContext();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -59,46 +94,48 @@ const ProfileScreen = () => {
         emergencyContact: 'N/A'
     });
 
+    useEffect(() => {
+        if (userProfile) {
+            setProfile({
+                name: userProfile.full_name || 'N/A',
+                age: userProfile.dob || 'N/A',
+                gender: userProfile.gender || 'N/A',
+                contactNumber: userProfile.phone || 'N/A',
+                address: userProfile.address || 'N/A',
+                bloodGroup: userProfile.blood_group || 'N/A',
+                emergencyContact: userProfile.emergency_contact || 'N/A',
+                photo_url: userProfile.photo_url
+            });
+            setLoading(false);
+        }
+    }, [userProfile]);
+
     const [editingField, setEditingField] = useState<keyof ProfileData | null>(null);
     const [tempValue, setTempValue] = useState('');
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+    const [isAvatarModalVisible, setIsAvatarModalVisible] = useState(false);
+    const [isLogoutAlertVisible, setIsLogoutAlertVisible] = useState(false);
 
-    useEffect(() => {
-        fetchProfile();
-    }, []);
+    const APP_AVATARS = [
+        'https://api.dicebear.com/7.x/avataaars/png?seed=Felix&backgroundColor=b6e3f4',
+        'https://api.dicebear.com/7.x/avataaars/png?seed=Aneka&backgroundColor=ffdfbf',
+        'https://api.dicebear.com/7.x/avataaars/png?seed=Caleb&backgroundColor=d1d4f9',
+        'https://api.dicebear.com/7.x/avataaars/png?seed=Jocelyn&backgroundColor=ffd5dc',
+        'https://api.dicebear.com/7.x/avataaars/png?seed=George&backgroundColor=c0aede',
+        'https://api.dicebear.com/7.x/avataaars/png?seed=Sophia&backgroundColor=ffdfbf',
+        'https://api.dicebear.com/7.x/avataaars/png?seed=Oliver&backgroundColor=b6e3f4',
+        'https://api.dicebear.com/7.x/avataaars/png?seed=Emma&backgroundColor=d1d4f9',
+        'https://api.dicebear.com/7.x/avataaars/png?seed=Sam&backgroundColor=ffdfbf',
+    ];
 
-    const fetchProfile = async () => {
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
+    // Screen automatically syncs with useAppContext() via the useEffect below
 
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', user.id)
-                .single();
-
-            if (error) throw error;
-
-            if (data) {
-                setProfile({
-                    name: data.full_name || 'N/A',
-                    age: data.dob || 'N/A', // Using DOB as age for now or we could calculate
-                    gender: data.gender || 'N/A',
-                    contactNumber: data.phone || 'N/A',
-                    address: data.address || 'N/A',
-                    bloodGroup: data.blood_group || 'N/A',
-                    emergencyContact: data.emergency_contact || 'N/A'
-                });
-            }
-        } catch (error: any) {
-            console.error('Error fetching profile:', error.message);
-        } finally {
-            setLoading(false);
-        }
+    const handleLogout = () => {
+        setIsLogoutAlertVisible(true);
     };
 
-    const handleLogout = async () => {
+    const confirmLogout = async () => {
+        setIsLogoutAlertVisible(false);
         const { error } = await supabase.auth.signOut();
         if (error) {
             Alert.alert('Error', error.message);
@@ -109,7 +146,7 @@ const ProfileScreen = () => {
 
     const openEdit = (field: keyof ProfileData) => {
         setEditingField(field);
-        setTempValue(profile[field]);
+        setTempValue(profile[field] || '');
         setIsEditModalVisible(true);
     };
 
@@ -151,6 +188,73 @@ const ProfileScreen = () => {
     const handleCancel = () => {
         setIsEditModalVisible(false);
         setEditingField(null);
+    };
+
+    const handleRemovePhoto = async () => {
+        try {
+            setSaving(true);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { error } = await supabase
+                .from('profiles')
+                .update({ photo_url: null })
+                .eq('id', user.id);
+
+            if (error) throw error;
+
+            setProfile(prev => ({ ...prev, photo_url: undefined }));
+            await refreshData();
+            Alert.alert('Success', 'Profile picture removed.');
+        } catch (error: any) {
+            Alert.alert('Error', error.message);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleSelectAvatar = async (url: string) => {
+        try {
+            setSaving(true);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('Not authenticated');
+
+            const { error: updateError } = await supabase
+                .from('profiles')
+                .update({ photo_url: url })
+                .eq('id', user.id);
+
+            if (updateError) throw updateError;
+
+            setProfile(prev => ({ ...prev, photo_url: url }));
+            await refreshData();
+            setIsAvatarModalVisible(false);
+            Alert.alert('Success', 'Profile picture updated successfully!');
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'Failed to update photo');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleUpdatePhoto = () => {
+        setIsAvatarModalVisible(true);
+    };
+
+    const showPhotoOptions = () => {
+        Alert.alert(
+            'Profile Photo',
+            'Would you like to update or remove your profile photo?',
+            [
+                { text: 'Upload New Photo', onPress: handleUpdatePhoto },
+                {
+                    text: 'Remove Photo',
+                    onPress: handleRemovePhoto,
+                    style: 'destructive'
+                },
+                { text: 'Cancel', style: 'cancel' }
+            ]
+        );
     };
 
     const renderEditField = () => {
@@ -256,12 +360,30 @@ const ProfileScreen = () => {
                 >
                     <View style={styles.profileInfoRow}>
                         <View style={styles.avatarContainer}>
-                            <Image
-                                source={{ uri: 'https://avatar.iran.liara.run/public/70' }}
-                                style={styles.avatar}
-                            />
-                            <TouchableOpacity style={styles.editBadge}>
-                                <ProfileEditIcon size={16} color="#FFFFFF" />
+                            {profile.photo_url ? (
+                                <Image
+                                    key={profile.photo_url}
+                                    source={{ uri: profile.photo_url }}
+                                    style={styles.avatar}
+                                    resizeMode="cover"
+                                />
+                            ) : (
+                                <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                                    <Text style={styles.avatarPlaceholderText}>
+                                        {(profile.name || 'U').charAt(0).toUpperCase()}
+                                    </Text>
+                                </View>
+                            )}
+                            <TouchableOpacity
+                                style={styles.editBadge}
+                                onPress={showPhotoOptions}
+                                disabled={saving}
+                            >
+                                {saving ? (
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                ) : (
+                                    <ProfileEditIcon size={16} color="#FFFFFF" />
+                                )}
                             </TouchableOpacity>
                         </View>
                         <View style={styles.headerInfo}>
@@ -293,6 +415,55 @@ const ProfileScreen = () => {
                 <View style={{ height: 40 }} />
             </ScrollView>
 
+            {/* Avatar Selection Modal */}
+            <Modal
+                visible={isAvatarModalVisible}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setIsAvatarModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+                        <View style={styles.editHeader}>
+                            <Text style={styles.modalTitle}>Choose Avatar</Text>
+                            <TouchableOpacity onPress={() => setIsAvatarModalVisible(false)}>
+                                <Text style={styles.closeText}>✕</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <Text style={styles.modalSubtitle}>Pick a character that represents you</Text>
+
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            <View style={styles.avatarGrid}>
+                                {APP_AVATARS.map((url, index) => (
+                                    <TouchableOpacity
+                                        key={index}
+                                        style={[
+                                            styles.avatarOption,
+                                            profile.photo_url === url && styles.selectedAvatarOption
+                                        ]}
+                                        onPress={() => handleSelectAvatar(url)}
+                                    >
+                                        <Image source={{ uri: url }} style={styles.avatarChoice} />
+                                        {profile.photo_url === url && (
+                                            <View style={styles.selectedBadge}>
+                                                <Text style={styles.checkIcon}>✓</Text>
+                                            </View>
+                                        )}
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </ScrollView>
+
+                        <TouchableOpacity
+                            style={styles.cancelAvatarButton}
+                            onPress={() => setIsAvatarModalVisible(false)}
+                        >
+                            <Text style={styles.cancelButtonText}>Cancel</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
             {/* Edit Modal */}
             <Modal
                 transparent
@@ -319,6 +490,13 @@ const ProfileScreen = () => {
                     </KeyboardAvoidingView>
                 </TouchableOpacity>
             </Modal>
+
+            <AlertBox
+                visible={isLogoutAlertVisible}
+                message="Do you really want to logout?"
+                onYes={confirmLogout}
+                onNo={() => setIsLogoutAlertVisible(false)}
+            />
         </View>
     );
 };
@@ -350,6 +528,16 @@ const styles = StyleSheet.create({
         borderRadius: 55,
         borderWidth: 2,
         borderColor: '#FFFFFF',
+    },
+    avatarPlaceholder: {
+        backgroundColor: 'rgba(255, 255, 255, 0.3)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    avatarPlaceholderText: {
+        fontFamily: 'Judson-Bold',
+        fontSize: 40,
+        color: '#FFFFFF',
     },
     editBadge: {
         position: 'absolute',
@@ -554,6 +742,73 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#FFFFFF',
     },
+    // Modal Text Styles
+    modalTitle: {
+        fontFamily: 'Judson-Bold',
+        fontSize: 22,
+        color: '#000000',
+        marginBottom: 10,
+    },
+    modalSubtitle: {
+        fontFamily: 'Judson-Regular',
+        fontSize: 15,
+        color: '#666666',
+        marginBottom: 20,
+    },
+    // Avatar Modal Styles
+    avatarGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        paddingVertical: 10,
+    },
+    avatarOption: {
+        width: width * 0.25,
+        height: width * 0.25,
+        borderRadius: 20,
+        backgroundColor: '#F5F9FF',
+        marginBottom: 15,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: 'transparent',
+    },
+    selectedAvatarOption: {
+        borderColor: '#0062FF',
+        backgroundColor: '#E6F0FF',
+    },
+    avatarChoice: {
+        width: '80%',
+        height: '80%',
+        borderRadius: 15,
+    },
+    selectedBadge: {
+        position: 'absolute',
+        top: -5,
+        right: -5,
+        backgroundColor: '#0062FF',
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#FFFFFF',
+    },
+    checkIcon: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
+    cancelAvatarButton: {
+        width: '100%',
+        height: 50,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 15,
+        borderTopWidth: 1,
+        borderTopColor: '#EEE',
+    }
 });
 
 export default ProfileScreen;

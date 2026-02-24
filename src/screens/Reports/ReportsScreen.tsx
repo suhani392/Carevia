@@ -31,7 +31,8 @@ const ReportsScreen = () => {
 
     const memberId = screenParams?.memberId;
     const currentReports = memberId ? memberReports : reports;
-    const pageTitle = memberId ? `${screenParams.name}'s Reports` : 'Your Saved Reports';
+    const firstName = screenParams?.name ? screenParams.name.split(' ')[0] : '';
+    const pageTitle = memberId ? `${firstName}'s Reports` : 'Your Saved Reports';
 
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
     const [isActionMenuVisible, setIsActionMenuVisible] = useState(false);
