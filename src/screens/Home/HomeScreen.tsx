@@ -7,12 +7,16 @@ import AppStatusBar from '../../components/status-bar/status-bar';
 import Menu from '../../components/navigation/menu-drawer/menu';
 import { useNavigation } from '../../context/NavigationContext';
 import { useAppContext } from '../../context/AppContext';
+import { getAvatarSource } from '../../lib/avatars';
+
 
 const HomeScreen = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const { navigate } = useNavigation();
-    const { updates, userProfile, familyMembers, refreshData } = useAppContext();
+    const { updates, userProfile, familyMembers, refreshData, t } = useAppContext();
     const [refreshing, setRefreshing] = useState(false);
+    const [isUpdatesExpanded, setIsUpdatesExpanded] = useState(false);
+
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -37,8 +41,9 @@ const HomeScreen = () => {
 
                 {/* Emergency Access Section */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Emergency Access</Text>
+                    <Text style={styles.sectionTitle}>{t('emergency_access')}</Text>
                     <View style={styles.emergencyRow}>
+
                         <Pressable
                             style={styles.modernLargeCard}
                             onPress={() => navigate('documents')}
@@ -47,7 +52,8 @@ const HomeScreen = () => {
                                 colors={['#E6F0FF', '#C7DFFF']}
                                 style={styles.cardGradient}
                             >
-                                <Text style={styles.modernCardTitle}>My Documents</Text>
+                                <Text style={styles.modernCardTitle}>{t('documents')}</Text>
+
                                 <View style={styles.modernDocIconContainer}>
                                     <Image
                                         source={require('../../assets/icons/home/documents.png')}
@@ -69,7 +75,8 @@ const HomeScreen = () => {
                                     <View style={styles.modernIconContainer}>
                                         <ReportIcon size={24} color="#0062FF" />
                                     </View>
-                                    <Text style={styles.modernSmallCardText}>View{"\n"}Reports</Text>
+                                    <Text style={styles.modernSmallCardText}>{t('reports')}</Text>
+
                                 </LinearGradient>
                             </Pressable>
                             <Pressable
@@ -83,7 +90,8 @@ const HomeScreen = () => {
                                     <View style={styles.modernIconContainer}>
                                         <BotIcon size={24} color="#0062FF" />
                                     </View>
-                                    <Text style={styles.modernSmallCardText}>Ask{"\n"}Question</Text>
+                                    <Text style={styles.modernSmallCardText}>{t('ai_assistant')}</Text>
+
                                 </LinearGradient>
                             </Pressable>
                         </View>
@@ -92,50 +100,66 @@ const HomeScreen = () => {
 
                 {/* Family Updates Section */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Family Updates</Text>
+                    <Text style={styles.sectionTitle}>{t('family_updates')}</Text>
+
                     {updates.length > 0 ? (
-                        updates.map((update, index) => {
-                            // Resolve sender's photo and name locally
-                            let senderPhoto = update.photo_url; // Fallback to recorded URL if it exists
-                            let senderName = update.name;
+                        <>
+                            {(isUpdatesExpanded ? updates : updates.slice(0, 4)).map((update, index) => {
+                                // Resolve sender's photo and name locally
+                                let senderPhoto = update.photo_url;
+                                let senderName = update.name;
 
-                            if (userProfile?.id === update.user_id) {
-                                senderPhoto = userProfile.photo_url;
-                                senderName = 'You';
-                            } else {
-                                const member = familyMembers.find(m => m.id === update.user_id);
-                                if (member) {
-                                    senderPhoto = member.image;
-                                    senderName = member.name;
+                                if (userProfile?.id === update.user_id) {
+                                    senderPhoto = userProfile.photo_url;
+                                    senderName = 'You';
+                                } else {
+                                    const member = familyMembers.find(m => m.id === update.user_id);
+                                    if (member) {
+                                        senderPhoto = member.image;
+                                        senderName = member.name;
+                                    }
                                 }
-                            }
 
-                            return (
-                                <View key={update.id} style={styles.familyCard}>
-                                    <View style={styles.updateInfoRow}>
-                                        {senderPhoto ? (
-                                            <Image
-                                                source={{ uri: senderPhoto }}
-                                                style={styles.updateAvatar}
-                                            />
-                                        ) : (
-                                            <View style={[styles.updateAvatar, styles.updateAvatarPlaceholder]}>
-                                                <Text style={styles.updateAvatarPlaceholderText}>
-                                                    {(senderName || 'U').charAt(0).toUpperCase()}
+                                return (
+                                    <View key={update.id} style={styles.familyCard}>
+                                        <View style={styles.updateInfoRow}>
+                                            {senderPhoto && getAvatarSource(senderPhoto) ? (
+                                                <Image
+                                                    source={getAvatarSource(senderPhoto)}
+                                                    style={styles.updateAvatar}
+                                                />
+                                            ) : (
+                                                <View style={[styles.updateAvatar, styles.updateAvatarPlaceholder]}>
+                                                    <Text style={styles.updateAvatarPlaceholderText}>
+                                                        {(senderName || 'U').charAt(0).toUpperCase()}
+                                                    </Text>
+                                                </View>
+                                            )}
+
+                                            <View style={styles.updateMeta}>
+                                                <Text style={styles.updateName}>
+                                                    {senderName}
                                                 </Text>
+                                                <Text style={styles.updateText}>{update.text}</Text>
                                             </View>
-                                        )}
-                                        <View style={styles.updateMeta}>
-                                            <Text style={styles.updateName}>
-                                                {senderName}
-                                            </Text>
-                                            <Text style={styles.updateText}>{update.text}</Text>
                                         </View>
                                     </View>
-                                </View>
-                            );
-                        })
+                                );
+                            })}
+                            {updates.length > 4 && (
+                                <Pressable
+                                    style={styles.readMoreButton}
+                                    onPress={() => setIsUpdatesExpanded(!isUpdatesExpanded)}
+                                >
+                                    <Text style={styles.readMoreText}>
+                                        {isUpdatesExpanded ? t('show_less') : t('read_more')}
+                                    </Text>
+
+                                </Pressable>
+                            )}
+                        </>
                     ) : (
+
                         <View style={styles.emptyUpdatesCard}>
                             <Text style={styles.emptyUpdatesText}>No recent family updates</Text>
                         </View>
@@ -315,7 +339,22 @@ const styles = StyleSheet.create({
         fontSize: 15,
         color: 'rgba(0,0,0,0.5)',
     },
+    readMoreButton: {
+        alignItems: 'center',
+        paddingVertical: 10,
+        backgroundColor: '#F0F7FF',
+        borderRadius: 15,
+        borderWidth: 1,
+        borderColor: '#E6F0FF',
+        marginTop: 5,
+    },
+    readMoreText: {
+        fontFamily: 'Judson-Bold',
+        fontSize: 14,
+        color: '#0062FF',
+    },
 });
+
 
 
 export default HomeScreen;

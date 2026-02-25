@@ -6,6 +6,8 @@ import AppStatusBar from '../../components/status-bar/status-bar';
 import Menu from '../../components/navigation/menu-drawer/menu';
 import { useNavigation } from '../../context/NavigationContext';
 import { useAppContext } from '../../context/AppContext';
+import { getAvatarSource } from '../../lib/avatars';
+
 
 const { width } = Dimensions.get('window');
 
@@ -28,8 +30,10 @@ const FamilyScreen = () => {
         userEmail,
         invitationError,
         cancelInvitation,
-        removeFamilyMember
+        removeFamilyMember,
+        t
     } = useAppContext();
+
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -42,12 +46,13 @@ const FamilyScreen = () => {
 
         try {
             await sendInvitation(memberEmail.trim());
-            Alert.alert("Invitation Sent", `A family invitation has been sent to ${memberEmail}.`);
+            Alert.alert(t('invite'), `${t('sent_to')} ${memberEmail}`);
             setShowAddModal(false);
             setMemberEmail('');
         } catch (error: any) {
-            Alert.alert("Error", error.message || "Failed to send invitation");
+            Alert.alert(t('status'), error.message || t('status'));
         }
+
     };
 
     return (
@@ -67,14 +72,16 @@ const FamilyScreen = () => {
 
                 {loading && (
                     <View style={styles.loadingContainer}>
-                        <Text style={styles.loadingText}>Loading Family Data...</Text>
+                        <Text style={styles.loadingText}>{t('loading')}</Text>
                     </View>
                 )}
 
+
                 <View style={[styles.section, { marginBottom: 10 }]}>
                     <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Family Invites</Text>
+                        <Text style={styles.sectionTitle}>{t('family_invites')}</Text>
                     </View>
+
 
                     {invitations.length > 0 ? (
                         <View style={styles.invitesContainer}>
@@ -82,14 +89,15 @@ const FamilyScreen = () => {
                                 <View key={invite.id} style={styles.inviteCard}>
                                     <View style={styles.inviteInfo}>
                                         <Text style={styles.inviteSender}>
-                                            {invite.type === 'received' ? invite.sender_name : `Sent to ${invite.receiver_email}`}
+                                            {invite.type === 'received' ? invite.sender_name : `${t('sent_to')} ${invite.receiver_email}`}
                                         </Text>
                                         <Text style={styles.inviteText}>
                                             {invite.type === 'received'
-                                                ? 'invited you to join their family group'
-                                                : 'Waiting for their acceptance...'}
+                                                ? t('invited_you')
+                                                : t('waiting_acceptance')}
                                         </Text>
                                     </View>
+
                                     <View style={styles.inviteActions}>
                                         {invite.type === 'received' ? (
                                             <>
@@ -97,8 +105,9 @@ const FamilyScreen = () => {
                                                     style={styles.rejectButton}
                                                     onPress={() => rejectInvitation(invite.id)}
                                                 >
-                                                    <Text style={styles.rejectButtonText}>Reject</Text>
+                                                    <Text style={styles.rejectButtonText}>{t('reject')}</Text>
                                                 </TouchableOpacity>
+
                                                 <TouchableOpacity
                                                     style={styles.acceptButton}
                                                     onPress={() => acceptInvitation(invite.id)}
@@ -107,26 +116,28 @@ const FamilyScreen = () => {
                                                         colors={['#0062FF', '#5C8EDF']}
                                                         style={styles.acceptButtonGradient}
                                                     >
-                                                        <Text style={styles.acceptButtonText}>Accept</Text>
+                                                        <Text style={styles.acceptButtonText}>{t('accept')}</Text>
                                                     </LinearGradient>
                                                 </TouchableOpacity>
+
                                             </>
                                         ) : (
                                             <TouchableOpacity
                                                 style={styles.rejectButton}
                                                 onPress={() => {
                                                     Alert.alert(
-                                                        "Cancel Invitation",
-                                                        "Are you sure you want to cancel this invitation?",
+                                                        t('cancel_request'),
+                                                        t('remove_member_confirm'),
                                                         [
-                                                            { text: "No", style: "cancel" },
-                                                            { text: "Yes, Cancel", onPress: () => cancelInvitation(invite.id), style: "destructive" }
+                                                            { text: t('cancel'), style: "cancel" },
+                                                            { text: t('cancel_request'), onPress: () => cancelInvitation(invite.id), style: "destructive" }
                                                         ]
                                                     );
                                                 }}
                                             >
-                                                <Text style={styles.rejectButtonText}>Cancel Request</Text>
+                                                <Text style={styles.rejectButtonText}>{t('cancel_request')}</Text>
                                             </TouchableOpacity>
+
                                         )}
                                     </View>
                                 </View>
@@ -135,8 +146,9 @@ const FamilyScreen = () => {
                     ) : (
                         <View style={styles.emptyInvitesCard}>
                             <Text style={styles.emptyInvitesText}>
-                                {invitationError ? "Database Permission Issue" : "No pending family invitations"}
+                                {t('no_pending_invites')}
                             </Text>
+
                             {invitationError && (
                                 <Text style={[styles.debugEmailText, { color: '#FF4C4C', textAlign: 'center' }]}>
                                     Your Supabase RLS policy might be blocking this. Please check your "invitations" table permissions.
@@ -149,15 +161,16 @@ const FamilyScreen = () => {
 
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Family Members</Text>
+                        <Text style={styles.sectionTitle}>{t('family_members')}</Text>
                         <TouchableOpacity
                             style={styles.addMemberButton}
                             activeOpacity={0.8}
                             onPress={() => setShowAddModal(true)}
                         >
-                            <Text style={styles.addMemberText}>Add Member</Text>
+                            <Text style={styles.addMemberText}>{t('add_member')}</Text>
                         </TouchableOpacity>
                     </View>
+
 
                     <View style={styles.memberGrid}>
                         {!loading && familyMembers.length > 0 ? (
@@ -168,8 +181,8 @@ const FamilyScreen = () => {
                                         onPress={() => setActiveMemberId(activeMemberId === member.id ? null : member.id)}
                                         style={styles.memberInfoRow}
                                     >
-                                        {member.image ? (
-                                            <Image source={{ uri: member.image }} style={styles.memberAvatar} />
+                                        {member.image && getAvatarSource(member.image) ? (
+                                            <Image source={getAvatarSource(member.image)} style={styles.memberAvatar} />
                                         ) : (
                                             <View style={[styles.memberAvatar, styles.avatarPlaceholder]}>
                                                 <Text style={styles.avatarPlaceholderText}>
@@ -177,6 +190,7 @@ const FamilyScreen = () => {
                                                 </Text>
                                             </View>
                                         )}
+
                                         <View style={styles.memberMeta}>
                                             <Text style={styles.memberName}>{member.name}</Text>
                                             <Text style={styles.memberEmail}>{member.email || 'Family Member'}</Text>
@@ -188,43 +202,46 @@ const FamilyScreen = () => {
                                                 style={[styles.actionSubButton, { backgroundColor: '#FFF0F0', borderColor: '#FFE0E0' }]}
                                                 onPress={() => {
                                                     Alert.alert(
-                                                        "Remove Family Member",
-                                                        `Are you sure you want to remove ${member.name} from your family group? They will no longer have access to your shared space.`,
+                                                        t('remove_member'),
+                                                        `${t('remove_member_confirm')} ${member.name}?`,
                                                         [
-                                                            { text: "Cancel", style: "cancel" },
-                                                            { text: "Remove", onPress: () => removeFamilyMember(member.id), style: "destructive" }
+                                                            { text: t('cancel'), style: "cancel" },
+                                                            { text: t('delete'), onPress: () => removeFamilyMember(member.id), style: "destructive" }
                                                         ]
                                                     );
                                                 }}
                                             >
-                                                <Text style={[styles.actionSubButtonText, { color: '#FF4C4C' }]}>Remove</Text>
+                                                <Text style={[styles.actionSubButtonText, { color: '#FF4C4C' }]}>{t('delete')}</Text>
                                             </TouchableOpacity>
+
                                         )}
                                         <TouchableOpacity
                                             style={styles.actionSubButton}
                                             onPress={() => navigate('reports', { name: member.name, memberId: member.id })}
                                         >
-                                            <Text style={styles.actionSubButtonText}>Reports</Text>
+                                            <Text style={styles.actionSubButtonText}>{t('reports')}</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             style={styles.actionSubButton}
                                             onPress={() => navigate('documents', { name: member.name, memberId: member.id })}
                                         >
-                                            <Text style={styles.actionSubButtonText}>Documents</Text>
+                                            <Text style={styles.actionSubButtonText}>{t('documents')}</Text>
                                         </TouchableOpacity>
+
                                     </View>
                                 </View>
                             ))
                         ) : !loading ? (
                             <View style={styles.emptyMembersContainer}>
-                                <Text style={styles.emptyText}>You haven’t added any family members yet.</Text>
+                                <Text style={styles.emptyText}>{t('empty_family_msg')}</Text>
                                 <TouchableOpacity
                                     style={styles.emptyAddButton}
                                     onPress={() => setShowAddModal(true)}
                                 >
-                                    <Text style={styles.emptyAddButtonText}>+ Add Member</Text>
+                                    <Text style={styles.emptyAddButtonText}>+ {t('add_member')}</Text>
                                 </TouchableOpacity>
                             </View>
+
                         ) : null}
                     </View>
                 </View>
@@ -240,12 +257,12 @@ const FamilyScreen = () => {
             >
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Add Family Member</Text>
-                        <Text style={styles.modalSubtitle}>Enter their email address to send a family invitation.</Text>
+                        <Text style={styles.modalTitle}>{t('add_member')}</Text>
+                        <Text style={styles.modalSubtitle}>{t('enter_email')}</Text>
 
                         <TextInput
                             style={styles.modalInput}
-                            placeholder="Email Address"
+                            placeholder={t('email')}
                             placeholderTextColor="#999"
                             value={memberEmail}
                             onChangeText={setMemberEmail}
@@ -254,12 +271,13 @@ const FamilyScreen = () => {
                             autoFocus={true}
                         />
 
+
                         <View style={styles.modalButtons}>
                             <TouchableOpacity
                                 style={styles.cancelButton}
                                 onPress={() => setShowAddModal(false)}
                             >
-                                <Text style={styles.cancelButtonText}>Cancel</Text>
+                                <Text style={styles.cancelButtonText}>{t('cancel')}</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
@@ -270,10 +288,11 @@ const FamilyScreen = () => {
                                     colors={['#0062FF', '#5C8EDF']}
                                     style={styles.confirmButtonGradient}
                                 >
-                                    <Text style={styles.confirmButtonText}>Send Invitation</Text>
+                                    <Text style={styles.confirmButtonText}>{t('invite')}</Text>
                                 </LinearGradient>
                             </TouchableOpacity>
                         </View>
+
                     </View>
                 </View>
             </Modal>

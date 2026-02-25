@@ -24,6 +24,8 @@ import Menu from '../../components/navigation/menu-drawer/menu';
 import AlertBox from '../../components/common/alert-box';
 import { supabase } from '../../lib/supabase';
 import { useAppContext } from '../../context/AppContext';
+import { APP_AVATAR_LIST, getAvatarSource } from '../../lib/avatars';
+
 
 // Helper to convert base64 to ArrayBuffer
 const decodeBase64 = (base64: string) => {
@@ -80,7 +82,8 @@ interface ProfileData {
 
 const ProfileScreen = () => {
     const { goBack, navigate } = useNavigation();
-    const { updates, userProfile, refreshData } = useAppContext();
+    const { updates, userProfile, refreshData, t } = useAppContext();
+
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -114,35 +117,15 @@ const ProfileScreen = () => {
     const [tempValue, setTempValue] = useState('');
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
     const [isAvatarModalVisible, setIsAvatarModalVisible] = useState(false);
-    const [isLogoutAlertVisible, setIsLogoutAlertVisible] = useState(false);
+    const [tempAvatar, setTempAvatar] = useState<string | null>(null);
 
-    const APP_AVATARS = [
-        'https://api.dicebear.com/7.x/avataaars/png?seed=Felix&backgroundColor=b6e3f4',
-        'https://api.dicebear.com/7.x/avataaars/png?seed=Aneka&backgroundColor=ffdfbf',
-        'https://api.dicebear.com/7.x/avataaars/png?seed=Caleb&backgroundColor=d1d4f9',
-        'https://api.dicebear.com/7.x/avataaars/png?seed=Jocelyn&backgroundColor=ffd5dc',
-        'https://api.dicebear.com/7.x/avataaars/png?seed=George&backgroundColor=c0aede',
-        'https://api.dicebear.com/7.x/avataaars/png?seed=Sophia&backgroundColor=ffdfbf',
-        'https://api.dicebear.com/7.x/avataaars/png?seed=Oliver&backgroundColor=b6e3f4',
-        'https://api.dicebear.com/7.x/avataaars/png?seed=Emma&backgroundColor=d1d4f9',
-        'https://api.dicebear.com/7.x/avataaars/png?seed=Sam&backgroundColor=ffdfbf',
-    ];
+    const APP_AVATARS = APP_AVATAR_LIST;
+
+
 
     // Screen automatically syncs with useAppContext() via the useEffect below
 
-    const handleLogout = () => {
-        setIsLogoutAlertVisible(true);
-    };
 
-    const confirmLogout = async () => {
-        setIsLogoutAlertVisible(false);
-        const { error } = await supabase.auth.signOut();
-        if (error) {
-            Alert.alert('Error', error.message);
-        } else {
-            navigate('login');
-        }
-    };
 
     const openEdit = (field: keyof ProfileData) => {
         setEditingField(field);
@@ -213,7 +196,7 @@ const ProfileScreen = () => {
         }
     };
 
-    const handleSelectAvatar = async (url: string) => {
+    const handleSelectAvatar = async (avatarKey: string) => {
         try {
             setSaving(true);
             const { data: { user } } = await supabase.auth.getUser();
@@ -221,12 +204,12 @@ const ProfileScreen = () => {
 
             const { error: updateError } = await supabase
                 .from('profiles')
-                .update({ photo_url: url })
+                .update({ photo_url: avatarKey })
                 .eq('id', user.id);
 
             if (updateError) throw updateError;
 
-            setProfile(prev => ({ ...prev, photo_url: url }));
+            setProfile(prev => ({ ...prev, photo_url: avatarKey }));
             await refreshData();
             setIsAvatarModalVisible(false);
             Alert.alert('Success', 'Profile picture updated successfully!');
@@ -237,22 +220,26 @@ const ProfileScreen = () => {
         }
     };
 
+
     const handleUpdatePhoto = () => {
+        setTempAvatar(profile.photo_url || null);
         setIsAvatarModalVisible(true);
     };
 
+
     const showPhotoOptions = () => {
         Alert.alert(
-            'Profile Photo',
-            'Would you like to update or remove your profile photo?',
+            t('profile'),
+            t('pick_character'),
             [
-                { text: 'Upload New Photo', onPress: handleUpdatePhoto },
+                { text: t('select_avatar'), onPress: handleUpdatePhoto },
+
                 {
-                    text: 'Remove Photo',
+                    text: t('remove_photo'),
                     onPress: handleRemovePhoto,
                     style: 'destructive'
                 },
-                { text: 'Cancel', style: 'cancel' }
+                { text: t('cancel'), style: 'cancel' }
             ]
         );
     };
@@ -263,14 +250,14 @@ const ProfileScreen = () => {
         const isDropdown = editingField === 'gender' || editingField === 'bloodGroup';
 
         const options = {
-            gender: ['Male', 'Female', 'Other'],
+            gender: [t('male'), t('female'), t('other')],
             bloodGroup: ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-']
         };
 
         return (
             <View style={styles.editContainer}>
                 <View style={styles.editHeader}>
-                    <Text style={styles.editTitle}>Edit {editingField.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</Text>
+                    <Text style={styles.editTitle}>{t('edit')} {t(editingField as any) || editingField}</Text>
                     <TouchableOpacity onPress={handleCancel}>
                         <Text style={styles.closeText}>✕</Text>
                     </TouchableOpacity>
@@ -294,21 +281,21 @@ const ProfileScreen = () => {
                         value={tempValue}
                         onChangeText={setTempValue}
                         autoFocus
-                        placeholder={`Enter ${editingField}`}
                     />
                 )}
 
                 <View style={styles.editButtons}>
                     <TouchableOpacity style={styles.cancelButton} onPress={handleCancel} disabled={saving}>
-                        <Text style={styles.cancelButtonText}>Don't Save</Text>
+                        <Text style={styles.cancelButtonText}>{t('cancel')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
-                        {saving ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveButtonText}>Save</Text>}
+                        {saving ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveButtonText}>{t('save')}</Text>}
                     </TouchableOpacity>
                 </View>
             </View>
         );
     };
+
 
     const ProfileItem = ({ icon: Icon, label, value, field }: { icon: any, label: string, value: string, field: keyof ProfileData }) => (
         <TouchableOpacity style={styles.profileItem} onPress={() => openEdit(field)}>
@@ -345,10 +332,11 @@ const ProfileScreen = () => {
                 showActionRow={false}
                 showUserBlock={false}
                 centerTitle={true}
-                title="Profile"
+                title={t('profile')}
                 showRightIcon={true}
                 showCrossButton={true}
             />
+
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 {/* Profile Card */}
@@ -360,10 +348,10 @@ const ProfileScreen = () => {
                 >
                     <View style={styles.profileInfoRow}>
                         <View style={styles.avatarContainer}>
-                            {profile.photo_url ? (
+                            {profile.photo_url && getAvatarSource(profile.photo_url) ? (
                                 <Image
                                     key={profile.photo_url}
-                                    source={{ uri: profile.photo_url }}
+                                    source={getAvatarSource(profile.photo_url)}
                                     style={styles.avatar}
                                     resizeMode="cover"
                                 />
@@ -374,6 +362,7 @@ const ProfileScreen = () => {
                                     </Text>
                                 </View>
                             )}
+
                             <TouchableOpacity
                                 style={styles.editBadge}
                                 onPress={showPhotoOptions}
@@ -394,23 +383,21 @@ const ProfileScreen = () => {
                     </View>
                 </LinearGradient>
 
-                <Text style={styles.sectionTitle}>My Details</Text>
+                <Text style={styles.sectionTitle}>{t('my_details')}</Text>
 
 
                 <View style={styles.itemsList}>
-                    <ProfileItem icon={NameIcon} label="Name" value={profile.name} field="name" />
-                    <ProfileItem icon={AgeIcon} label="Age" value={profile.age} field="age" />
-                    <ProfileItem icon={GenderIcon} label="Gender" value={profile.gender} field="gender" />
-                    <ProfileItem icon={ContactIcon} label="Contact Number" value={profile.contactNumber} field="contactNumber" />
-                    <ProfileItem icon={AddressIcon} label="Address" value={profile.address} field="address" />
-                    <ProfileItem icon={BloodGroupIcon} label="Blood Group" value={profile.bloodGroup} field="bloodGroup" />
-                    <ProfileItem icon={EmergencyContactIcon} label="Emergency Contact" value={profile.emergencyContact} field="emergencyContact" />
+                    <ProfileItem icon={NameIcon} label={t('name')} value={profile.name} field="name" />
+                    <ProfileItem icon={AgeIcon} label={t('age')} value={profile.age} field="age" />
+                    <ProfileItem icon={GenderIcon} label={t('gender')} value={t(profile.gender.toLowerCase() as any) || profile.gender} field="gender" />
+                    <ProfileItem icon={ContactIcon} label={t('contact_number')} value={profile.contactNumber} field="contactNumber" />
+                    <ProfileItem icon={AddressIcon} label={t('address')} value={profile.address} field="address" />
+                    <ProfileItem icon={BloodGroupIcon} label={t('blood_group')} value={profile.bloodGroup} field="bloodGroup" />
+                    <ProfileItem icon={EmergencyContactIcon} label={t('emergency_contact')} value={profile.emergencyContact} field="emergencyContact" />
                 </View>
 
-                {/* Logout Button */}
-                <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-                    <Text style={styles.logoutText}>Logout</Text>
-                </TouchableOpacity>
+
+
 
                 <View style={{ height: 40 }} />
             </ScrollView>
@@ -425,41 +412,55 @@ const ProfileScreen = () => {
                 <View style={styles.modalOverlay}>
                     <View style={[styles.modalContent, { maxHeight: '80%' }]}>
                         <View style={styles.editHeader}>
-                            <Text style={styles.modalTitle}>Choose Avatar</Text>
+                            <Text style={styles.modalTitle}>{t('choose_avatar')}</Text>
                             <TouchableOpacity onPress={() => setIsAvatarModalVisible(false)}>
                                 <Text style={styles.closeText}>✕</Text>
                             </TouchableOpacity>
                         </View>
-                        <Text style={styles.modalSubtitle}>Pick a character that represents you</Text>
+                        <Text style={styles.modalSubtitle}>{t('pick_character')}</Text>
+
 
                         <ScrollView showsVerticalScrollIndicator={false}>
                             <View style={styles.avatarGrid}>
-                                {APP_AVATARS.map((url, index) => (
+                                {APP_AVATARS.map((key, index) => (
                                     <TouchableOpacity
                                         key={index}
                                         style={[
                                             styles.avatarOption,
-                                            profile.photo_url === url && styles.selectedAvatarOption
+                                            tempAvatar === key && styles.selectedAvatarOption
                                         ]}
-                                        onPress={() => handleSelectAvatar(url)}
+                                        onPress={() => setTempAvatar(key)}
                                     >
-                                        <Image source={{ uri: url }} style={styles.avatarChoice} />
-                                        {profile.photo_url === url && (
+                                        <Image source={getAvatarSource(key)} style={styles.avatarChoice} />
+                                        {tempAvatar === key && (
                                             <View style={styles.selectedBadge}>
                                                 <Text style={styles.checkIcon}>✓</Text>
                                             </View>
                                         )}
+
                                     </TouchableOpacity>
                                 ))}
+
                             </View>
                         </ScrollView>
 
-                        <TouchableOpacity
-                            style={styles.cancelAvatarButton}
-                            onPress={() => setIsAvatarModalVisible(false)}
-                        >
-                            <Text style={styles.cancelButtonText}>Cancel</Text>
-                        </TouchableOpacity>
+                        <View style={styles.avatarModalButtons}>
+                            <TouchableOpacity
+                                style={styles.avatarCancelButton}
+                                onPress={() => setIsAvatarModalVisible(false)}
+                            >
+                                <Text style={styles.avatarCancelText}>{t('cancel')}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.avatarDoneButton, !tempAvatar && styles.avatarDoneDisabled]}
+                                onPress={() => tempAvatar && handleSelectAvatar(tempAvatar)}
+                                disabled={saving}
+                            >
+                                {saving ? <ActivityIndicator color="#FFF" /> : <Text style={styles.avatarDoneText}>{t('done')}</Text>}
+                            </TouchableOpacity>
+                        </View>
+
+
                     </View>
                 </View>
             </Modal>
@@ -491,12 +492,7 @@ const ProfileScreen = () => {
                 </TouchableOpacity>
             </Modal>
 
-            <AlertBox
-                visible={isLogoutAlertVisible}
-                message="Do you really want to logout?"
-                onYes={confirmLogout}
-                onNo={() => setIsLogoutAlertVisible(false)}
-            />
+
         </View>
     );
 };
@@ -618,20 +614,7 @@ const styles = StyleSheet.create({
         fontSize: 15,
         color: 'rgba(60, 135, 255, 0.8)',
     },
-    logoutBtn: {
-        width: '100%',
-        height: 60,
-        backgroundColor: '#FF4C4C',
-        borderRadius: 20,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: 20,
-    },
-    logoutText: {
-        fontFamily: 'Judson-Bold',
-        fontSize: 18,
-        color: '#FFFFFF',
-    },
+
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -800,16 +783,44 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: 'bold',
     },
-    cancelAvatarButton: {
-        width: '100%',
+    avatarModalButtons: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 20,
+        paddingTop: 15,
+        borderTopWidth: 1,
+        borderTopColor: '#F0F0F0',
+    },
+    avatarCancelButton: {
+        flex: 1,
         height: 50,
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 15,
-        borderTopWidth: 1,
-        borderTopColor: '#EEE',
+        marginRight: 10,
+    },
+    avatarCancelText: {
+        fontFamily: 'Judson-Bold',
+        fontSize: 16,
+        color: '#666666',
+    },
+    avatarDoneButton: {
+        flex: 2,
+        height: 50,
+        backgroundColor: '#0062FF',
+        borderRadius: 15,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    avatarDoneDisabled: {
+        backgroundColor: '#CCC',
+    },
+    avatarDoneText: {
+        fontFamily: 'Judson-Bold',
+        fontSize: 16,
+        color: '#FFFFFF',
     }
 });
+
 
 export default ProfileScreen;
 

@@ -12,7 +12,8 @@ const { width, height } = Dimensions.get('window');
 
 const AiAssistantScreen = () => {
     const { navigate } = useNavigation();
-    const { reports, documents } = useAppContext();
+    const { reports, documents, t, language } = useAppContext();
+
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [inputText, setInputText] = useState('');
     const [isAttachmentMenuOpen, setIsAttachmentMenuOpen] = useState(false);
@@ -21,8 +22,9 @@ const AiAssistantScreen = () => {
 
     // Mock messages
     const [messages, setMessages] = useState([
-        { id: 1, type: 'bot', text: `Hello! I am your AI Assistant. How can I help you today?` },
+        { id: 1, type: 'bot', text: t('bot_welcome') },
     ]);
+
 
     useEffect(() => {
         fetchProfile();
@@ -34,10 +36,11 @@ const AiAssistantScreen = () => {
             const { data } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
             if (data) {
                 setProfile(data);
-                setMessages([{ id: 1, type: 'bot', text: `Hello ${data.full_name}! I am your AI Assistant. How can I help you today?` }]);
+                setMessages([{ id: 1, type: 'bot', text: `${t('greetings')} ${data.full_name}! ${t('bot_welcome')}` }]);
             }
         }
     };
+
 
     const handleSend = () => {
         if (inputText.trim() || selectedAttachment) {
@@ -55,9 +58,10 @@ const AiAssistantScreen = () => {
                 setMessages(prev => [...prev, {
                     id: prev.length + 1,
                     type: 'bot',
-                    text: selectedAttachment ? "I've received the file. Let me analyze it for you..." : "I'm processing your request."
+                    text: selectedAttachment ? t('analyzing_file') : t('analyzing')
                 }]);
             }, 1000);
+
         }
     };
 
@@ -92,9 +96,10 @@ const AiAssistantScreen = () => {
                         </TouchableOpacity>
 
                         <View style={styles.titleContainer}>
-                            <Text style={styles.title}>Your AI Assistant</Text>
-                            <Text style={styles.date}>{new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
+                            <Text style={styles.title}>{t('ai_assistant')}</Text>
+                            <Text style={styles.date}>{new Date().toLocaleDateString(language === 'mr' ? 'mr-IN' : language === 'hi' ? 'hi-IN' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
                         </View>
+
 
                         <TouchableOpacity
                             style={styles.iconBlock}
@@ -146,8 +151,9 @@ const AiAssistantScreen = () => {
                         <View style={styles.inputRow}>
                             <TextInput
                                 style={styles.textInput}
-                                placeholder="Ask anything..."
+                                placeholder={t('ask_anything')}
                                 placeholderTextColor="rgba(0, 0, 0, 0.4)"
+
                                 value={inputText}
                                 onChangeText={setInputText}
                                 multiline
@@ -170,11 +176,12 @@ const AiAssistantScreen = () => {
                 <View style={styles.attachmentOverlay}>
                     <Pressable style={styles.overlayPressable} onPress={() => setIsAttachmentMenuOpen(false)} />
                     <View style={styles.attachmentPopup}>
-                        <Text style={styles.attachmentPopupTitle}>Link a File</Text>
+                        <Text style={styles.attachmentPopupTitle}>{t('link_file')}</Text>
                         <ScrollView style={{ maxHeight: 200 }}>
                             {reports.length === 0 && documents.length === 0 && (
                                 <Text style={styles.noAttachmentsText}>No files found to link</Text>
                             )}
+
                             {reports.map((report) => (
                                 <TouchableOpacity
                                     key={`report-${report.id}`}

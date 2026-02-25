@@ -9,7 +9,9 @@ const { width } = Dimensions.get('window');
 
 const SignUp = () => {
     const { navigate } = useNavigation();
+    const { t } = useAppContext();
     const [name, setName] = useState('');
+
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
@@ -100,13 +102,14 @@ const SignUp = () => {
         >
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <View style={styles.header}>
-                    <Text style={styles.title}>Create your account</Text>
-                    <Text style={styles.subtitle}>Enter your credentials to create an account</Text>
+                    <Text style={styles.title}>{t('signup_title')}</Text>
+                    <Text style={styles.subtitle}>{t('signup_subtitle')}</Text>
                 </View>
 
                 <View style={styles.form}>
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Name :</Text>
+                        <Text style={styles.label}>{t('name')} :</Text>
+
                         <TextInput
                             style={styles.input}
                             placeholderTextColor="rgba(0,0,0,0.5)"
@@ -151,7 +154,8 @@ const SignUp = () => {
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Phone Number :</Text>
+                        <Text style={styles.label}>{t('phone')} :</Text>
+
                         <TextInput
                             style={styles.input}
                             placeholderTextColor="rgba(0,0,0,0.5)"
@@ -163,7 +167,8 @@ const SignUp = () => {
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Password :</Text>
+                        <Text style={styles.label}>{t('password')} :</Text>
+
                         <TextInput
                             style={styles.input}
                             placeholderTextColor="rgba(0,0,0,0.5)"
@@ -175,7 +180,8 @@ const SignUp = () => {
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Confirm Password :</Text>
+                        <Text style={styles.label}>{t('confirm_password')} :</Text>
+
                         <TextInput
                             style={styles.input}
                             placeholderTextColor="rgba(0,0,0,0.5)"
@@ -194,9 +200,10 @@ const SignUp = () => {
                         {loading ? (
                             <ActivityIndicator color="#000" />
                         ) : (
-                            <Text style={styles.signUpBtnText}>Sign Up</Text>
+                            <Text style={styles.signUpBtnText}>{t('signup_btn')}</Text>
                         )}
                     </TouchableOpacity>
+
 
                     <View style={styles.dividerContainer}>
                         <View style={styles.divider} />
@@ -204,11 +211,12 @@ const SignUp = () => {
                 </View>
 
                 <View style={styles.footer}>
-                    <Text style={styles.footerText}>Already have an account?</Text>
+                    <Text style={styles.footerText}>{t('already_account')}</Text>
                     <TouchableOpacity onPress={() => navigate('login')}>
-                        <Text style={styles.loginBtnText}>Login here</Text>
+                        <Text style={styles.loginBtnText}>{t('login_here')}</Text>
                     </TouchableOpacity>
                 </View>
+
             </ScrollView>
         </LinearGradient>
     );

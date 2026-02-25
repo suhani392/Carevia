@@ -1,8 +1,13 @@
 import { View, Text, StyleSheet, Dimensions, Platform, StatusBar, Pressable, Animated, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, ScreenName } from '../../../context/NavigationContext';
+import { useAppContext } from '../../../context/AppContext';
 import AlertBox from '../../common/alert-box';
+
 import { useState, useEffect, useRef } from 'react';
+import { supabase } from '../../../lib/supabase';
+import { Alert } from 'react-native';
+
 
 const { width, height } = Dimensions.get('window');
 
@@ -14,7 +19,9 @@ const Menu: React.FC<MenuProps> = ({ onClose }) => {
     const slideAnim = useRef(new Animated.Value(-width)).current;
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const { navigate } = useNavigation();
+    const { t } = useAppContext();
     const [isAlertVisible, setIsAlertVisible] = useState(false);
+
 
     useEffect(() => {
         // Slide in and Fade in
@@ -51,14 +58,15 @@ const Menu: React.FC<MenuProps> = ({ onClose }) => {
     };
 
     // Menu items
-    const menuItems: { label: string; screen: ScreenName }[] = [
-        { label: "Home", screen: "home" },
-        { label: "AI Assistant", screen: "ai_assistant" },
-        { label: "Contact Us", screen: "contact_us" },
-        { label: "Help & Policy", screen: "help_policy" },
-        { label: "Settings", screen: "settings" },
-        { label: "About", screen: "about" }
+    const menuItems: { label: string; screen: ScreenName, key: any }[] = [
+        { label: t('home'), screen: "home", key: 'home' },
+        { label: t('ai_assistant'), screen: "ai_assistant", key: 'ai_assistant' },
+        { label: "Contact Us", screen: "contact_us", key: 'contact_us' },
+        { label: "Help & Policy", screen: "help_policy", key: 'help_policy' },
+        { label: t('settings'), screen: "settings", key: 'settings' },
+        { label: "About", screen: "about", key: 'about' }
     ];
+
 
     const handleNavigation = (screen: ScreenName) => {
         handleClose();
@@ -71,13 +79,23 @@ const Menu: React.FC<MenuProps> = ({ onClose }) => {
         setIsAlertVisible(true);
     };
 
-    const confirmLogout = () => {
+    const confirmLogout = async () => {
         setIsAlertVisible(false);
-        handleClose();
-        setTimeout(() => {
-            navigate('login');
-        }, 300);
+        try {
+            const { error } = await supabase.auth.signOut();
+            if (error) {
+                Alert.alert('Error', error.message);
+                return;
+            }
+            handleClose();
+            setTimeout(() => {
+                navigate('login');
+            }, 300);
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'Failed to logout');
+        }
     };
+
 
     return (
         <View style={styles.overlay}>
@@ -117,16 +135,18 @@ const Menu: React.FC<MenuProps> = ({ onClose }) => {
 
                     <View style={styles.footer}>
                         <Pressable onPress={handleLogout}>
-                            <Text style={styles.itemText}>Logout</Text>
+                            <Text style={styles.itemText}>{t('logout')}</Text>
                         </Pressable>
+
                     </View>
                 </LinearGradient>
             </Animated.View>
 
             <AlertBox
                 visible={isAlertVisible}
-                message="Do you really want to logout?"
+                message={t('logout') + "?"}
                 onYes={confirmLogout}
+
                 onNo={() => setIsAlertVisible(false)}
             />
         </View>

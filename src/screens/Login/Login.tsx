@@ -2,13 +2,17 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, Dimensions, Platform, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '../../context/NavigationContext';
+import { useAppContext } from '../../context/AppContext';
 import { supabase } from '../../lib/supabase';
+
 
 const { width } = Dimensions.get('window');
 
 const Login = () => {
     const { navigate } = useNavigation();
+    const { t } = useAppContext();
     const [email, setEmail] = useState('');
+
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -44,13 +48,15 @@ const Login = () => {
         >
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <View style={styles.header}>
-                    <Text style={styles.title}>Login to your account</Text>
-                    <Text style={styles.subtitle}>Enter your credentials to access your account</Text>
+                    <Text style={styles.title}>{t('login_title')}</Text>
+                    <Text style={styles.subtitle}>{t('login_subtitle')}</Text>
                 </View>
+
 
                 <View style={styles.form}>
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Email :</Text>
+                        <Text style={styles.label}>{t('email')} :</Text>
+
                         <TextInput
                             style={styles.input}
                             placeholderTextColor="rgba(0,0,0,0.5)"
@@ -63,7 +69,8 @@ const Login = () => {
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Password :</Text>
+                        <Text style={styles.label}>{t('password')} :</Text>
+
                         <TextInput
                             style={styles.input}
                             placeholderTextColor="rgba(0,0,0,0.5)"
@@ -82,13 +89,15 @@ const Login = () => {
                         {loading ? (
                             <ActivityIndicator color="#000" />
                         ) : (
-                            <Text style={styles.loginBtnText}>Login</Text>
+                            <Text style={styles.loginBtnText}>{t('login_btn')}</Text>
                         )}
                     </TouchableOpacity>
 
+
                     <TouchableOpacity style={styles.forgotBtn}>
-                        <Text style={styles.forgotText}>Forgot Password?</Text>
+                        <Text style={styles.forgotText}>{t('forgot_password')}</Text>
                     </TouchableOpacity>
+
 
                     <View style={styles.dividerContainer}>
                         <View style={styles.divider} />
@@ -96,11 +105,12 @@ const Login = () => {
                 </View>
 
                 <View style={styles.footer}>
-                    <Text style={styles.footerText}>Don't have an account?</Text>
+                    <Text style={styles.footerText}>{t('no_account')}</Text>
                     <TouchableOpacity onPress={() => navigate('signup')}>
-                        <Text style={styles.createBtnText}>Create new account</Text>
+                        <Text style={styles.createBtnText}>{t('create_account')}</Text>
                     </TouchableOpacity>
                 </View>
+
             </ScrollView>
         </LinearGradient>
     );

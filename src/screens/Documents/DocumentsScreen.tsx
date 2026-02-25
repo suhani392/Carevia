@@ -68,9 +68,12 @@ interface Document {
 
 const DocumentsScreen = () => {
     const { screenParams, goBack, navigate } = useNavigation();
-    const { documents, addDocument, updateDocument, deleteDocument, addUpdate, userProfile } = useAppContext();
+    const { documents, addDocument, updateDocument, deleteDocument, addUpdate, userProfile, t, language } = useAppContext();
+
+
     const firstName = screenParams?.name ? screenParams.name.split(' ')[0] : '';
-    const subTitleText = screenParams?.name ? `${firstName}'s Documents` : 'My Documents';
+    const subTitleText = screenParams?.name ? `${firstName}${t('docs_title_other')}` : t('docs_title_me');
+
     const isOwner = !screenParams?.name;
 
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
@@ -129,14 +132,16 @@ const DocumentsScreen = () => {
 
             if (error) throw error;
             if (data) {
+                const localeMapping: any = { en: 'en-GB', mr: 'mr-IN', hi: 'hi-IN' };
                 setMemberDocuments(data.map(d => ({
                     id: d.id,
                     name: d.original_name,
-                    date: new Date(d.uploaded_at || d.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+                    date: new Date(d.uploaded_at || d.created_at).toLocaleDateString(localeMapping[language] || 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
                     timestamp: new Date(d.uploaded_at || d.created_at).getTime(),
                     uri: d.file_path
                 })));
             }
+
         } catch (error) {
             console.error('Error fetching member documents:', error);
         } finally {
@@ -206,18 +211,21 @@ const DocumentsScreen = () => {
 
                     if (dbError) throw dbError;
 
+                    const localeMapping: any = { en: 'en-GB', mr: 'mr-IN', hi: 'hi-IN' };
                     const newDoc: Document = {
                         id: dbEntry.id,
                         name: dbEntry.original_name,
-                        date: new Date(dbEntry.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+                        date: new Date(dbEntry.created_at).toLocaleDateString(localeMapping[language] || 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
                         timestamp: new Date(dbEntry.created_at).getTime(),
                         uri: dbEntry.file_path
                     };
                     setMemberDocuments(prev => [newDoc, ...prev]);
+
                     await addUpdate("Me", `You added a new document to ${screenParams.name}'s section: ${asset.name}`);
                 }
-                Alert.alert('Success', 'Document added successfully');
+                Alert.alert(t('done'), t('done'));
             }
+
         } catch (error: any) {
             console.error('Error adding document:', error);
             Alert.alert('Upload Failed', error.message || 'Failed to upload document');
@@ -261,18 +269,19 @@ const DocumentsScreen = () => {
                 break;
             case 'Delete':
                 Alert.alert(
-                    'Delete Document',
-                    'Are you sure you want to delete this document?',
+                    t('delete_doc'),
+                    t('delete_doc_confirm'),
                     [
-                        { text: 'Cancel', style: 'cancel' },
+                        { text: t('cancel'), style: 'cancel' },
                         {
-                            text: 'Delete',
+                            text: t('delete'),
                             style: 'destructive',
                             onPress: () => deleteDocument(selectedDoc.id)
                         },
                     ]
                 );
                 break;
+
             case 'Share':
                 Alert.alert('Share', `Sharing ${selectedDoc.name}`);
                 break;
@@ -290,11 +299,12 @@ const DocumentsScreen = () => {
 
     const getGreeting = () => {
         const hour = new Date().getHours();
-        if (hour < 12) return 'Good Morning';
-        if (hour < 17) return 'Good Afternoon';
-        if (hour < 21) return 'Good Evening';
-        return 'Good Night';
+        if (hour < 12) return t('good_morning');
+        if (hour < 17) return t('good_afternoon');
+        if (hour < 21) return t('good_evening');
+        return t('good_night');
     };
+
 
     const getCurrentDate = () => {
         return new Date().toLocaleDateString('en-GB', {
@@ -326,10 +336,11 @@ const DocumentsScreen = () => {
                             onPress={() => setIsFilterDropdownVisible(!isFilterDropdownVisible)}
                         >
                             <Text style={styles.filterText}>
-                                {sortOrder === 'newest' ? 'Newest First' : 'Oldest First'}
+                                {sortOrder === 'newest' ? t('sort_newest') : t('sort_oldest')}
                             </Text>
                             <Text style={styles.filterArrow}>▼</Text>
                         </TouchableOpacity>
+
 
                         <Animated.View style={[
                             styles.filterDropdown,
@@ -349,8 +360,9 @@ const DocumentsScreen = () => {
                                     setIsFilterDropdownVisible(false);
                                 }}
                             >
-                                <Text style={styles.dropdownText}>Newest First</Text>
+                                <Text style={styles.dropdownText}>{t('sort_newest')}</Text>
                             </TouchableOpacity>
+
                             <TouchableOpacity
                                 style={styles.dropdownItem}
                                 onPress={() => {
@@ -358,15 +370,17 @@ const DocumentsScreen = () => {
                                     setIsFilterDropdownVisible(false);
                                 }}
                             >
-                                <Text style={styles.dropdownText}>Oldest First</Text>
+                                <Text style={styles.dropdownText}>{t('sort_oldest')}</Text>
                             </TouchableOpacity>
+
                         </Animated.View>
                     </View>
                 </View>
 
                 <Text style={styles.subtitle}>
-                    {isOwner ? 'Your uploaded medical documents' : `${firstName}'s uploaded documents`}
+                    {isOwner ? t('docs_subtitle_me') : `${firstName}${t('docs_subtitle_other')}`}
                 </Text>
+
 
                 <View style={styles.documentsList}>
                     {sortedDocuments.length > 0 ? (
@@ -410,10 +424,11 @@ const DocumentsScreen = () => {
                                     key={doc.id}
                                     style={styles.docCard}
                                     onPress={handleDocPress}
-                                    onLongPress={() => {
+                                    onLongPress={!memberId ? () => {
                                         setSelectedDoc(doc);
                                         setIsActionMenuVisible(true);
-                                    }}
+                                    } : undefined}
+
                                 >
                                     <View style={styles.docIconContainer}>
                                         <View style={styles.whiteBox}>
@@ -422,23 +437,28 @@ const DocumentsScreen = () => {
                                     </View>
                                     <View style={styles.docInfo}>
                                         <Text style={styles.docName}>{doc.name}</Text>
-                                        <Text style={styles.docDate}>Uploaded on {doc.date}</Text>
+                                        <Text style={styles.docDate}>{t('uploaded_on')} {doc.date}</Text>
                                     </View>
-                                    <TouchableOpacity
-                                        onPress={() => {
-                                            setSelectedDoc(doc);
-                                            setIsActionMenuVisible(true);
-                                        }}
-                                        style={styles.moreButton}
-                                    >
-                                        <ThreeDotsIcon color="rgba(0,0,0,0.6)" />
-                                    </TouchableOpacity>
+
+                                    {!memberId && (
+                                        <TouchableOpacity
+                                            onPress={() => {
+                                                setSelectedDoc(doc);
+                                                setIsActionMenuVisible(true);
+                                            }}
+                                            style={styles.moreButton}
+                                        >
+                                            <ThreeDotsIcon color="rgba(0,0,0,0.6)" />
+                                        </TouchableOpacity>
+                                    )}
+
                                 </TouchableOpacity>
                             );
                         })
                     ) : (
-                        <Text style={styles.emptyText}>You haven’t added any documents yet.</Text>
+                        <Text style={styles.emptyText}>{t('empty_docs_msg')}</Text>
                     )}
+
                 </View>
 
                 <View style={{ height: 100 }} />
@@ -471,18 +491,19 @@ const DocumentsScreen = () => {
                             end={{ x: 1, y: 0 }}
                             style={styles.menuGradient}
                         >
-                            {['Rename', 'Delete'].map((action, index) => (
+                            {['view', 'rename', 'delete'].map((action, index) => (
                                 <TouchableOpacity
                                     key={action}
                                     style={[
                                         styles.menuItem,
-                                        index === 1 && { borderBottomWidth: 0 }
+                                        index === 2 && { borderBottomWidth: 0 }
                                     ]}
-                                    onPress={() => handleAction(action)}
+                                    onPress={() => handleAction(action.charAt(0).toUpperCase() + action.slice(1))}
                                 >
-                                    <Text style={styles.menuItemText}>{action}</Text>
+                                    <Text style={styles.menuItemText}>{t(action)}</Text>
                                 </TouchableOpacity>
                             ))}
+
                         </LinearGradient>
                     </Animated.View>
                 </TouchableOpacity>
@@ -497,7 +518,8 @@ const DocumentsScreen = () => {
             >
                 <View style={styles.modalOverlay}>
                     <View style={styles.dialogContainer}>
-                        <Text style={styles.dialogTitle}>Rename Document</Text>
+                        <Text style={styles.dialogTitle}>{t('rename_doc')}</Text>
+
                         <TextInput
                             style={styles.renameInput}
                             value={newName}
@@ -506,12 +528,13 @@ const DocumentsScreen = () => {
                         />
                         <View style={styles.dialogButtons}>
                             <TouchableOpacity onPress={() => setIsRenameModalVisible(false)}>
-                                <Text style={styles.dialogCancelText}>Cancel</Text>
+                                <Text style={styles.dialogCancelText}>{t('cancel')}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity onPress={submitRename}>
-                                <Text style={styles.dialogSubmitText}>Rename</Text>
+                                <Text style={styles.dialogSubmitText}>{t('rename')}</Text>
                             </TouchableOpacity>
                         </View>
+
                     </View>
                 </View>
             </Modal>

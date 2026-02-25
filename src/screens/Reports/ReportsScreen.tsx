@@ -25,14 +25,18 @@ const { width } = Dimensions.get('window');
 
 const ReportsScreen = () => {
     const { screenParams, goBack, navigate } = useNavigation();
-    const { reports, updateReport, deleteReport, userProfile, addUpdate } = useAppContext();
+    const { reports, updateReport, deleteReport, userProfile, addUpdate, t, language, colors } = useAppContext();
+
+
+
     const [memberReports, setMemberReports] = useState<Report[]>([]);
     const [isFetchingMember, setIsFetchingMember] = useState(false);
 
     const memberId = screenParams?.memberId;
     const currentReports = memberId ? memberReports : reports;
     const firstName = screenParams?.name ? screenParams.name.split(' ')[0] : '';
-    const pageTitle = memberId ? `${firstName}'s Reports` : 'Your Saved Reports';
+    const pageTitle = memberId ? `${firstName}${t('reports_title_other')}` : t('reports_title_me');
+
 
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
     const [isActionMenuVisible, setIsActionMenuVisible] = useState(false);
@@ -84,15 +88,17 @@ const ReportsScreen = () => {
 
             if (error) throw error;
             if (data) {
+                const localeMapping: any = { en: 'en-GB', mr: 'mr-IN', hi: 'hi-IN' };
                 setMemberReports(data.map(r => ({
                     id: r.id,
                     name: r.name,
-                    date: new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+                    date: new Date(r.created_at).toLocaleDateString(localeMapping[language] || 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
                     timestamp: new Date(r.created_at).getTime(),
                     uri: r.uri,
                     analysis: r.analysis
                 })));
             }
+
         } catch (error) {
             console.error('Error fetching member reports:', error);
         } finally {
@@ -140,18 +146,19 @@ const ReportsScreen = () => {
                 break;
             case 'Delete':
                 Alert.alert(
-                    'Delete Report',
-                    'Are you sure you want to delete this report?',
+                    t('delete_report'),
+                    t('delete_report_confirm'),
                     [
-                        { text: 'Cancel', style: 'cancel' },
+                        { text: t('cancel'), style: 'cancel' },
                         {
-                            text: 'Delete',
+                            text: t('delete'),
                             style: 'destructive',
                             onPress: () => deleteReport(selectedReport.id)
                         },
                     ]
                 );
                 break;
+
             case 'Share':
                 Alert.alert('Share', `Sharing ${selectedReport.name}`);
                 break;
@@ -168,7 +175,8 @@ const ReportsScreen = () => {
 
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+
             <AppStatusBar />
 
             {/* Header */}
@@ -187,18 +195,21 @@ const ReportsScreen = () => {
                     <Text style={styles.pageTitle}>{pageTitle}</Text>
                     <View>
                         <TouchableOpacity
-                            style={styles.filterButton}
+                            style={[styles.filterButton, { backgroundColor: colors.card }]}
                             onPress={() => setIsFilterDropdownVisible(!isFilterDropdownVisible)}
                         >
-                            <Text style={styles.filterText}>
-                                {sortOrder === 'newest' ? 'Newest First' : 'Oldest First'}
+                            <Text style={[styles.filterText, { color: colors.text }]}>
+                                {sortOrder === 'newest' ? t('sort_newest') : t('sort_oldest')}
                             </Text>
-                            <Text style={styles.filterArrow}>▼</Text>
+                            <Text style={[styles.filterArrow, { color: colors.text }]}>▼</Text>
                         </TouchableOpacity>
+
+
 
                         <Animated.View style={[
                             styles.filterDropdown,
                             {
+                                backgroundColor: colors.modalBg,
                                 opacity: dropdownAnim,
                                 transform: [
                                     { scale: dropdownAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) },
@@ -207,24 +218,29 @@ const ReportsScreen = () => {
                                 pointerEvents: isFilterDropdownVisible ? 'auto' : 'none'
                             }
                         ]}>
+
                             <TouchableOpacity
-                                style={styles.dropdownItem}
+                                style={[styles.dropdownItem, { borderBottomColor: colors.divider }]}
                                 onPress={() => {
                                     setSortOrder('newest');
                                     setIsFilterDropdownVisible(false);
                                 }}
                             >
-                                <Text style={styles.dropdownText}>Newest First</Text>
+                                <Text style={[styles.dropdownText, { color: colors.text }]}>{t('sort_newest')}</Text>
                             </TouchableOpacity>
+
+
                             <TouchableOpacity
-                                style={styles.dropdownItem}
+                                style={[styles.dropdownItem, { borderBottomColor: colors.divider }]}
                                 onPress={() => {
                                     setSortOrder('oldest');
                                     setIsFilterDropdownVisible(false);
                                 }}
                             >
-                                <Text style={styles.dropdownText}>Oldest First</Text>
+                                <Text style={[styles.dropdownText, { color: colors.text }]}>{t('sort_oldest')}</Text>
                             </TouchableOpacity>
+
+
                         </Animated.View>
                     </View>
                 </View>
@@ -265,10 +281,11 @@ const ReportsScreen = () => {
                                     key={report.id}
                                     style={styles.reportCard}
                                     onPress={handleReportPress}
-                                    onLongPress={() => {
+                                    onLongPress={!memberId ? () => {
                                         setSelectedReport(report);
                                         setIsActionMenuVisible(true);
-                                    }}
+                                    } : undefined}
+
                                 >
                                     <View style={styles.reportIconContainer}>
                                         <View style={styles.whiteBox}>
@@ -276,24 +293,31 @@ const ReportsScreen = () => {
                                         </View>
                                     </View>
                                     <View style={styles.reportInfo}>
-                                        <Text style={styles.reportName}>{report.name}</Text>
-                                        <Text style={styles.reportDate}>Uploaded on {report.date}</Text>
+                                        <Text style={[styles.reportName, { color: colors.text }]}>{report.name}</Text>
+                                        <Text style={[styles.reportDate, { color: colors.textSecondary }]}>{t('uploaded_on')} {report.date}</Text>
                                     </View>
-                                    <TouchableOpacity
-                                        onPress={() => {
-                                            setSelectedReport(report);
-                                            setIsActionMenuVisible(true);
-                                        }}
-                                        style={styles.moreButton}
-                                    >
-                                        <ThreeDotsIcon color="rgba(0,0,0,0.6)" />
-                                    </TouchableOpacity>
+
+
+                                    {!memberId && (
+                                        <TouchableOpacity
+                                            onPress={() => {
+                                                setSelectedReport(report);
+                                                setIsActionMenuVisible(true);
+                                            }}
+                                            style={styles.moreButton}
+                                        >
+                                            <ThreeDotsIcon color="rgba(0,0,0,0.6)" />
+                                        </TouchableOpacity>
+                                    )}
+
                                 </TouchableOpacity>
                             );
                         })
                     ) : (
-                        <Text style={styles.emptyText}>You haven’t added any reports yet.</Text>
+                        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('empty_reports_msg')}</Text>
                     )}
+
+
                 </View>
 
                 <View style={{ height: 100 }} />
@@ -323,18 +347,19 @@ const ReportsScreen = () => {
                             end={{ x: 1, y: 0 }}
                             style={styles.menuGradient}
                         >
-                            {['Rename', 'Delete'].map((action, index) => (
+                            {['view', 'rename', 'delete'].map((action, index) => (
                                 <TouchableOpacity
                                     key={action}
                                     style={[
                                         styles.menuItem,
-                                        index === 1 && { borderBottomWidth: 0 }
+                                        index === 2 && { borderBottomWidth: 0 }
                                     ]}
-                                    onPress={() => handleAction(action)}
+                                    onPress={() => handleAction(action.charAt(0).toUpperCase() + action.slice(1))}
                                 >
-                                    <Text style={styles.menuItemText}>{action}</Text>
+                                    <Text style={styles.menuItemText}>{t(action)}</Text>
                                 </TouchableOpacity>
                             ))}
+
                         </LinearGradient>
                     </Animated.View>
                 </TouchableOpacity>
@@ -358,12 +383,13 @@ const ReportsScreen = () => {
                         />
                         <View style={styles.dialogButtons}>
                             <TouchableOpacity onPress={() => setIsRenameModalVisible(false)}>
-                                <Text style={styles.dialogCancelText}>Cancel</Text>
+                                <Text style={styles.dialogCancelText}>{t('cancel')}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity onPress={submitRename}>
-                                <Text style={styles.dialogSubmitText}>Rename</Text>
+                                <Text style={styles.dialogSubmitText}>{t('rename')}</Text>
                             </TouchableOpacity>
                         </View>
+
                     </View>
                 </View>
             </Modal>

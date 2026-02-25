@@ -6,6 +6,7 @@ import { MenuIcon, ProfileIcon, DropdownIcon, UploadIcon, BackIcon, CrossIcon } 
 import { useNavigation } from '../../context/NavigationContext';
 import { supabase } from '../../lib/supabase';
 import { useAppContext } from '../../context/AppContext';
+import { getAvatarSource } from '../../lib/avatars';
 
 const { width } = Dimensions.get('window');
 
@@ -34,7 +35,9 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
     subtitle
 }) => {
     const { navigate } = useNavigation();
-    const { userProfile, userEmail } = useAppContext();
+    const { userProfile, userEmail, t, language, colors } = useAppContext();
+
+
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
     const animation = useRef(new Animated.Value(0)).current;
@@ -54,17 +57,23 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
 
     const getGreeting = () => {
         const hour = new Date().getHours();
-        if (hour >= 5 && hour < 12) return 'Good Morning';
-        if (hour >= 12 && hour < 17) return 'Good Afternoon';
-        if (hour >= 17 && hour < 21) return 'Good Evening';
-        return 'Good Night';
+        if (hour >= 5 && hour < 12) return t('good_morning');
+        if (hour >= 12 && hour < 17) return t('good_afternoon');
+        if (hour >= 17 && hour < 21) return t('good_evening');
+        return t('good_night');
     };
 
     const getFormattedDate = () => {
         const date = new Date();
+        const localeMapping = {
+            en: 'en-US',
+            mr: 'mr-IN',
+            hi: 'hi-IN'
+        };
         const options: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' };
-        return date.toLocaleDateString('en-US', options);
+        return date.toLocaleDateString(localeMapping[language] || 'en-US', options);
     };
+
 
     const handleUpload = async () => {
         try {
@@ -99,7 +108,8 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
 
     return (
         <LinearGradient
-            colors={['#0055FF', '#6A9EFF']}
+            colors={colors.headerGradient}
+
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
             style={[
@@ -147,9 +157,9 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
                 <Pressable onPress={toggleExpand}>
                     <Animated.View style={[styles.userBlock, { height: blockHeight }]}>
                         <View style={styles.userMainRow}>
-                            {profile?.photo_url ? (
+                            {profile?.photo_url && getAvatarSource(profile.photo_url) ? (
                                 <Image
-                                    source={{ uri: profile.photo_url }}
+                                    source={getAvatarSource(profile.photo_url)}
                                     style={styles.userImage}
                                 />
                             ) : (
@@ -160,12 +170,13 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
                                 </View>
                             )}
                             <View style={styles.userInfo}>
-                                <Text style={styles.userName}>{profile?.full_name || 'Loading...'}</Text>
+                                <Text style={styles.userName}>{profile?.full_name || t('loading')}</Text>
                                 <Text style={styles.userDetails}>
-                                    {profile?.dob ? `${new Date().getFullYear() - new Date(profile.dob).getFullYear()} years` : ''}
-                                    {profile?.gender ? ` • ${profile.gender}` : ''}
+                                    {profile?.dob ? `${new Date().getFullYear() - new Date(profile.dob).getFullYear()} ${t('years')}` : ''}
+                                    {profile?.gender ? ` • ${t(profile.gender.toLowerCase() as any) || profile.gender}` : ''}
                                 </Text>
                             </View>
+
                             <Animated.View style={{ transform: [{ rotate }] }}>
                                 <DropdownIcon size={20} />
                             </Animated.View>
@@ -173,11 +184,12 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
 
                         {isExpanded && (
                             <View style={styles.expandedDetails}>
-                                <Text style={styles.detailText}>{profile?.phone || 'No phone'}</Text>
+                                <Text style={styles.detailText}>{profile?.phone || t('no_phone')}</Text>
                                 <Text style={styles.detailText}>{profile?.email || ''}</Text>
                                 <Text style={styles.detailText}>{profile?.address || 'India'}</Text>
                             </View>
                         )}
+
                     </Animated.View>
                 </Pressable>
             )}
@@ -185,7 +197,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
 
             {showActionRow && (
                 <>
-                    <Text style={styles.promptText}>Want to understand your report?</Text>
+                    <Text style={styles.promptText}>{t('understand_report')}</Text>
 
                     <View style={styles.actionRow}>
                         <Pressable style={styles.actionItem} onPress={() => navigate('scan_report')}>
@@ -195,20 +207,21 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
                                     style={styles.scanIcon}
                                 />
                             </View>
-                            <Text style={styles.actionText}>Scan{"\n"}report</Text>
+                            <Text style={styles.actionText}>{t('scan')}{"\n"}{t('report')}</Text>
                         </Pressable>
 
-                        <Text style={styles.orText}>or</Text>
+                        <Text style={styles.orText}>{t('or')}</Text>
 
                         <Pressable style={styles.actionItem} onPress={handleUpload}>
                             <View style={styles.actionBlock}>
                                 <UploadIcon size={35} color="#FFFFFF" />
                             </View>
-                            <Text style={styles.actionText}>Upload{"\n"}report</Text>
+                            <Text style={styles.actionText}>{t('upload')}{"\n"}{t('report')}</Text>
                         </Pressable>
                     </View>
                 </>
             )}
+
 
             <View style={{ height: 20 }} />
         </LinearGradient>
