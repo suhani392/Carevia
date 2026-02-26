@@ -42,6 +42,10 @@ const SettingsScreen = () => {
         { label: 'English', code: 'en' },
         { label: 'मराठी (Marathi)', code: 'mr' },
         { label: 'हिन्दी (Hindi)', code: 'hi' },
+        { label: 'ಕನ್ನಡ (Kannada)', code: 'kn' },
+        { label: 'ਪੰਜਾਬੀ (Punjabi)', code: 'pa' },
+        { label: 'தமிழ் (Tamil)', code: 'ta' },
+        { label: 'ગુજરાતી (Gujarati)', code: 'gu' },
     ];
 
     const currentLanguageLabel = languages.find(l => l.code === language)?.label || 'English';
@@ -97,7 +101,7 @@ const SettingsScreen = () => {
                 {/* Account Section */}
                 <View style={styles.section}>
                     <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('account')}</Text>
-                    <View style={[styles.card, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
 
                         <SettingItem
                             icon={ProfileIcon}
@@ -105,7 +109,7 @@ const SettingsScreen = () => {
                             onPress={() => navigate('profile')}
                         />
 
-                        <View style={styles.divider} />
+                        <View style={[styles.divider, { backgroundColor: colors.divider }]} />
                         <SettingItem
                             icon={LockIcon}
                             label={t('change_password')}
@@ -117,8 +121,8 @@ const SettingsScreen = () => {
 
                 {/* Preferences Section */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>{t('preferences')}</Text>
-                    <View style={styles.card}>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('preferences')}</Text>
+                    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
                         <SettingItem
                             icon={BellIcon}
                             label={t('notifications')}
@@ -242,7 +246,7 @@ const SettingsScreen = () => {
                 {/* Security Section */}
                 <View style={styles.section}>
                     <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('security')}</Text>
-                    <View style={[styles.card, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
                         <SettingItem
                             icon={ShieldIcon}
                             label={t('app_lock')}
@@ -271,7 +275,6 @@ const SettingsScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
     },
     scrollContent: {
         paddingHorizontal: 25,
@@ -283,12 +286,10 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontFamily: 'Judson-Bold',
         fontSize: 18,
-        color: '#000000',
         marginBottom: 12,
         marginLeft: 5,
     },
     card: {
-        backgroundColor: '#FFFFFF',
         borderRadius: 20,
         paddingHorizontal: 15,
         elevation: 2,
@@ -297,7 +298,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 4,
         borderWidth: 1,
-        borderColor: '#F0F0F0',
     },
     settingItem: {
         flexDirection: 'row',
@@ -313,7 +313,6 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 12,
-        backgroundColor: '#F0F7FF',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 15,
@@ -321,7 +320,6 @@ const styles = StyleSheet.create({
     itemLabel: {
         fontFamily: 'Judson-Regular',
         fontSize: 16,
-        color: '#000000',
     },
     itemRight: {
         flexDirection: 'row',
@@ -330,12 +328,10 @@ const styles = StyleSheet.create({
     itemValue: {
         fontFamily: 'Judson-Regular',
         fontSize: 14,
-        color: '#3C87FF',
         marginRight: 10,
     },
     divider: {
         height: 1,
-        backgroundColor: '#F0F0F0',
         marginLeft: 55,
     },
     modalOverlay: {
@@ -346,7 +342,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 30,
     },
     modalContent: {
-        backgroundColor: '#FFFFFF',
         borderRadius: 25,
         padding: 25,
         width: '100%',
@@ -355,7 +350,6 @@ const styles = StyleSheet.create({
     modalTitle: {
         fontFamily: 'Judson-Bold',
         fontSize: 20,
-        color: '#000000',
         marginBottom: 20,
         textAlign: 'center',
     },
@@ -367,24 +361,12 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         borderRadius: 15,
         marginBottom: 10,
-        backgroundColor: '#F8F9FB',
-    },
-    selectedLanguage: {
-        backgroundColor: '#E6F0FF',
-        borderWidth: 1,
-        borderColor: '#0062FF',
     },
     languageText: {
         fontFamily: 'Judson-Regular',
         fontSize: 16,
-        color: '#333333',
-    },
-    selectedLanguageText: {
-        fontFamily: 'Judson-Bold',
-        color: '#0062FF',
     },
     checkMark: {
-        color: '#0062FF',
         fontSize: 18,
         fontWeight: 'bold',
     },

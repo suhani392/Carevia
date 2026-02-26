@@ -14,6 +14,7 @@ import {
 import { supabase } from '../../lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '../../context/NavigationContext';
+import { useAppContext } from '../../context/AppContext';
 import AppStatusBar from '../../components/status-bar/status-bar';
 import HomeHeader from '../Home/HomeHeader';
 import {
@@ -27,6 +28,7 @@ const { width } = Dimensions.get('window');
 
 const ContactUsScreen = () => {
     const { goBack } = useNavigation();
+    const { colors, themeMode, t } = useAppContext();
 
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
@@ -47,7 +49,7 @@ const ContactUsScreen = () => {
 
     const handleSendMessage = async () => {
         if (!name.trim() || !email.trim() || !message.trim()) {
-            Alert.alert('Error', 'Please fill in all fields');
+            Alert.alert(t('error'), t('fill_all_fields'));
             return;
         }
 
@@ -58,10 +60,10 @@ const ContactUsScreen = () => {
                 .insert({ name, email, message });
 
             if (error) throw error;
-            Alert.alert('Success', 'Your message has been sent!');
+            Alert.alert(t('status'), t('msg_sent_success'));
             setMessage('');
         } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to send message');
+            Alert.alert(t('error'), error.message || t('status'));
         } finally {
             setLoading(false);
         }
@@ -69,22 +71,25 @@ const ContactUsScreen = () => {
 
 
     const SupportCard = ({ icon: Icon, title, subtitle, onPress }: any) => (
-        <TouchableOpacity style={styles.supportCard} onPress={onPress}>
+        <TouchableOpacity
+            style={[styles.supportCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+            onPress={onPress}
+        >
             <View style={styles.cardLeft}>
                 <View style={styles.iconContainer}>
-                    <Icon color="#3C87FF" size={24} />
+                    <Icon color={colors.primary} size={24} />
                 </View>
                 <View style={styles.textContainer}>
-                    <Text style={styles.cardTitle}>{title}</Text>
-                    <Text style={styles.cardSubtitle}>{subtitle}</Text>
+                    <Text style={[styles.cardTitle, { color: colors.text }]}>{title}</Text>
+                    <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>{subtitle}</Text>
                 </View>
             </View>
-            <ChevronRightIcon size={20} />
+            <ChevronRightIcon size={20} color={colors.textSecondary} />
         </TouchableOpacity>
     );
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
             <AppStatusBar />
 
             <HomeHeader
@@ -94,7 +99,7 @@ const ContactUsScreen = () => {
                 showUserBlock={false}
                 showRightIcon={false}
                 centerTitle={true}
-                title="Contact Us"
+                title={t('contact_us')}
             />
 
             <KeyboardAvoidingView
@@ -109,19 +114,19 @@ const ContactUsScreen = () => {
                     <View style={styles.cardsContainer}>
                         <SupportCard
                             icon={EmailSupportIcon}
-                            title="Email Support"
+                            title={t('email_support')}
                             subtitle="support@carevia.com"
                             onPress={() => { }}
                         />
                         <SupportCard
                             icon={CallUsIcon}
-                            title="Call Us"
+                            title={t('call_us')}
                             subtitle="+91 XX665.XXXXX"
                             onPress={() => { }}
                         />
                         <SupportCard
                             icon={ChatSupportIcon}
-                            title="Chat Support"
+                            title={t('chat_support')}
                             subtitle="Available 9AM - 6PM"
                             onPress={() => { }}
                         />
@@ -129,37 +134,37 @@ const ContactUsScreen = () => {
 
                     {/* Contact Form */}
                     <View style={styles.formSection}>
-                        <Text style={styles.formHeader}>Send Us a Message</Text>
+                        <Text style={[styles.formHeader, { color: colors.text }]}>{t('send_message_title')}</Text>
 
                         <TextInput
-                            style={styles.input}
-                            placeholder="Your Name"
+                            style={[styles.input, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
+                            placeholder={t('your_name')}
                             value={name}
                             onChangeText={setName}
-                            placeholderTextColor="#A0A0A0"
+                            placeholderTextColor={colors.textSecondary}
                             editable={!loading}
                         />
 
                         <TextInput
-                            style={styles.input}
-                            placeholder="Your Email"
+                            style={[styles.input, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
+                            placeholder={t('your_email')}
                             value={email}
                             onChangeText={setEmail}
                             keyboardType="email-address"
                             autoCapitalize="none"
-                            placeholderTextColor="#A0A0A0"
+                            placeholderTextColor={colors.textSecondary}
                             editable={!loading}
                         />
 
                         <TextInput
-                            style={[styles.input, styles.messageInput]}
-                            placeholder="Your Message"
+                            style={[styles.input, styles.messageInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
+                            placeholder={t('your_message')}
                             value={message}
                             onChangeText={setMessage}
                             multiline
                             numberOfLines={4}
                             textAlignVertical="top"
-                            placeholderTextColor="#A0A0A0"
+                            placeholderTextColor={colors.textSecondary}
                             editable={!loading}
                         />
 
@@ -169,13 +174,13 @@ const ContactUsScreen = () => {
                             disabled={loading}
                         >
                             <LinearGradient
-                                colors={['#8EBDFF', '#4C8DFF']}
+                                colors={themeMode === 'dark' ? ['#003366', '#001A33'] : ['#8EBDFF', '#4C8DFF']}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
                                 style={styles.sendButton}
                             >
                                 <Text style={styles.sendButtonText}>
-                                    {loading ? 'Sending...' : 'Send Message'}
+                                    {loading ? t('sending') : t('send_message')}
                                 </Text>
                             </LinearGradient>
                         </TouchableOpacity>
@@ -191,7 +196,6 @@ const ContactUsScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
     },
     scrollContent: {
         paddingHorizontal: 25,
@@ -204,12 +208,10 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: '#E6F0FF',
         borderRadius: 20,
         padding: 18,
         marginBottom: 15,
         borderWidth: 1,
-        borderColor: 'rgba(60, 135, 255, 0.2)',
     },
     cardLeft: {
         flexDirection: 'row',
@@ -228,13 +230,11 @@ const styles = StyleSheet.create({
     cardTitle: {
         fontFamily: 'Judson-Bold',
         fontSize: 18,
-        color: '#333333',
         marginBottom: 2,
     },
     cardSubtitle: {
         fontFamily: 'Judson-Regular',
         fontSize: 14,
-        color: '#666666',
     },
     formSection: {
         marginTop: 10,
@@ -242,20 +242,16 @@ const styles = StyleSheet.create({
     formHeader: {
         fontFamily: 'Judson-Bold',
         fontSize: 22,
-        color: '#333333',
         marginBottom: 20,
     },
     input: {
-        backgroundColor: '#F2F7FF',
         borderRadius: 15,
         paddingHorizontal: 20,
         paddingVertical: 15,
         fontFamily: 'Judson-Regular',
         fontSize: 16,
-        color: '#333333',
         marginBottom: 15,
         borderWidth: 1,
-        borderColor: '#E1EEFF',
     },
     messageInput: {
         height: 120,

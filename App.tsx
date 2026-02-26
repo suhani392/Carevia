@@ -8,7 +8,7 @@ import { supabase } from './src/lib/supabase';
 
 // Context
 import { NavigationProvider, useNavigation, ScreenName } from './src/context/NavigationContext';
-import { AppProvider } from './src/context/AppContext';
+import { AppProvider, useAppContext } from './src/context/AppContext';
 
 // Screens
 import LoginScreen from './src/screens/Login/Login';
@@ -35,6 +35,7 @@ SplashScreen.preventAutoHideAsync();
 
 function AppContent() {
     const { currentScreen, navigate } = useNavigation();
+    const { colors } = useAppContext();
     const [authChecked, setAuthChecked] = useState(false);
 
     useEffect(() => {
@@ -116,7 +117,7 @@ function AppContent() {
     const showNavbar = currentScreen === 'home' || currentScreen === 'family';
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
             <StatusBar style="light" translucent backgroundColor="transparent" />
 
             {/* Main Screen Content */}
@@ -175,7 +176,6 @@ export default function App() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
     },
     loadingContainer: {
         flex: 1,

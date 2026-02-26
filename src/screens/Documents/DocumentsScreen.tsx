@@ -68,7 +68,7 @@ interface Document {
 
 const DocumentsScreen = () => {
     const { screenParams, goBack, navigate } = useNavigation();
-    const { documents, addDocument, updateDocument, deleteDocument, addUpdate, userProfile, t, language } = useAppContext();
+    const { documents, addDocument, updateDocument, deleteDocument, addUpdate, userProfile, t, language, colors } = useAppContext();
 
 
     const firstName = screenParams?.name ? screenParams.name.split(' ')[0] : '';
@@ -315,7 +315,7 @@ const DocumentsScreen = () => {
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
             <AppStatusBar />
             <HomeHeader
                 showBackButton={true}
@@ -329,22 +329,23 @@ const DocumentsScreen = () => {
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <View style={styles.titleRow}>
-                    <Text style={styles.pageTitle}>{subTitleText}</Text>
+                    <Text style={[styles.pageTitle, { color: colors.text }]}>{subTitleText}</Text>
                     <View>
                         <TouchableOpacity
-                            style={styles.filterButton}
+                            style={[styles.filterButton, { backgroundColor: colors.card }]}
                             onPress={() => setIsFilterDropdownVisible(!isFilterDropdownVisible)}
                         >
-                            <Text style={styles.filterText}>
+                            <Text style={[styles.filterText, { color: colors.text }]}>
                                 {sortOrder === 'newest' ? t('sort_newest') : t('sort_oldest')}
                             </Text>
-                            <Text style={styles.filterArrow}>▼</Text>
+                            <Text style={[styles.filterArrow, { color: colors.text }]}>▼</Text>
                         </TouchableOpacity>
 
 
                         <Animated.View style={[
                             styles.filterDropdown,
                             {
+                                backgroundColor: colors.modalBg,
                                 opacity: dropdownAnim,
                                 transform: [
                                     { scale: dropdownAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) },
@@ -354,30 +355,30 @@ const DocumentsScreen = () => {
                             }
                         ]}>
                             <TouchableOpacity
-                                style={styles.dropdownItem}
+                                style={[styles.dropdownItem, { borderBottomColor: colors.divider }]}
                                 onPress={() => {
                                     setSortOrder('newest');
                                     setIsFilterDropdownVisible(false);
                                 }}
                             >
-                                <Text style={styles.dropdownText}>{t('sort_newest')}</Text>
+                                <Text style={[styles.dropdownText, { color: colors.text }]}>{t('sort_newest')}</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
-                                style={styles.dropdownItem}
+                                style={[styles.dropdownItem, { borderBottomColor: colors.divider }]}
                                 onPress={() => {
                                     setSortOrder('oldest');
                                     setIsFilterDropdownVisible(false);
                                 }}
                             >
-                                <Text style={styles.dropdownText}>{t('sort_oldest')}</Text>
+                                <Text style={[styles.dropdownText, { color: colors.text }]}>{t('sort_oldest')}</Text>
                             </TouchableOpacity>
 
                         </Animated.View>
                     </View>
                 </View>
 
-                <Text style={styles.subtitle}>
+                <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
                     {isOwner ? t('docs_subtitle_me') : `${firstName}${t('docs_subtitle_other')}`}
                 </Text>
 
@@ -422,7 +423,7 @@ const DocumentsScreen = () => {
                             return (
                                 <TouchableOpacity
                                     key={doc.id}
-                                    style={styles.docCard}
+                                    style={[styles.docCard, { backgroundColor: colors.card, borderColor: colors.cardBorder, borderWidth: 1 }]}
                                     onPress={handleDocPress}
                                     onLongPress={!memberId ? () => {
                                         setSelectedDoc(doc);
@@ -431,13 +432,13 @@ const DocumentsScreen = () => {
 
                                 >
                                     <View style={styles.docIconContainer}>
-                                        <View style={styles.whiteBox}>
-                                            <FileCheckIcon size={25} />
+                                        <View style={[styles.whiteBox, { backgroundColor: colors.primaryLight }]}>
+                                            <FileCheckIcon size={25} color={colors.primary} />
                                         </View>
                                     </View>
                                     <View style={styles.docInfo}>
-                                        <Text style={styles.docName}>{doc.name}</Text>
-                                        <Text style={styles.docDate}>{t('uploaded_on')} {doc.date}</Text>
+                                        <Text style={[styles.docName, { color: colors.text }]}>{doc.name}</Text>
+                                        <Text style={[styles.docDate, { color: colors.textSecondary }]}>{t('uploaded_on')} {doc.date}</Text>
                                     </View>
 
                                     {!memberId && (
@@ -448,7 +449,7 @@ const DocumentsScreen = () => {
                                             }}
                                             style={styles.moreButton}
                                         >
-                                            <ThreeDotsIcon color="rgba(0,0,0,0.6)" />
+                                            <ThreeDotsIcon color={colors.textSecondary} />
                                         </TouchableOpacity>
                                     )}
 
@@ -456,7 +457,7 @@ const DocumentsScreen = () => {
                             );
                         })
                     ) : (
-                        <Text style={styles.emptyText}>{t('empty_docs_msg')}</Text>
+                        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('empty_docs_msg')}</Text>
                     )}
 
                 </View>
@@ -465,7 +466,7 @@ const DocumentsScreen = () => {
             </ScrollView>
 
             {/* FAB */}
-            <TouchableOpacity style={styles.fab} onPress={handleAddDocument} disabled={loading}>
+            <TouchableOpacity style={[styles.fab, { backgroundColor: colors.primary }]} onPress={handleAddDocument} disabled={loading}>
                 <Text style={styles.fabIcon}>{loading ? '...' : '+'}</Text>
             </TouchableOpacity>
 
@@ -486,7 +487,7 @@ const DocumentsScreen = () => {
                         opacity: actionMenuAnim
                     }}>
                         <LinearGradient
-                            colors={['#0062FF', '#5C8EDF']}
+                            colors={colors.headerGradient as any}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                             style={styles.menuGradient}
@@ -517,21 +518,21 @@ const DocumentsScreen = () => {
                 onRequestClose={() => setIsRenameModalVisible(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.dialogContainer}>
-                        <Text style={styles.dialogTitle}>{t('rename_doc')}</Text>
+                    <View style={[styles.dialogContainer, { backgroundColor: colors.modalBg }]}>
+                        <Text style={[styles.dialogTitle, { color: colors.text }]}>{t('rename_doc')}</Text>
 
                         <TextInput
-                            style={styles.renameInput}
+                            style={[styles.renameInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border, borderWidth: 1 }]}
                             value={newName}
                             onChangeText={setNewName}
                             autoFocus
                         />
                         <View style={styles.dialogButtons}>
                             <TouchableOpacity onPress={() => setIsRenameModalVisible(false)}>
-                                <Text style={styles.dialogCancelText}>{t('cancel')}</Text>
+                                <Text style={[styles.dialogCancelText, { color: colors.textSecondary }]}>{t('cancel')}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity onPress={submitRename}>
-                                <Text style={styles.dialogSubmitText}>{t('rename')}</Text>
+                                <Text style={[styles.dialogSubmitText, { color: colors.primary }]}>{t('rename')}</Text>
                             </TouchableOpacity>
                         </View>
 
@@ -545,7 +546,6 @@ const DocumentsScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
     },
     scrollContent: {
         paddingHorizontal: 25,
@@ -561,12 +561,10 @@ const styles = StyleSheet.create({
     pageTitle: {
         fontFamily: 'Judson-Bold',
         fontSize: 22,
-        color: '#000000',
     },
     filterButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(204, 204, 204, 0.4)',
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 20,
@@ -574,18 +572,15 @@ const styles = StyleSheet.create({
     filterText: {
         fontFamily: 'Judson-Regular',
         fontSize: 16, // Increased font size
-        color: '#000000',
         marginRight: 8,
     },
     filterArrow: {
         fontSize: 10,
-        color: '#000000',
     },
     filterDropdown: {
         position: 'absolute',
         top: 50, // Adjusted for larger button
         right: 0,
-        backgroundColor: '#FFFFFF',
         borderRadius: 10,
         elevation: 5,
         shadowColor: '#000',
@@ -598,17 +593,14 @@ const styles = StyleSheet.create({
     dropdownItem: {
         padding: 12,
         borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
     },
     dropdownText: {
         fontFamily: 'Judson-Regular',
         fontSize: 14,
-        color: '#000000',
     },
     subtitle: {
         fontFamily: 'Judson-Regular',
         fontSize: 16,
-        color: '#000000',
         marginBottom: 20,
     },
     documentsList: {
@@ -617,10 +609,14 @@ const styles = StyleSheet.create({
     docCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(0, 98, 255, 0.15)',
         borderRadius: 20,
         padding: 12,
         marginBottom: 15,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
     },
     docIconContainer: {
         marginRight: 15,
@@ -628,7 +624,6 @@ const styles = StyleSheet.create({
     whiteBox: {
         width: 50,
         height: 50,
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
         borderRadius: 15,
         justifyContent: 'center',
         alignItems: 'center',
@@ -639,13 +634,11 @@ const styles = StyleSheet.create({
     docName: {
         fontFamily: 'Judson-Bold', // Strict Judson usage
         fontSize: 18,
-        color: '#000000',
         marginBottom: 4,
     },
     docDate: {
         fontFamily: 'Judson-Regular',
         fontSize: 14,
-        color: 'rgba(0,0,0,0.6)',
     },
     moreButton: {
         padding: 10,
@@ -653,7 +646,6 @@ const styles = StyleSheet.create({
     emptyText: {
         fontFamily: 'Judson-Regular',
         fontSize: 16,
-        color: 'rgba(0,0,0,0.5)',
         textAlign: 'center',
         marginTop: 50,
     },
@@ -663,11 +655,14 @@ const styles = StyleSheet.create({
         right: 25,
         width: 65,
         height: 65,
-        backgroundColor: '#0062FF',
         borderRadius: 32.5,
         justifyContent: 'center',
         alignItems: 'center',
         elevation: 5,
+        shadowColor: '#0062FF',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
     },
     fabIcon: {
         fontSize: 35,
@@ -700,27 +695,27 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     dialogContainer: {
-        backgroundColor: '#FFFFFF',
         borderRadius: 20,
         width: '80%',
         padding: 20,
         elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
     },
     dialogTitle: {
         fontFamily: 'Judson-Bold',
         fontSize: 20,
-        color: '#000000',
         marginBottom: 15,
     },
     renameInput: {
         width: '100%',
         height: 50,
-        backgroundColor: '#F5F5F5',
         borderRadius: 10,
         paddingHorizontal: 15,
         fontFamily: 'Judson-Regular',
         fontSize: 16,
-        color: '#000000',
         marginBottom: 20,
     },
     dialogButtons: {
@@ -730,13 +725,11 @@ const styles = StyleSheet.create({
     dialogCancelText: {
         fontFamily: 'Judson-Bold',
         fontSize: 16,
-        color: '#666666',
         marginRight: 20,
     },
     dialogSubmitText: {
         fontFamily: 'Judson-Bold',
         fontSize: 16,
-        color: '#0062FF',
     }
 });
 

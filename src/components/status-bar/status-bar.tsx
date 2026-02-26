@@ -1,19 +1,19 @@
 import React from 'react';
 import { View, StyleSheet, Platform, StatusBar } from 'react-native';
+import { useAppContext } from '../../context/AppContext';
 
-/**
- * A plain status bar component with #0155FF color.
- * Designed to be static and contains no text or icons.
- */
 const STATUS_BAR_HEIGHT = Platform.OS === 'ios' ? 50 : StatusBar.currentHeight || 0;
 
 const AppStatusBar = () => {
+    const { colors, themeMode } = useAppContext();
+    const bgColor = colors.headerGradient[0] || '#0155FF';
+
     return (
-        <View style={styles.statusBar}>
+        <View style={[styles.statusBar, { backgroundColor: bgColor }]}>
             <StatusBar
-                backgroundColor="#0155FF"
+                backgroundColor={bgColor}
                 barStyle="light-content"
-                hidden={false} // Showing the system icons (time, battery, etc.)
+                hidden={false}
                 translucent={false}
             />
         </View>
@@ -23,7 +23,6 @@ const AppStatusBar = () => {
 const styles = StyleSheet.create({
     statusBar: {
         height: STATUS_BAR_HEIGHT,
-        backgroundColor: '#0155FF',
         width: '100%',
         position: 'relative',
         zIndex: 9999,

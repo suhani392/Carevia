@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { View, StyleSheet, Pressable, Animated, Image } from 'react-native';
+import { useAppContext } from '../../../context/AppContext';
 import { HomeIcon } from './icons';
 
 interface BottomNavbarProps {
@@ -8,6 +9,7 @@ interface BottomNavbarProps {
 }
 
 const BottomNavbar: React.FC<BottomNavbarProps> = ({ activeTab, onTabChange }) => {
+    const { colors, themeMode } = useAppContext();
     const slideAnim = useRef(new Animated.Value(activeTab === 'home' ? 0 : 1)).current;
 
     React.useEffect(() => {
@@ -42,12 +44,16 @@ const BottomNavbar: React.FC<BottomNavbarProps> = ({ activeTab, onTabChange }) =
 
     return (
         <View style={styles.outerWrapper}>
-            <View style={styles.container}>
-                {/* 1. White Sliding Button - Shadows Removed */}
+            <View style={[styles.container, { backgroundColor: themeMode === 'dark' ? '#2A2A2A' : '#CCE0FF' }]}>
+                {/* 1. Sliding Button */}
                 <Animated.View
                     style={[
                         styles.slider,
-                        { transform: [{ translateX }] }
+                        {
+                            transform: [{ translateX }],
+                            backgroundColor: colors.background,
+                            borderColor: themeMode === 'dark' ? '#444' : '#CCE0FF'
+                        }
                     ]}
                 />
 
@@ -55,7 +61,7 @@ const BottomNavbar: React.FC<BottomNavbarProps> = ({ activeTab, onTabChange }) =
                 <View style={styles.content}>
                     <Pressable onPress={() => toggleTab('home')} style={styles.tab}>
                         <Animated.View style={{ transform: [{ scale: homeScale }], opacity: activeTab === 'home' ? 1 : 0.6 }}>
-                            <HomeIcon color="#3C87FF" size={25} />
+                            <HomeIcon color={colors.primary} size={25} />
                         </Animated.View>
                     </Pressable>
 
@@ -63,7 +69,7 @@ const BottomNavbar: React.FC<BottomNavbarProps> = ({ activeTab, onTabChange }) =
                         <Animated.View style={{ transform: [{ scale: familyScale }], opacity: activeTab === 'family' ? 1 : 0.6 }}>
                             <Image
                                 source={require('../../../assets/icons/bottom-navbar/family.png')}
-                                style={styles.familyIcon}
+                                style={[styles.familyIcon, { tintColor: colors.primary }]}
                                 resizeMode="contain"
                             />
                         </Animated.View>
@@ -84,7 +90,6 @@ const styles = StyleSheet.create({
     container: {
         width: 235,
         height: 60,
-        backgroundColor: '#CCE0FF',
         borderRadius: 30,
         flexDirection: 'row',
         alignItems: 'center',
@@ -94,10 +99,8 @@ const styles = StyleSheet.create({
         position: 'absolute',
         width: 126,
         height: 60,
-        backgroundColor: '#FFFFFF',
         borderRadius: 30,
         borderWidth: 1,
-        borderColor: '#CCE0FF',
     },
     content: {
         flex: 1,
@@ -113,7 +116,6 @@ const styles = StyleSheet.create({
     familyIcon: {
         width: 30,
         height: 30,
-        tintColor: '#3C87FF',
     },
 });
 

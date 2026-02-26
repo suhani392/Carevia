@@ -11,6 +11,7 @@ import {
     Dimensions
 } from 'react-native';
 import { useNavigation } from '../../context/NavigationContext';
+import { useAppContext } from '../../context/AppContext';
 import AppStatusBar from '../../components/status-bar/status-bar';
 import HomeHeader from '../Home/HomeHeader';
 import {
@@ -28,6 +29,7 @@ import {
 const { width, height } = Dimensions.get('window');
 
 const HelpItem = ({ icon: Icon, question, answer, isExpanded, onToggle }: any) => {
+    const { colors } = useAppContext();
     const animation = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
@@ -45,7 +47,7 @@ const HelpItem = ({ icon: Icon, question, answer, isExpanded, onToggle }: any) =
 
     const bodyHeight = animation.interpolate({
         inputRange: [0, 1],
-        outputRange: [0, 100], // Approximate height for answer
+        outputRange: [0, 120], // Increased height to accommodate translated text if any
     });
 
     const opacity = animation.interpolate({
@@ -56,23 +58,30 @@ const HelpItem = ({ icon: Icon, question, answer, isExpanded, onToggle }: any) =
     return (
         <View style={styles.helpCardWrapper}>
             <TouchableOpacity
-                style={[styles.helpCard, isExpanded && styles.helpCardExpanded]}
+                style={[
+                    styles.helpCard,
+                    { backgroundColor: colors.card, borderColor: colors.cardBorder },
+                    isExpanded && styles.helpCardExpanded
+                ]}
                 onPress={onToggle}
                 activeOpacity={0.7}
             >
                 <View style={styles.itemLeft}>
                     <View style={styles.iconContainer}>
-                        <Icon color="#3C87FF" size={24} />
+                        <Icon color={colors.primary} size={24} />
                     </View>
-                    <Text style={styles.itemLabel}>{question}</Text>
+                    <Text style={[styles.itemLabel, { color: colors.text }]}>{question}</Text>
                 </View>
                 <Animated.View style={{ transform: [{ rotate }] }}>
-                    <PlusIcon size={18} color="#3C87FF" />
+                    <PlusIcon size={18} color={colors.primary} />
                 </Animated.View>
             </TouchableOpacity>
 
-            <Animated.View style={[styles.answerContainer, { height: bodyHeight, opacity }]}>
-                <Text style={styles.answerText}>{answer}</Text>
+            <Animated.View style={[
+                styles.answerContainer,
+                { height: bodyHeight, opacity, backgroundColor: colors.card, borderColor: colors.cardBorder }
+            ]}>
+                <Text style={[styles.answerText, { color: colors.textSecondary }]}>{answer}</Text>
             </Animated.View>
         </View>
     );
@@ -80,29 +89,30 @@ const HelpItem = ({ icon: Icon, question, answer, isExpanded, onToggle }: any) =
 
 const HelpPolicyScreen = () => {
     const { goBack, navigate } = useNavigation();
+    const { colors, themeMode, t } = useAppContext();
     const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
     const [isTermsVisible, setIsTermsVisible] = useState(false);
 
     const helpData = [
         {
             icon: UploadReportsIcon,
-            question: "How to upload reports?",
-            answer: "Go to the Home screen, tap on 'Upload Report', select your document from the gallery or scan it using our advanced medical scanner."
+            question: t('faq_q1'),
+            answer: t('faq_a1')
         },
         {
             icon: AddMembersIcon,
-            question: "How to add family members?",
-            answer: "Navigate to the Family screen, tap the '+' icon or 'Add Member' button, and enter their basic details to start tracking their health."
+            question: t('faq_q2'),
+            answer: t('faq_a2')
         },
         {
             icon: EmergencyAccessIcon,
-            question: "How emergency access works?",
-            answer: "Emergency access allows designated contacts to view your critical medical info during an emergency, even if you can't unlock your phone."
+            question: t('faq_q3'),
+            answer: t('faq_a3')
         },
         {
             icon: SecureDataIcon,
-            question: "How secure is my data?",
-            answer: "Your data is encrypted using military-grade AES-256 encryption. We never share your medical records with third parties without your consent."
+            question: t('faq_q4'),
+            answer: t('faq_a4')
         },
     ];
 
@@ -111,7 +121,7 @@ const HelpPolicyScreen = () => {
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
             <AppStatusBar />
 
             <HomeHeader
@@ -121,13 +131,13 @@ const HelpPolicyScreen = () => {
                 showUserBlock={false}
                 showRightIcon={false}
                 centerTitle={true}
-                title="Help & Policy"
+                title={t('help_policy')}
             />
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 {/* Help Section */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Help</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('help')}</Text>
                     {helpData.map((item, index) => (
                         <HelpItem
                             key={index}
@@ -140,39 +150,42 @@ const HelpPolicyScreen = () => {
 
                 {/* Policy Section */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Policy</Text>
-                    <TouchableOpacity style={styles.policyCard} onPress={() => setIsTermsVisible(true)}>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('policy')}</Text>
+                    <TouchableOpacity
+                        style={[styles.policyCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+                        onPress={() => setIsTermsVisible(true)}
+                    >
                         <View style={styles.itemLeft}>
                             <View style={styles.iconContainer}>
-                                <TermsIcon color="#3C87FF" size={24} />
+                                <TermsIcon color={colors.primary} size={24} />
                             </View>
-                            <Text style={styles.itemLabel}>Terms & Conditions</Text>
+                            <Text style={[styles.itemLabel, { color: colors.text }]}>{t('terms_conditions')}</Text>
                         </View>
-                        <ChevronRightIcon size={20} color="#3C87FF" />
+                        <ChevronRightIcon size={20} color={colors.primary} />
                     </TouchableOpacity>
                 </View>
 
                 {/* Feedback Section */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Feedback</Text>
-                    <TouchableOpacity style={styles.policyCard}>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('feedback')}</Text>
+                    <TouchableOpacity style={[styles.policyCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
                         <View style={styles.itemLeft}>
                             <View style={styles.iconContainer}>
-                                <RateIcon color="#3C87FF" size={24} />
+                                <RateIcon color={colors.primary} size={24} />
                             </View>
-                            <Text style={styles.itemLabel}>Rate Carevia</Text>
+                            <Text style={[styles.itemLabel, { color: colors.text }]}>{t('rate_carevia')}</Text>
                         </View>
-                        <ChevronRightIcon size={20} color="#3C87FF" />
+                        <ChevronRightIcon size={20} color={colors.primary} />
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.policyCard}>
+                    <TouchableOpacity style={[styles.policyCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
                         <View style={styles.itemLeft}>
                             <View style={styles.iconContainer}>
-                                <FeedbackIcon color="#3C87FF" size={24} />
+                                <FeedbackIcon color={colors.primary} size={24} />
                             </View>
-                            <Text style={styles.itemLabel}>Send Feedback</Text>
+                            <Text style={[styles.itemLabel, { color: colors.text }]}>{t('send_feedback')}</Text>
                         </View>
-                        <ChevronRightIcon size={20} color="#3C87FF" />
+                        <ChevronRightIcon size={20} color={colors.primary} />
                     </TouchableOpacity>
                 </View>
 
@@ -187,16 +200,16 @@ const HelpPolicyScreen = () => {
                 onRequestClose={() => setIsTermsVisible(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
+                    <View style={[styles.modalContent, { backgroundColor: colors.modalBg }]}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Terms & Conditions</Text>
+                            <Text style={[styles.modalTitle, { color: colors.text }]}>{t('terms_conditions')}</Text>
                             <TouchableOpacity onPress={() => setIsTermsVisible(false)} style={styles.closeButton}>
-                                <Text style={styles.closeIcon}>✕</Text>
+                                <Text style={[styles.closeIcon, { color: colors.textSecondary }]}>✕</Text>
                             </TouchableOpacity>
                         </View>
                         <ScrollView showsVerticalScrollIndicator={false} style={styles.termsScroll}>
-                            <Text style={styles.termsText}>
-                                Last Updated: February 2026{"\n"}{"\n"}
+                            <Text style={[styles.termsText, { color: colors.textSecondary }]}>
+                                {t('last_updated')}: February 2026{"\n"}{"\n"}
                                 1. Acceptance of Terms{"\n"}
                                 By accessing or using Carevia, you agree to be bound by these Terms and Conditions and all applicable laws and regulations.{"\n"}{"\n"}
                                 2. Health Data Privacy{"\n"}
@@ -225,7 +238,6 @@ const HelpPolicyScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
     },
     scrollContent: {
         paddingHorizontal: 25,
@@ -237,7 +249,6 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontFamily: 'Judson-Bold',
         fontSize: 20,
-        color: '#000000',
         marginBottom: 15,
     },
     helpCardWrapper: {
@@ -247,11 +258,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: '#E6F1FF',
         borderRadius: 15,
         padding: 15,
         borderWidth: 1,
-        borderColor: '#D0E5FF',
     },
     helpCardExpanded: {
         borderBottomLeftRadius: 0,
@@ -259,19 +268,16 @@ const styles = StyleSheet.create({
         borderBottomWidth: 0,
     },
     answerContainer: {
-        backgroundColor: '#E6F1FF',
         borderBottomLeftRadius: 15,
         borderBottomRightRadius: 15,
         paddingHorizontal: 15,
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: '#D0E5FF',
         borderTopWidth: 0,
     },
     answerText: {
         fontFamily: 'Judson-Regular',
         fontSize: 14,
-        color: '#555555',
         lineHeight: 20,
         paddingBottom: 15,
     },
@@ -279,12 +285,10 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: '#E6F1FF',
         borderRadius: 15,
         padding: 15,
         marginBottom: 12,
         borderWidth: 1,
-        borderColor: '#D0E5FF',
     },
     itemLeft: {
         flexDirection: 'row',
@@ -301,7 +305,6 @@ const styles = StyleSheet.create({
     itemLabel: {
         fontFamily: 'Judson-Regular',
         fontSize: 16,
-        color: '#000000',
         flex: 1,
     },
     modalOverlay: {
@@ -312,7 +315,6 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     modalContent: {
-        backgroundColor: '#FFFFFF',
         borderRadius: 30,
         width: '100%',
         maxHeight: height * 0.8,
@@ -332,14 +334,12 @@ const styles = StyleSheet.create({
     modalTitle: {
         fontFamily: 'Judson-Bold',
         fontSize: 22,
-        color: '#000000',
     },
     closeButton: {
         padding: 5,
     },
     closeIcon: {
         fontSize: 20,
-        color: '#666666',
         fontWeight: 'bold',
     },
     termsScroll: {
@@ -348,7 +348,6 @@ const styles = StyleSheet.create({
     termsText: {
         fontFamily: 'Judson-Regular',
         fontSize: 15,
-        color: '#444444',
         lineHeight: 24,
     },
 });

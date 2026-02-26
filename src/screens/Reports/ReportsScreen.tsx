@@ -192,7 +192,7 @@ const ReportsScreen = () => {
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <View style={styles.titleRow}>
-                    <Text style={styles.pageTitle}>{pageTitle}</Text>
+                    <Text style={[styles.pageTitle, { color: colors.text }]}>{pageTitle}</Text>
                     <View>
                         <TouchableOpacity
                             style={[styles.filterButton, { backgroundColor: colors.card }]}
@@ -279,7 +279,7 @@ const ReportsScreen = () => {
                             return (
                                 <TouchableOpacity
                                     key={report.id}
-                                    style={styles.reportCard}
+                                    style={[styles.reportCard, { backgroundColor: colors.card, borderColor: colors.cardBorder, borderWidth: 1 }]}
                                     onPress={handleReportPress}
                                     onLongPress={!memberId ? () => {
                                         setSelectedReport(report);
@@ -288,8 +288,8 @@ const ReportsScreen = () => {
 
                                 >
                                     <View style={styles.reportIconContainer}>
-                                        <View style={styles.whiteBox}>
-                                            <FileCheckIcon size={25} />
+                                        <View style={[styles.whiteBox, { backgroundColor: colors.primaryLight }]}>
+                                            <FileCheckIcon size={25} color={colors.primary} />
                                         </View>
                                     </View>
                                     <View style={styles.reportInfo}>
@@ -306,7 +306,7 @@ const ReportsScreen = () => {
                                             }}
                                             style={styles.moreButton}
                                         >
-                                            <ThreeDotsIcon color="rgba(0,0,0,0.6)" />
+                                            <ThreeDotsIcon color={colors.textSecondary} />
                                         </TouchableOpacity>
                                     )}
 
@@ -373,20 +373,20 @@ const ReportsScreen = () => {
                 onRequestClose={() => setIsRenameModalVisible(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.dialogContainer}>
-                        <Text style={styles.dialogTitle}>Rename Report</Text>
+                    <View style={[styles.dialogContainer, { backgroundColor: colors.modalBg }]}>
+                        <Text style={[styles.dialogTitle, { color: colors.text }]}>Rename Report</Text>
                         <TextInput
-                            style={styles.renameInput}
+                            style={[styles.renameInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border, borderWidth: 1 }]}
                             value={newName}
                             onChangeText={setNewName}
                             autoFocus
                         />
                         <View style={styles.dialogButtons}>
                             <TouchableOpacity onPress={() => setIsRenameModalVisible(false)}>
-                                <Text style={styles.dialogCancelText}>{t('cancel')}</Text>
+                                <Text style={[styles.dialogCancelText, { color: colors.textSecondary }]}>{t('cancel')}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity onPress={submitRename}>
-                                <Text style={styles.dialogSubmitText}>{t('rename')}</Text>
+                                <Text style={[styles.dialogSubmitText, { color: colors.primary }]}>{t('rename')}</Text>
                             </TouchableOpacity>
                         </View>
 
@@ -400,7 +400,6 @@ const ReportsScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
     },
     scrollContent: {
         paddingHorizontal: 25,
@@ -410,18 +409,16 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 20, // Increased margin for visual clarity
+        marginBottom: 20,
         zIndex: 10,
     },
     pageTitle: {
         fontFamily: 'Judson-Bold',
         fontSize: 22,
-        color: '#000000',
     },
     filterButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(204, 204, 204, 0.4)',
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 20,
@@ -429,18 +426,15 @@ const styles = StyleSheet.create({
     filterText: {
         fontFamily: 'Judson-Regular',
         fontSize: 16,
-        color: '#000000',
         marginRight: 8,
     },
     filterArrow: {
         fontSize: 10,
-        color: '#000000',
     },
     filterDropdown: {
         position: 'absolute',
         top: 50,
         right: 0,
-        backgroundColor: '#FFFFFF',
         borderRadius: 10,
         elevation: 5,
         shadowColor: '#000',
@@ -453,12 +447,10 @@ const styles = StyleSheet.create({
     dropdownItem: {
         padding: 12,
         borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
     },
     dropdownText: {
         fontFamily: 'Judson-Regular',
         fontSize: 14,
-        color: '#000000',
     },
     reportsList: {
         width: '100%',
@@ -466,10 +458,14 @@ const styles = StyleSheet.create({
     reportCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(0, 98, 255, 0.15)',
         borderRadius: 20,
         padding: 12,
         marginBottom: 15,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
     },
     reportIconContainer: {
         marginRight: 15,
@@ -477,7 +473,6 @@ const styles = StyleSheet.create({
     whiteBox: {
         width: 50,
         height: 50,
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
         borderRadius: 15,
         justifyContent: 'center',
         alignItems: 'center',
@@ -488,13 +483,11 @@ const styles = StyleSheet.create({
     reportName: {
         fontFamily: 'Judson-Bold',
         fontSize: 18,
-        color: '#000000',
         marginBottom: 4,
     },
     reportDate: {
         fontFamily: 'Judson-Regular',
         fontSize: 14,
-        color: 'rgba(0,0,0,0.6)',
     },
     moreButton: {
         padding: 10,
@@ -502,7 +495,6 @@ const styles = StyleSheet.create({
     emptyText: {
         fontFamily: 'Judson-Regular',
         fontSize: 16,
-        color: 'rgba(0,0,0,0.5)',
         textAlign: 'center',
         marginTop: 50,
     },
@@ -533,27 +525,27 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     dialogContainer: {
-        backgroundColor: '#FFFFFF',
         borderRadius: 20,
         width: '80%',
         padding: 20,
         elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
     },
     dialogTitle: {
         fontFamily: 'Judson-Bold',
         fontSize: 20,
-        color: '#000000',
         marginBottom: 15,
     },
     renameInput: {
         width: '100%',
         height: 50,
-        backgroundColor: '#F5F5F5',
         borderRadius: 10,
         paddingHorizontal: 15,
         fontFamily: 'Judson-Regular',
         fontSize: 16,
-        color: '#000000',
         marginBottom: 20,
     },
     dialogButtons: {
@@ -563,13 +555,11 @@ const styles = StyleSheet.create({
     dialogCancelText: {
         fontFamily: 'Judson-Bold',
         fontSize: 16,
-        color: '#666666',
         marginRight: 20,
     },
     dialogSubmitText: {
         fontFamily: 'Judson-Bold',
         fontSize: 16,
-        color: '#0062FF',
     }
 });
 

@@ -14,6 +14,7 @@ import {
 import * as Sharing from 'expo-sharing';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { useNavigation } from '../../context/NavigationContext';
+import { useAppContext } from '../../context/AppContext';
 import HomeHeader from '../Home/HomeHeader';
 import AppStatusBar from '../../components/status-bar/status-bar';
 import { ShareIcon, DownloadIcon } from '../Home/Icons';
@@ -27,6 +28,7 @@ const { width } = Dimensions.get('window');
 
 const DocumentView = () => {
     const { screenParams, goBack } = useNavigation();
+    const { colors, themeMode } = useAppContext();
     const [isLoading, setIsLoading] = React.useState(false);
     const [isBusy, setIsBusy] = React.useState(false);
 
@@ -200,7 +202,7 @@ const DocumentView = () => {
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
             <AppStatusBar />
 
             <HomeHeader
@@ -215,17 +217,17 @@ const DocumentView = () => {
 
             {isPdf ? (
                 <View style={styles.pdfContainer}>
-                    <Text style={styles.docTitle}>{docName}</Text>
-                    <View style={[styles.imageContainer, { flex: 1, aspectRatio: undefined }]}>
-                        <View style={[styles.imageWrapper, { height: '100%', borderRadius: 15 }]}>
+                    <Text style={[styles.docTitle, { color: colors.text }]}>{docName}</Text>
+                    <View style={[styles.imageContainer, { flex: 1, aspectRatio: undefined, backgroundColor: colors.surface, borderColor: colors.cardBorder, borderWidth: 1 }]}>
+                        <View style={[styles.imageWrapper, { height: '100%', borderRadius: 15, backgroundColor: themeMode === 'dark' ? '#1A1A1A' : '#FFFFFF' }]}>
                             {isLoading && (
-                                <View style={styles.loadingContainer}>
-                                    <ActivityIndicator color="#0062FF" size="large" />
+                                <View style={[styles.loadingContainer, { backgroundColor: colors.surface }]}>
+                                    <ActivityIndicator color={colors.primary} size="large" />
                                 </View>
                             )}
                             <Pdf
                                 source={{ uri: docUri, cache: true }}
-                                style={styles.pdfViewer}
+                                style={[styles.pdfViewer, { backgroundColor: themeMode === 'dark' ? '#1A1A1A' : '#FFFFFF' }]}
                                 onLoadProgress={(percent) => console.log('PDF Loading...', percent)}
                                 onLoadComplete={(numberOfPages) => {
                                     console.log(`Finished loading ${numberOfPages} pages`);
@@ -243,43 +245,43 @@ const DocumentView = () => {
                                 }}
                                 trustAllCerts={false}
                                 renderActivityIndicator={() => (
-                                    <View style={styles.loadingContainer}>
-                                        <ActivityIndicator color="#0062FF" size="large" />
+                                    <View style={[styles.loadingContainer, { backgroundColor: colors.surface }]}>
+                                        <ActivityIndicator color={colors.primary} size="large" />
                                     </View>
                                 )}
                             />
                         </View>
-                        <View style={styles.pageIndicator}>
-                            <Text style={styles.pageIndicatorText}>
+                        <View style={[styles.pageIndicator, { backgroundColor: colors.modalBg }]}>
+                            <Text style={[styles.pageIndicatorText, { color: colors.text }]}>
                                 Page {currentPage}/{totalPages}
                             </Text>
                         </View>
                     </View>
                     <View style={styles.buttonRow}>
                         <TouchableOpacity
-                            style={[styles.actionButton, isBusy && { opacity: 0.5 }]}
+                            style={[styles.actionButton, { backgroundColor: colors.card }, isBusy && { opacity: 0.5 }]}
                             onPress={handleShare}
                             disabled={isBusy}
                         >
-                            <ShareIcon color="#000000" size={22} />
-                            <Text style={styles.actionButtonText}>Share</Text>
+                            <ShareIcon color={colors.primary} size={22} />
+                            <Text style={[styles.actionButtonText, { color: colors.text }]}>Share</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={[styles.actionButton, isBusy && { opacity: 0.5 }]}
+                            style={[styles.actionButton, { backgroundColor: colors.card }, isBusy && { opacity: 0.5 }]}
                             onPress={handleDownload}
                             disabled={isBusy}
                         >
-                            <DownloadIcon color="#000000" size={22} />
-                            <Text style={styles.actionButtonText}>Download</Text>
+                            <DownloadIcon color={colors.primary} size={22} />
+                            <Text style={[styles.actionButtonText, { color: colors.text }]}>Download</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
             ) : (
                 <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                    <Text style={styles.docTitle}>{docName}</Text>
+                    <Text style={[styles.docTitle, { color: colors.text }]}>{docName}</Text>
 
-                    <View style={styles.imageContainer}>
+                    <View style={[styles.imageContainer, { backgroundColor: colors.surface, borderColor: colors.cardBorder, borderWidth: 1 }]}>
                         <View style={styles.imageWrapper}>
                             <Image
                                 source={{ uri: docUri || 'https://img.freepik.com/free-vector/medical-report-template_23-2148509372.jpg' }}
@@ -294,28 +296,28 @@ const DocumentView = () => {
                             />
                         </View>
 
-                        <View style={styles.pageIndicator}>
-                            <Text style={styles.pageIndicatorText}>Page 1/1</Text>
+                        <View style={[styles.pageIndicator, { backgroundColor: colors.modalBg }]}>
+                            <Text style={[styles.pageIndicatorText, { color: colors.text }]}>Page 1/1</Text>
                         </View>
                     </View>
 
                     <View style={styles.buttonRow}>
                         <TouchableOpacity
-                            style={[styles.actionButton, isBusy && { opacity: 0.5 }]}
+                            style={[styles.actionButton, { backgroundColor: colors.card }, isBusy && { opacity: 0.5 }]}
                             onPress={handleShare}
                             disabled={isBusy}
                         >
-                            <ShareIcon color="#000000" size={22} />
-                            <Text style={styles.actionButtonText}>Share</Text>
+                            <ShareIcon color={colors.primary} size={22} />
+                            <Text style={[styles.actionButtonText, { color: colors.text }]}>Share</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={[styles.actionButton, isBusy && { opacity: 0.5 }]}
+                            style={[styles.actionButton, { backgroundColor: colors.card }, isBusy && { opacity: 0.5 }]}
                             onPress={handleDownload}
                             disabled={isBusy}
                         >
-                            <DownloadIcon color="#000000" size={22} />
-                            <Text style={styles.actionButtonText}>Download</Text>
+                            <DownloadIcon color={colors.primary} size={22} />
+                            <Text style={[styles.actionButtonText, { color: colors.text }]}>Download</Text>
                         </TouchableOpacity>
                     </View>
 
@@ -330,7 +332,6 @@ const DocumentView = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
     },
     scrollContent: {
         paddingHorizontal: 25,
@@ -339,13 +340,11 @@ const styles = StyleSheet.create({
     docTitle: {
         fontFamily: 'Judson-Bold',
         fontSize: 22,
-        color: '#000000',
         marginBottom: 20,
     },
     imageContainer: {
         width: '100%',
         aspectRatio: 0.75,
-        backgroundColor: '#D9D9D9',
         borderRadius: 20,
         padding: 15,
         justifyContent: 'center',
@@ -355,7 +354,6 @@ const styles = StyleSheet.create({
     imageWrapper: {
         width: '100%',
         height: '92%',
-        backgroundColor: '#FFFFFF',
         borderRadius: 5,
         overflow: 'hidden',
     },
@@ -367,12 +365,10 @@ const styles = StyleSheet.create({
         flex: 1,
         width: '100%',
         height: '100%',
-        backgroundColor: '#FFFFFF',
     },
     pageIndicator: {
         position: 'absolute',
         bottom: 15,
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
         paddingHorizontal: 20,
         paddingVertical: 8,
         borderRadius: 20,
@@ -381,7 +377,6 @@ const styles = StyleSheet.create({
     pageIndicatorText: {
         fontFamily: 'Judson-Regular',
         fontSize: 14,
-        color: '#000000',
     },
     buttonRow: {
         flexDirection: 'row',
@@ -392,7 +387,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         width: '47%',
         height: 55,
-        backgroundColor: '#E6F0FF',
         borderRadius: 15,
         justifyContent: 'center',
         alignItems: 'center',
@@ -400,7 +394,6 @@ const styles = StyleSheet.create({
     actionButtonText: {
         fontFamily: 'Judson-Bold',
         fontSize: 16,
-        color: '#000000',
         marginLeft: 10,
     },
     loadingContainer: {
@@ -411,7 +404,6 @@ const styles = StyleSheet.create({
         bottom: 0,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#FFFFFF',
         zIndex: 10,
     },
     pdfContainer: {
@@ -420,13 +412,6 @@ const styles = StyleSheet.create({
         paddingTop: 30,
         paddingBottom: 20,
     },
-    pdfWrapper: {
-        flex: 1,
-        backgroundColor: '#F5F5F5',
-        borderRadius: 20,
-        overflow: 'hidden',
-    },
 });
-
 
 export default DocumentView;

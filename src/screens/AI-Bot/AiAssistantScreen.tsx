@@ -12,7 +12,7 @@ const { width, height } = Dimensions.get('window');
 
 const AiAssistantScreen = () => {
     const { navigate } = useNavigation();
-    const { reports, documents, t, language } = useAppContext();
+    const { reports, documents, t, language, colors } = useAppContext();
 
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [inputText, setInputText] = useState('');
@@ -76,7 +76,7 @@ const AiAssistantScreen = () => {
 
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
             <AppStatusBar />
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -84,7 +84,7 @@ const AiAssistantScreen = () => {
             >
                 {/* Header */}
                 <LinearGradient
-                    colors={['#0062FF', '#5C8EDF']}
+                    colors={colors.headerGradient as any}
                     style={styles.header}
                 >
                     <View style={styles.headerContent}>
@@ -112,7 +112,7 @@ const AiAssistantScreen = () => {
 
                 {/* Chat Area */}
                 <ScrollView
-                    style={styles.chatArea}
+                    style={[styles.chatArea, { backgroundColor: colors.background }]}
                     contentContainerStyle={styles.chatScrollContent}
                     showsVerticalScrollIndicator={false}
                 >
@@ -127,32 +127,34 @@ const AiAssistantScreen = () => {
                             <View
                                 style={[
                                     styles.bubble,
-                                    msg.type === 'user' ? styles.userBubble : styles.botBubble
+                                    msg.type === 'user'
+                                        ? [styles.userBubble, { backgroundColor: colors.primaryLight }]
+                                        : [styles.botBubble, { backgroundColor: colors.card, borderColor: colors.cardBorder, borderWidth: 1 }]
                                 ]}
                             >
-                                <Text style={styles.messageText}>{msg.text}</Text>
+                                <Text style={[styles.messageText, { color: colors.text }]}>{msg.text}</Text>
                             </View>
                         </View>
                     ))}
                 </ScrollView>
 
                 {/* Input Area */}
-                <View style={styles.inputContainer}>
-                    <View style={styles.inputWrapper}>
+                <View style={[styles.inputContainer, { backgroundColor: colors.background }]}>
+                    <View style={[styles.inputWrapper, { backgroundColor: colors.inputBg, borderColor: colors.border, borderWidth: 1 }]}>
                         {selectedAttachment && (
-                            <View style={styles.attachmentBadge}>
-                                <LinkIcon size={14} color="#0062FF" />
-                                <Text style={styles.attachmentBadgeText}>{selectedAttachment}</Text>
+                            <View style={[styles.attachmentBadge, { backgroundColor: colors.primaryLight }]}>
+                                <LinkIcon size={14} color={colors.primary} />
+                                <Text style={[styles.attachmentBadgeText, { color: colors.primary }]}>{selectedAttachment}</Text>
                                 <TouchableOpacity onPress={() => setSelectedAttachment(null)}>
-                                    <CrossIcon size={14} color="#0062FF" />
+                                    <CrossIcon size={14} color={colors.primary} />
                                 </TouchableOpacity>
                             </View>
                         )}
                         <View style={styles.inputRow}>
                             <TextInput
-                                style={styles.textInput}
+                                style={[styles.textInput, { color: colors.text }]}
                                 placeholder={t('ask_anything')}
-                                placeholderTextColor="rgba(0, 0, 0, 0.4)"
+                                placeholderTextColor={colors.textSecondary}
 
                                 value={inputText}
                                 onChangeText={setInputText}
@@ -160,10 +162,10 @@ const AiAssistantScreen = () => {
                             />
                             <View style={styles.inputActions}>
                                 <TouchableOpacity style={styles.actionButton} onPress={toggleAttachmentMenu}>
-                                    <AttachIcon size={24} color="#000000" />
+                                    <AttachIcon size={24} color={colors.text} />
                                 </TouchableOpacity>
                                 <TouchableOpacity style={styles.actionButton} onPress={handleSend}>
-                                    <SendIcon size={24} color="#0062FF" />
+                                    <SendIcon size={24} color={colors.primary} />
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -175,29 +177,29 @@ const AiAssistantScreen = () => {
             {isAttachmentMenuOpen && (
                 <View style={styles.attachmentOverlay}>
                     <Pressable style={styles.overlayPressable} onPress={() => setIsAttachmentMenuOpen(false)} />
-                    <View style={styles.attachmentPopup}>
-                        <Text style={styles.attachmentPopupTitle}>{t('link_file')}</Text>
+                    <View style={[styles.attachmentPopup, { backgroundColor: colors.modalBg }]}>
+                        <Text style={[styles.attachmentPopupTitle, { color: colors.primary }]}>{t('link_file')}</Text>
                         <ScrollView style={{ maxHeight: 200 }}>
                             {reports.length === 0 && documents.length === 0 && (
-                                <Text style={styles.noAttachmentsText}>No files found to link</Text>
+                                <Text style={[styles.noAttachmentsText, { color: colors.textSecondary }]}>No files found to link</Text>
                             )}
 
                             {reports.map((report) => (
                                 <TouchableOpacity
                                     key={`report-${report.id}`}
-                                    style={styles.attachmentOption}
+                                    style={[styles.attachmentOption, { borderBottomColor: colors.divider }]}
                                     onPress={() => handleSelectAttachment(report.name)}
                                 >
-                                    <Text style={styles.attachmentOptionText}>{report.name} (Report)</Text>
+                                    <Text style={[styles.attachmentOptionText, { color: colors.text }]}>{report.name} (Report)</Text>
                                 </TouchableOpacity>
                             ))}
                             {documents.map((doc) => (
                                 <TouchableOpacity
                                     key={`doc-${doc.id}`}
-                                    style={styles.attachmentOption}
+                                    style={[styles.attachmentOption, { borderBottomColor: colors.divider }]}
                                     onPress={() => handleSelectAttachment(doc.name)}
                                 >
-                                    <Text style={styles.attachmentOptionText}>{doc.name} (Document)</Text>
+                                    <Text style={[styles.attachmentOptionText, { color: colors.text }]}>{doc.name} (Document)</Text>
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
@@ -214,7 +216,6 @@ const AiAssistantScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
     },
     header: {
         height: 100,
@@ -277,36 +278,28 @@ const styles = StyleSheet.create({
         borderRadius: 20,
     },
     botBubble: {
-        backgroundColor: '#F5F5F5',
         borderBottomLeftRadius: 0,
     },
     userBubble: {
-        backgroundColor: '#CCE0FF',
         borderBottomRightRadius: 0,
     },
     messageText: {
         fontFamily: 'Judson-Regular',
         fontSize: 15,
-        color: '#333',
     },
     inputContainer: {
         paddingTop: 10,
         paddingBottom: Platform.OS === 'ios' ? 30 : 20,
         paddingHorizontal: 20,
-        backgroundColor: '#FFFFFF',
     },
     inputWrapper: {
-        backgroundColor: '#FFFFFF',
         borderRadius: 20,
-        borderWidth: 0.5,
-        borderColor: '#000000',
         paddingHorizontal: 15,
         paddingVertical: 10,
     },
     attachmentBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(0, 98, 255, 0.08)',
         alignSelf: 'flex-start',
         paddingHorizontal: 12,
         paddingVertical: 6,
@@ -314,7 +307,6 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     attachmentBadgeText: {
-        color: '#0062FF',
         fontSize: 12,
         fontFamily: 'Judson-Bold',
         marginHorizontal: 8,
@@ -327,7 +319,6 @@ const styles = StyleSheet.create({
         flex: 1,
         fontFamily: 'Judson-Regular',
         fontSize: 16,
-        color: '#000000',
         paddingTop: 0,
         paddingBottom: 0,
     },
@@ -355,7 +346,6 @@ const styles = StyleSheet.create({
     },
     attachmentPopup: {
         width: width * 0.85,
-        backgroundColor: '#FFFFFF',
         borderRadius: 20,
         marginBottom: 100, // Position above input bar
         shadowColor: '#000',
@@ -368,14 +358,12 @@ const styles = StyleSheet.create({
     attachmentPopupTitle: {
         fontFamily: 'Judson-Bold',
         fontSize: 18,
-        color: '#0062FF',
         textAlign: 'center',
         marginBottom: 10,
     },
     noAttachmentsText: {
         fontFamily: 'Judson-Regular',
         fontSize: 14,
-        color: '#999',
         textAlign: 'center',
         paddingVertical: 20,
     },
@@ -383,12 +371,10 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         paddingHorizontal: 20,
         borderBottomWidth: 0.5,
-        borderBottomColor: 'rgba(0,0,0,0.05)',
     },
     attachmentOptionText: {
         fontFamily: 'Judson-Regular',
         fontSize: 15,
-        color: '#000000',
     },
 });
 

@@ -49,7 +49,7 @@ const { width, height } = Dimensions.get('window');
 
 const ScanReportScreen = () => {
     const { goBack, navigate, screenParams } = useNavigation();
-    const { addReport } = useAppContext();
+    const { addReport, colors, themeMode, t } = useAppContext();
     const [permission, requestPermission] = useCameraPermissions();
     const [torch, setTorch] = useState(false);
     const [capturedImages, setCapturedImages] = useState<string[]>([]);
@@ -135,16 +135,16 @@ const ScanReportScreen = () => {
     });
 
     if (!permission) {
-        return <View style={styles.container} />;
+        return <View style={[styles.container, { backgroundColor: colors.background }]} />;
     }
 
     if (!permission.granted) {
         return (
-            <View style={styles.container}>
-                <View style={styles.permissionContent}>
-                    <Text style={styles.permissionText}>We need your permission to show the camera</Text>
-                    <Pressable onPress={requestPermission} style={styles.permissionButton}>
-                        <Text style={styles.permissionButtonText}>Grant Permission</Text>
+            <View style={[styles.container, { backgroundColor: colors.background }]}>
+                <View style={[styles.permissionContent, { backgroundColor: colors.background }]}>
+                    <Text style={[styles.permissionText, { color: colors.text }]}>{t('permission_camera')}</Text>
+                    <Pressable onPress={requestPermission} style={[styles.permissionButton, { backgroundColor: colors.primary }]}>
+                        <Text style={styles.permissionButtonText}>{t('grant_permission')}</Text>
                     </Pressable>
                 </View>
             </View>
@@ -153,12 +153,12 @@ const ScanReportScreen = () => {
 
     if (isAnalysisMode && capturedImages.length > 0) {
         return (
-            <View style={styles.analysisContainer}>
+            <View style={[styles.analysisContainer, { backgroundColor: colors.background }]}>
                 <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
                 <Animated.View style={[styles.stickyHeader, { height: headerHeight }]}>
                     <LinearGradient
-                        colors={['#0062FF', '#0062FF']}
+                        colors={colors.headerGradient as any}
                         style={StyleSheet.absoluteFill}
                     />
                     <View style={styles.analysisTopIcons}>
@@ -169,7 +169,7 @@ const ScanReportScreen = () => {
                             <BackIcon size={24} color="#FFFFFF" />
                         </Pressable>
                         <View style={styles.analysisHeaderText}>
-                            <Animated.Text style={[styles.analysisTitle, { fontSize: titleFontSize }]}>Your Report Analysis</Animated.Text>
+                            <Animated.Text style={[styles.analysisTitle, { fontSize: titleFontSize }]}>{t('report_analysis')}</Animated.Text>
                         </View>
                         <Pressable style={styles.analysisIconBlock} onPress={goBack}>
                             <CrossIcon size={24} color="#FFFFFF" />
@@ -187,14 +187,14 @@ const ScanReportScreen = () => {
                 >
                     <View>
                         <LinearGradient
-                            colors={['#0062FF', '#5C8EDF']}
+                            colors={colors.headerGradient as any}
                             style={styles.analysisImageWrapper}
                         >
                             {isPdf ? (
-                                <View style={[styles.capturedImageContainer, { alignSelf: 'center', marginRight: 0 }]}>
+                                <View style={[styles.capturedImageContainer, { alignSelf: 'center', marginRight: 0, backgroundColor: themeMode === 'dark' ? '#1A1A1A' : '#FFFFFF' }]}>
                                     <Pdf
                                         source={{ uri: capturedImages[0] || '' }}
-                                        style={styles.pdfView}
+                                        style={[styles.pdfView, { backgroundColor: themeMode === 'dark' ? '#1A1A1A' : '#FFFFFF' }]}
                                         trustAllCerts={false}
                                         onLoadComplete={(numberOfPages) => {
                                             console.log(`Number of pages: ${numberOfPages}`);
@@ -214,6 +214,7 @@ const ScanReportScreen = () => {
                                             key={index}
                                             style={[
                                                 styles.capturedImageContainer,
+                                                { backgroundColor: themeMode === 'dark' ? '#1A1A1A' : '#FFFFFF' },
                                                 index === capturedImages.length - 1 && { marginRight: 0 }
                                             ]}
                                         >
@@ -234,38 +235,38 @@ const ScanReportScreen = () => {
 
                     <View style={styles.analysisContent}>
                         <View style={styles.contentSection}>
-                            <Text style={styles.sectionHeading}>Overall Report Summary</Text>
-                            <Text style={styles.sectionPara}>Vitamin B12 & D3 deficiency observed, along with a spike in WBCs count and low haemoglobin.</Text>
+                            <Text style={[styles.sectionHeading, { color: colors.text }]}>{t('report_summary')}</Text>
+                            <Text style={[styles.sectionPara, { color: colors.textSecondary }]}>Vitamin B12 & D3 deficiency observed, along with a spike in WBCs count and low haemoglobin.</Text>
                         </View>
 
                         <View style={styles.contentSection}>
-                            <Text style={styles.sectionHeading}>Vitamins</Text>
-                            <Text style={styles.sectionPara}>Vitamin B12 : 5.3 (deficient)</Text>
-                            <Text style={styles.sectionPara}>Vitamin D3 : 6.6 (deficient)</Text>
+                            <Text style={[styles.sectionHeading, { color: colors.text }]}>Vitamins</Text>
+                            <Text style={[styles.sectionPara, { color: colors.textSecondary }]}>Vitamin B12 : 5.3 (deficient)</Text>
+                            <Text style={[styles.sectionPara, { color: colors.textSecondary }]}>Vitamin D3 : 6.6 (deficient)</Text>
                         </View>
 
                         <View style={styles.contentSection}>
-                            <Text style={styles.sectionHeading}>Blood Cells</Text>
-                            <Text style={styles.sectionPara}>WBCs : 5.3 (high)</Text>
+                            <Text style={[styles.sectionHeading, { color: colors.text }]}>Blood Cells</Text>
+                            <Text style={[styles.sectionPara, { color: colors.textSecondary }]}>WBCs : 5.3 (high)</Text>
                         </View>
 
                         <View style={styles.contentSection}>
-                            <Text style={styles.sectionHeading}>Other Blood Factors</Text>
-                            <Text style={styles.sectionPara}>Haemoglobin : 5.3 (low)</Text>
+                            <Text style={[styles.sectionHeading, { color: colors.text }]}>Other Blood Factors</Text>
+                            <Text style={[styles.sectionPara, { color: colors.textSecondary }]}>Haemoglobin : 5.3 (low)</Text>
                         </View>
 
                         <View style={styles.contentSection}>
-                            <Text style={styles.sectionHeading}>AI Suggestions</Text>
-                            <Text style={styles.sectionPara}>Prefer fish, and other fermented food items to balance your vitamin B12 levels.</Text>
-                            <Text style={styles.sectionPara}>For balancing vitamin D3, morning sunlight is the best!</Text>
-                            <Text style={styles.sectionPara}>Keep your health proper including proper medications if you are sick currently, as being sick makes the WBCs count to spike up for body recovery.</Text>
-                            <Text style={styles.sectionPara}>Include beetroot, dates, raisins & spinach in your diet to regain the required haemoglobin level.</Text>
+                            <Text style={[styles.sectionHeading, { color: colors.text }]}>{t('ai_suggestions')}</Text>
+                            <Text style={[styles.sectionPara, { color: colors.textSecondary }]}>Prefer fish, and other fermented food items to balance your vitamin B12 levels.</Text>
+                            <Text style={[styles.sectionPara, { color: colors.textSecondary }]}>For balancing vitamin D3, morning sunlight is the best!</Text>
+                            <Text style={[styles.sectionPara, { color: colors.textSecondary }]}>Keep your health proper including proper medications if you are sick currently, as being sick makes the WBCs count to spike up for body recovery.</Text>
+                            <Text style={[styles.sectionPara, { color: colors.textSecondary }]}>Include beetroot, dates, raisins & spinach in your diet to regain the required haemoglobin level.</Text>
                         </View>
 
                         <View style={styles.analysisFooter}>
-                            <TouchableOpacity style={styles.saveButton} onPress={() => setShowSaveModal(true)}>
-                                <DownloadIcon size={20} color="#000000" />
-                                <Text style={styles.saveButtonText}>Save Report</Text>
+                            <TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.card, borderColor: colors.cardBorder, borderWidth: 1 }]} onPress={() => setShowSaveModal(true)}>
+                                <DownloadIcon size={20} color={colors.primary} />
+                                <Text style={[styles.saveButtonText, { color: colors.text }]}>{t('save_report')}</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -273,10 +274,10 @@ const ScanReportScreen = () => {
                 </Animated.ScrollView>
 
                 <TouchableOpacity
-                    style={styles.fixedChatButton}
+                    style={[styles.fixedChatButton, { backgroundColor: colors.card, borderColor: colors.cardBorder, borderWidth: 1 }]}
                     onPress={() => navigate('ai_assistant')}
                 >
-                    <BotIcon size={28} color="#3C87FF" />
+                    <BotIcon size={28} color={colors.primary} />
                 </TouchableOpacity>
 
                 {/* Save Report Modal */}
@@ -287,14 +288,14 @@ const ScanReportScreen = () => {
                     onRequestClose={() => setShowSaveModal(false)}
                 >
                     <View style={styles.modalOverlay}>
-                        <View style={styles.modalContent}>
-                            <Text style={styles.modalTitle}>Save Report</Text>
-                            <Text style={styles.modalSubtitle}>Please enter a name for your report to stay organized.</Text>
+                        <View style={[styles.modalContent, { backgroundColor: colors.modalBg }]}>
+                            <Text style={[styles.modalTitle, { color: colors.text }]}>{t('save_report')}</Text>
+                            <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>{t('enter_report_name')}</Text>
 
                             <TextInput
-                                style={styles.modalInput}
-                                placeholder="e.g. Blood Test - Jan"
-                                placeholderTextColor="#999"
+                                style={[styles.modalInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border, borderWidth: 1 }]}
+                                placeholder={t('report_name_placeholder')}
+                                placeholderTextColor={colors.textSecondary}
                                 value={reportName}
                                 onChangeText={setReportName}
                                 autoFocus={true}
@@ -302,10 +303,10 @@ const ScanReportScreen = () => {
 
                             <View style={styles.modalButtons}>
                                 <TouchableOpacity
-                                    style={styles.cancelButton}
+                                    style={[styles.cancelButton, { backgroundColor: colors.surface }]}
                                     onPress={() => setShowSaveModal(false)}
                                 >
-                                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                                    <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>{t('cancel')}</Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
@@ -374,7 +375,7 @@ const ScanReportScreen = () => {
                                                 setShowSaveModal(false);
                                                 navigate('reports');
                                             } catch (error: any) {
-                                                Alert.alert('Upload Error', error.message);
+                                                Alert.alert(t('upload_error'), error.message);
                                             } finally {
                                                 setLoading(false);
                                             }
@@ -383,11 +384,11 @@ const ScanReportScreen = () => {
                                     disabled={loading}
                                 >
                                     <LinearGradient
-                                        colors={['#0062FF', '#5C8EDF']}
+                                        colors={colors.headerGradient as any}
                                         style={styles.confirmButtonGradient}
                                     >
                                         <Text style={styles.confirmButtonText}>
-                                            {loading ? 'Uploading...' : 'Save Now'}
+                                            {loading ? t('uploading') : t('save_now')}
                                         </Text>
                                     </LinearGradient>
                                 </TouchableOpacity>
@@ -414,7 +415,7 @@ const ScanReportScreen = () => {
                     <View style={styles.header}>
                         <Pressable onPress={() => navigate('home')}>
                             <LinearGradient
-                                colors={['#0062FF', '#5C8EDF']}
+                                colors={colors.headerGradient as any}
                                 style={styles.iconBlock}
                             >
                                 <BackIcon size={24} color="#FFFFFF" />
@@ -428,7 +429,7 @@ const ScanReportScreen = () => {
                             }}
                         >
                             <LinearGradient
-                                colors={torch ? ['#FFD700', '#FFA500'] : ['#0062FF', '#5C8EDF']}
+                                colors={torch ? ['#FFD700', '#FFA500'] : colors.headerGradient as any}
                                 style={styles.iconBlock}
                             >
                                 <FlashlightIcon size={24} color={torch ? "#000000" : "#FFFFFF"} />
@@ -442,7 +443,7 @@ const ScanReportScreen = () => {
 
                     <View style={styles.instructionContainer}>
                         <Text style={styles.instructionText}>
-                            Make sure to capture a clear picture of report
+                            {t('capture_instruction')}
                         </Text>
                     </View>
 
@@ -466,7 +467,7 @@ const ScanReportScreen = () => {
 
                             <TouchableOpacity style={styles.captureButton} onPress={handleCapture}>
                                 <LinearGradient
-                                    colors={['#0062FF', '#5C8EDF']}
+                                    colors={colors.headerGradient as any}
                                     style={styles.gradientCircle}
                                 >
                                     <View style={styles.whiteInnerCircle} />
@@ -480,10 +481,10 @@ const ScanReportScreen = () => {
                                         onPress={() => setIsAnalysisMode(true)}
                                     >
                                         <LinearGradient
-                                            colors={['#0062FF', '#5C8EDF']}
+                                            colors={colors.headerGradient as any}
                                             style={styles.finishGradient}
                                         >
-                                            <Text style={styles.finishText}>Finish</Text>
+                                            <Text style={styles.finishText}>{t('finish')}</Text>
                                         </LinearGradient>
                                     </TouchableOpacity>
                                 )}

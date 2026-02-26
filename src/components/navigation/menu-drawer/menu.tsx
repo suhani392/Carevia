@@ -19,7 +19,7 @@ const Menu: React.FC<MenuProps> = ({ onClose }) => {
     const slideAnim = useRef(new Animated.Value(-width)).current;
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const { navigate } = useNavigation();
-    const { t } = useAppContext();
+    const { t, colors } = useAppContext();
     const [isAlertVisible, setIsAlertVisible] = useState(false);
 
 
@@ -61,10 +61,10 @@ const Menu: React.FC<MenuProps> = ({ onClose }) => {
     const menuItems: { label: string; screen: ScreenName, key: any }[] = [
         { label: t('home'), screen: "home", key: 'home' },
         { label: t('ai_assistant'), screen: "ai_assistant", key: 'ai_assistant' },
-        { label: "Contact Us", screen: "contact_us", key: 'contact_us' },
-        { label: "Help & Policy", screen: "help_policy", key: 'help_policy' },
+        { label: t('contact_us'), screen: "contact_us", key: 'contact_us' },
+        { label: t('help_policy'), screen: "help_policy", key: 'help_policy' },
         { label: t('settings'), screen: "settings", key: 'settings' },
-        { label: "About", screen: "about", key: 'about' }
+        { label: t('about'), screen: "about", key: 'about' }
     ];
 
 
@@ -112,7 +112,7 @@ const Menu: React.FC<MenuProps> = ({ onClose }) => {
                 ]}
             >
                 <LinearGradient
-                    colors={['#0062FF', '#5C8EDF']}
+                    colors={colors.headerGradient as any}
                     style={styles.container}
                 >
                     <View style={styles.header}>

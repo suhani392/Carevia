@@ -13,7 +13,7 @@ import { getAvatarSource } from '../../lib/avatars';
 const HomeScreen = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const { navigate } = useNavigation();
-    const { updates, userProfile, familyMembers, refreshData, t } = useAppContext();
+    const { updates, userProfile, familyMembers, refreshData, t, colors, themeMode } = useAppContext();
     const [refreshing, setRefreshing] = useState(false);
     const [isUpdatesExpanded, setIsUpdatesExpanded] = useState(false);
 
@@ -25,7 +25,7 @@ const HomeScreen = () => {
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
             <AppStatusBar />
             {isMenuOpen && <Menu onClose={() => setIsMenuOpen(false)} />}
 
@@ -34,14 +34,14 @@ const HomeScreen = () => {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
                 }
             >
                 <HomeHeader onMenuPress={() => setIsMenuOpen(true)} />
 
                 {/* Emergency Access Section */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>{t('emergency_access')}</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('emergency_access')}</Text>
                     <View style={styles.emergencyRow}>
 
                         <Pressable
@@ -49,12 +49,12 @@ const HomeScreen = () => {
                             onPress={() => navigate('documents')}
                         >
                             <LinearGradient
-                                colors={['#E6F0FF', '#C7DFFF']}
+                                colors={themeMode === 'dark' ? ['#1A2A47', '#001A4D'] : ['#E6F0FF', '#C7DFFF']}
                                 style={styles.cardGradient}
                             >
-                                <Text style={styles.modernCardTitle}>{t('documents')}</Text>
+                                <Text style={[styles.modernCardTitle, themeMode === 'dark' && { color: '#8AB4FF' }]}>{t('documents')}</Text>
 
-                                <View style={styles.modernDocIconContainer}>
+                                <View style={[styles.modernDocIconContainer, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
                                     <Image
                                         source={require('../../assets/icons/home/documents.png')}
                                         style={styles.modernDocIcon}
@@ -69,13 +69,13 @@ const HomeScreen = () => {
                                 onPress={() => navigate('reports')}
                             >
                                 <LinearGradient
-                                    colors={['#F0F7FF', '#D8E9FF']}
+                                    colors={themeMode === 'dark' ? ['#1A1A1A', '#2A2A2A'] : ['#F0F7FF', '#D8E9FF']}
                                     style={styles.cardGradientSmall}
                                 >
-                                    <View style={styles.modernIconContainer}>
-                                        <ReportIcon size={24} color="#0062FF" />
+                                    <View style={[styles.modernIconContainer, { backgroundColor: colors.card }]}>
+                                        <ReportIcon size={24} color={colors.primary} />
                                     </View>
-                                    <Text style={styles.modernSmallCardText}>{t('reports')}</Text>
+                                    <Text style={[styles.modernSmallCardText, { color: themeMode === 'dark' ? '#8AB4FF' : '#0047BA' }]}>{t('reports')}</Text>
 
                                 </LinearGradient>
                             </Pressable>
@@ -84,13 +84,13 @@ const HomeScreen = () => {
                                 onPress={() => navigate('ai_assistant')}
                             >
                                 <LinearGradient
-                                    colors={['#F0F7FF', '#D8E9FF']}
+                                    colors={themeMode === 'dark' ? ['#1A1A1A', '#2A2A2A'] : ['#F0F7FF', '#D8E9FF']}
                                     style={styles.cardGradientSmall}
                                 >
-                                    <View style={styles.modernIconContainer}>
-                                        <BotIcon size={24} color="#0062FF" />
+                                    <View style={[styles.modernIconContainer, { backgroundColor: colors.card }]}>
+                                        <BotIcon size={24} color={colors.primary} />
                                     </View>
-                                    <Text style={styles.modernSmallCardText}>{t('ai_assistant')}</Text>
+                                    <Text style={[styles.modernSmallCardText, { color: themeMode === 'dark' ? '#8AB4FF' : '#0047BA' }]}>{t('ai_assistant')}</Text>
 
                                 </LinearGradient>
                             </Pressable>
@@ -100,7 +100,7 @@ const HomeScreen = () => {
 
                 {/* Family Updates Section */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>{t('family_updates')}</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('family_updates')}</Text>
 
                     {updates.length > 0 ? (
                         <>
@@ -111,7 +111,7 @@ const HomeScreen = () => {
 
                                 if (userProfile?.id === update.user_id) {
                                     senderPhoto = userProfile.photo_url;
-                                    senderName = 'You';
+                                    senderName = t('you');
                                 } else {
                                     const member = familyMembers.find(m => m.id === update.user_id);
                                     if (member) {
@@ -121,7 +121,7 @@ const HomeScreen = () => {
                                 }
 
                                 return (
-                                    <View key={update.id} style={styles.familyCard}>
+                                    <View key={update.id} style={[styles.familyCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
                                         <View style={styles.updateInfoRow}>
                                             {senderPhoto && getAvatarSource(senderPhoto) ? (
                                                 <Image
@@ -129,18 +129,18 @@ const HomeScreen = () => {
                                                     style={styles.updateAvatar}
                                                 />
                                             ) : (
-                                                <View style={[styles.updateAvatar, styles.updateAvatarPlaceholder]}>
-                                                    <Text style={styles.updateAvatarPlaceholderText}>
+                                                <View style={[styles.updateAvatar, styles.updateAvatarPlaceholder, { backgroundColor: colors.primaryLight, borderColor: colors.cardBorder }]}>
+                                                    <Text style={[styles.updateAvatarPlaceholderText, { color: colors.primary }]}>
                                                         {(senderName || 'U').charAt(0).toUpperCase()}
                                                     </Text>
                                                 </View>
                                             )}
 
                                             <View style={styles.updateMeta}>
-                                                <Text style={styles.updateName}>
+                                                <Text style={[styles.updateName, { color: colors.text }]}>
                                                     {senderName}
                                                 </Text>
-                                                <Text style={styles.updateText}>{update.text}</Text>
+                                                <Text style={[styles.updateText, { color: colors.textSecondary }]}>{update.text}</Text>
                                             </View>
                                         </View>
                                     </View>
@@ -148,10 +148,10 @@ const HomeScreen = () => {
                             })}
                             {updates.length > 4 && (
                                 <Pressable
-                                    style={styles.readMoreButton}
+                                    style={[styles.readMoreButton, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
                                     onPress={() => setIsUpdatesExpanded(!isUpdatesExpanded)}
                                 >
-                                    <Text style={styles.readMoreText}>
+                                    <Text style={[styles.readMoreText, { color: colors.primary }]}>
                                         {isUpdatesExpanded ? t('show_less') : t('read_more')}
                                     </Text>
 
@@ -160,8 +160,8 @@ const HomeScreen = () => {
                         </>
                     ) : (
 
-                        <View style={styles.emptyUpdatesCard}>
-                            <Text style={styles.emptyUpdatesText}>No recent family updates</Text>
+                        <View style={[styles.emptyUpdatesCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+                            <Text style={[styles.emptyUpdatesText, { color: colors.textSecondary }]}>{t('no_updates')}</Text>
                         </View>
                     )}
                 </View>
@@ -176,7 +176,6 @@ const HomeScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
     },
     scrollView: {
         flex: 1,
@@ -191,7 +190,6 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontFamily: 'Judson-Bold',
         fontSize: 20,
-        color: '#000000',
         marginBottom: 15,
     },
     emergencyRow: {
@@ -204,7 +202,6 @@ const styles = StyleSheet.create({
         borderRadius: 25,
         overflow: 'hidden',
         elevation: 5,
-        shadowColor: '#0062FF',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.15,
         shadowRadius: 8,
@@ -217,18 +214,15 @@ const styles = StyleSheet.create({
     modernCardTitle: {
         fontFamily: 'Judson-Bold',
         fontSize: 18,
-        color: '#0047BA',
         marginBottom: 15,
     },
     modernDocIconContainer: {
         flex: 1,
         width: '100%',
-        backgroundColor: '#FFFFFF',
         borderRadius: 20,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.4)',
     },
     modernDocIcon: {
         width: '65%',
@@ -243,7 +237,6 @@ const styles = StyleSheet.create({
         borderRadius: 25,
         overflow: 'hidden',
         elevation: 4,
-        shadowColor: '#0062FF',
         shadowOffset: { width: 0, height: 3 },
         shadowOpacity: 0.1,
         shadowRadius: 6,
@@ -257,7 +250,6 @@ const styles = StyleSheet.create({
     modernIconContainer: {
         width: 44,
         height: 44,
-        backgroundColor: '#FFFFFF',
         borderRadius: 15,
         justifyContent: 'center',
         alignItems: 'center',
@@ -270,18 +262,15 @@ const styles = StyleSheet.create({
     modernSmallCardText: {
         fontFamily: 'Judson-Bold',
         fontSize: 15,
-        color: '#0047BA',
         marginLeft: 12,
         flex: 1,
         lineHeight: 18,
     },
     familyCard: {
-        backgroundColor: '#FFFFFF',
         borderRadius: 20,
         padding: 15,
         marginBottom: 15,
         borderWidth: 1,
-        borderColor: '#E6F0FF',
         elevation: 2,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
@@ -299,16 +288,13 @@ const styles = StyleSheet.create({
         marginRight: 15,
     },
     updateAvatarPlaceholder: {
-        backgroundColor: '#E6F0FF',
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#C7DFFF',
     },
     updateAvatarPlaceholderText: {
         fontFamily: 'Judson-Bold',
         fontSize: 18,
-        color: '#0062FF',
     },
     updateMeta: {
         flex: 1,
@@ -316,42 +302,34 @@ const styles = StyleSheet.create({
     updateName: {
         fontFamily: 'Judson-Bold',
         fontSize: 17,
-        color: '#000000',
     },
     updateText: {
         fontFamily: 'Judson-Regular',
         fontSize: 14,
-        color: '#666666',
         lineHeight: 18,
         marginTop: 2,
     },
     emptyUpdatesCard: {
-        backgroundColor: '#F5F9FF',
         borderRadius: 20,
         padding: 25,
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#E1EEFF',
         borderStyle: 'dashed',
     },
     emptyUpdatesText: {
         fontFamily: 'Judson-Regular',
         fontSize: 15,
-        color: 'rgba(0,0,0,0.5)',
     },
     readMoreButton: {
         alignItems: 'center',
         paddingVertical: 10,
-        backgroundColor: '#F0F7FF',
         borderRadius: 15,
         borderWidth: 1,
-        borderColor: '#E6F0FF',
         marginTop: 5,
     },
     readMoreText: {
         fontFamily: 'Judson-Bold',
         fontSize: 14,
-        color: '#0062FF',
     },
 });
 

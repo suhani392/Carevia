@@ -82,7 +82,7 @@ interface ProfileData {
 
 const ProfileScreen = () => {
     const { goBack, navigate } = useNavigation();
-    const { updates, userProfile, refreshData, t } = useAppContext();
+    const { updates, userProfile, refreshData, t, colors, themeMode } = useAppContext();
 
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -96,6 +96,7 @@ const ProfileScreen = () => {
         bloodGroup: 'N/A',
         emergencyContact: 'N/A'
     });
+
 
     useEffect(() => {
         if (userProfile) {
@@ -257,9 +258,9 @@ const ProfileScreen = () => {
         return (
             <View style={styles.editContainer}>
                 <View style={styles.editHeader}>
-                    <Text style={styles.editTitle}>{t('edit')} {t(editingField as any) || editingField}</Text>
+                    <Text style={[styles.editTitle, { color: colors.text }]}>{t('edit')} {t(editingField as any) || editingField}</Text>
                     <TouchableOpacity onPress={handleCancel}>
-                        <Text style={styles.closeText}>✕</Text>
+                        <Text style={[styles.closeText, { color: colors.textSecondary }]}>✕</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -268,16 +269,24 @@ const ProfileScreen = () => {
                         {(options[editingField as keyof typeof options]).map(option => (
                             <TouchableOpacity
                                 key={option}
-                                style={[styles.optionItem, tempValue === option && styles.selectedOption]}
+                                style={[
+                                    styles.optionItem,
+                                    { backgroundColor: colors.inputBg, borderColor: tempValue === option ? colors.primary : colors.border },
+                                    tempValue === option && { backgroundColor: colors.primaryLight }
+                                ]}
                                 onPress={() => setTempValue(option)}
                             >
-                                <Text style={[styles.optionText, tempValue === option && styles.selectedOptionText]}>{option}</Text>
+                                <Text style={[
+                                    styles.optionText,
+                                    { color: colors.textSecondary },
+                                    tempValue === option && { color: colors.primary, fontFamily: 'Judson-Bold' }
+                                ]}>{option}</Text>
                             </TouchableOpacity>
                         ))}
                     </View>
                 ) : (
                     <TextInput
-                        style={styles.input}
+                        style={[styles.input, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border, borderWidth: 1 }]}
                         value={tempValue}
                         onChangeText={setTempValue}
                         autoFocus
@@ -286,9 +295,9 @@ const ProfileScreen = () => {
 
                 <View style={styles.editButtons}>
                     <TouchableOpacity style={styles.cancelButton} onPress={handleCancel} disabled={saving}>
-                        <Text style={styles.cancelButtonText}>{t('cancel')}</Text>
+                        <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>{t('cancel')}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
+                    <TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.primary }]} onPress={handleSave} disabled={saving}>
                         {saving ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveButtonText}>{t('save')}</Text>}
                     </TouchableOpacity>
                 </View>
@@ -297,31 +306,35 @@ const ProfileScreen = () => {
     };
 
 
-    const ProfileItem = ({ icon: Icon, label, value, field }: { icon: any, label: string, value: string, field: keyof ProfileData }) => (
-        <TouchableOpacity style={styles.profileItem} onPress={() => openEdit(field)}>
+    const ProfileItem = ({ icon: Icon, label, value, field, colors }: { icon: any, label: string, value: string, field: keyof ProfileData, colors: any }) => (
+        <TouchableOpacity
+            style={[styles.profileItem, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+            onPress={() => openEdit(field)}
+        >
             <View style={styles.itemLeft}>
                 <View style={styles.iconContainer}>
-                    <Icon color="#0062FF" size={24} />
+                    <Icon color={colors.primary} size={24} />
                 </View>
                 <View style={styles.textContainer}>
-                    <Text style={styles.itemLabel}>{label}</Text>
-                    <Text style={styles.itemValue}>{value}</Text>
+                    <Text style={[styles.itemLabel, { color: colors.primary }]}>{label}</Text>
+                    <Text style={[styles.itemValue, { color: colors.textSecondary }]}>{value}</Text>
                 </View>
             </View>
-            <ChevronRightIcon color="#0062FF" size={20} />
+            <ChevronRightIcon color={colors.primary} size={20} />
         </TouchableOpacity>
     );
 
+
     if (loading) {
         return (
-            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="large" color="#0062FF" />
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }]}>
+                <ActivityIndicator size="large" color={colors.primary} />
             </View>
         );
     }
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
             <AppStatusBar />
             {isMenuOpen && <Menu onClose={() => setIsMenuOpen(false)} />}
 
@@ -341,7 +354,7 @@ const ProfileScreen = () => {
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 {/* Profile Card */}
                 <LinearGradient
-                    colors={['#8EBDFF', '#4C8DFF']}
+                    colors={themeMode === 'dark' ? ['#1A2A47', '#003399'] : ['#8EBDFF', '#4C8DFF']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 0, y: 1 }}
                     style={styles.profileCard}
@@ -356,7 +369,7 @@ const ProfileScreen = () => {
                                     resizeMode="cover"
                                 />
                             ) : (
-                                <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                                <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: 'rgba(255, 255, 255, 0.3)' }]}>
                                     <Text style={styles.avatarPlaceholderText}>
                                         {(profile.name || 'U').charAt(0).toUpperCase()}
                                     </Text>
@@ -364,7 +377,7 @@ const ProfileScreen = () => {
                             )}
 
                             <TouchableOpacity
-                                style={styles.editBadge}
+                                style={[styles.editBadge, { backgroundColor: colors.primary }]}
                                 onPress={showPhotoOptions}
                                 disabled={saving}
                             >
@@ -383,17 +396,17 @@ const ProfileScreen = () => {
                     </View>
                 </LinearGradient>
 
-                <Text style={styles.sectionTitle}>{t('my_details')}</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('my_details')}</Text>
 
 
                 <View style={styles.itemsList}>
-                    <ProfileItem icon={NameIcon} label={t('name')} value={profile.name} field="name" />
-                    <ProfileItem icon={AgeIcon} label={t('age')} value={profile.age} field="age" />
-                    <ProfileItem icon={GenderIcon} label={t('gender')} value={t(profile.gender.toLowerCase() as any) || profile.gender} field="gender" />
-                    <ProfileItem icon={ContactIcon} label={t('contact_number')} value={profile.contactNumber} field="contactNumber" />
-                    <ProfileItem icon={AddressIcon} label={t('address')} value={profile.address} field="address" />
-                    <ProfileItem icon={BloodGroupIcon} label={t('blood_group')} value={profile.bloodGroup} field="bloodGroup" />
-                    <ProfileItem icon={EmergencyContactIcon} label={t('emergency_contact')} value={profile.emergencyContact} field="emergencyContact" />
+                    <ProfileItem icon={NameIcon} label={t('name')} value={profile.name} field="name" colors={colors} />
+                    <ProfileItem icon={AgeIcon} label={t('age')} value={profile.age} field="age" colors={colors} />
+                    <ProfileItem icon={GenderIcon} label={t('gender')} value={t(profile.gender.toLowerCase() as any) || profile.gender} field="gender" colors={colors} />
+                    <ProfileItem icon={ContactIcon} label={t('contact_number')} value={profile.contactNumber} field="contactNumber" colors={colors} />
+                    <ProfileItem icon={AddressIcon} label={t('address')} value={profile.address} field="address" colors={colors} />
+                    <ProfileItem icon={BloodGroupIcon} label={t('blood_group')} value={profile.bloodGroup} field="bloodGroup" colors={colors} />
+                    <ProfileItem icon={EmergencyContactIcon} label={t('emergency_contact')} value={profile.emergencyContact} field="emergencyContact" colors={colors} />
                 </View>
 
 
@@ -410,14 +423,14 @@ const ProfileScreen = () => {
                 onRequestClose={() => setIsAvatarModalVisible(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+                    <View style={[styles.modalContent, { maxHeight: '80%', backgroundColor: colors.modalBg }]}>
                         <View style={styles.editHeader}>
-                            <Text style={styles.modalTitle}>{t('choose_avatar')}</Text>
+                            <Text style={[styles.modalTitle, { color: colors.text }]}>{t('choose_avatar')}</Text>
                             <TouchableOpacity onPress={() => setIsAvatarModalVisible(false)}>
-                                <Text style={styles.closeText}>✕</Text>
+                                <Text style={[styles.closeText, { color: colors.textSecondary }]}>✕</Text>
                             </TouchableOpacity>
                         </View>
-                        <Text style={styles.modalSubtitle}>{t('pick_character')}</Text>
+                        <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>{t('pick_character')}</Text>
 
 
                         <ScrollView showsVerticalScrollIndicator={false}>
@@ -427,13 +440,13 @@ const ProfileScreen = () => {
                                         key={index}
                                         style={[
                                             styles.avatarOption,
-                                            tempAvatar === key && styles.selectedAvatarOption
+                                            { backgroundColor: colors.card, borderColor: tempAvatar === key ? colors.primary : 'transparent', borderWidth: 2 }
                                         ]}
                                         onPress={() => setTempAvatar(key)}
                                     >
                                         <Image source={getAvatarSource(key)} style={styles.avatarChoice} />
                                         {tempAvatar === key && (
-                                            <View style={styles.selectedBadge}>
+                                            <View style={[styles.selectedBadge, { backgroundColor: colors.primary }]}>
                                                 <Text style={styles.checkIcon}>✓</Text>
                                             </View>
                                         )}
@@ -444,15 +457,15 @@ const ProfileScreen = () => {
                             </View>
                         </ScrollView>
 
-                        <View style={styles.avatarModalButtons}>
+                        <View style={[styles.avatarModalButtons, { borderTopColor: colors.divider }]}>
                             <TouchableOpacity
                                 style={styles.avatarCancelButton}
                                 onPress={() => setIsAvatarModalVisible(false)}
                             >
-                                <Text style={styles.avatarCancelText}>{t('cancel')}</Text>
+                                <Text style={[styles.avatarCancelText, { color: colors.textSecondary }]}>{t('cancel')}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.avatarDoneButton, !tempAvatar && styles.avatarDoneDisabled]}
+                                style={[styles.avatarDoneButton, (!tempAvatar || saving) && { opacity: 0.5 }, { backgroundColor: colors.primary }]}
                                 onPress={() => tempAvatar && handleSelectAvatar(tempAvatar)}
                                 disabled={saving}
                             >
@@ -484,7 +497,7 @@ const ProfileScreen = () => {
                     >
                         <TouchableOpacity
                             activeOpacity={1}
-                            style={styles.modalContent}
+                            style={[styles.modalContent, { backgroundColor: colors.modalBg }]}
                         >
                             {renderEditField()}
                         </TouchableOpacity>
@@ -500,7 +513,6 @@ const ProfileScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
     },
     scrollContent: {
         paddingHorizontal: 25,
@@ -572,7 +584,6 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontFamily: 'Judson-Bold',
         fontSize: 22,
-        color: '#000000',
         marginBottom: 20,
     },
     itemsList: {
@@ -582,12 +593,10 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: '#E6F0FF',
         borderRadius: 20,
         padding: 16,
         marginBottom: 15,
         borderWidth: 1,
-        borderColor: 'rgba(0, 98, 255, 0.3)',
     },
     itemLeft: {
         flexDirection: 'row',
@@ -606,13 +615,11 @@ const styles = StyleSheet.create({
     itemLabel: {
         fontFamily: 'Judson-Bold',
         fontSize: 18,
-        color: '#3C87FF',
         marginBottom: 2,
     },
     itemValue: {
         fontFamily: 'Judson-Regular',
         fontSize: 15,
-        color: 'rgba(60, 135, 255, 0.8)',
     },
 
     modalOverlay: {
@@ -626,7 +633,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     modalContent: {
-        backgroundColor: '#FFFFFF',
         borderRadius: 30,
         padding: 25,
         width: '100%',
@@ -648,22 +654,18 @@ const styles = StyleSheet.create({
     editTitle: {
         fontFamily: 'Judson-Bold',
         fontSize: 22,
-        color: '#000000',
     },
     closeText: {
         fontSize: 20,
-        color: '#666',
         fontWeight: 'bold',
     },
     input: {
         width: '100%',
         height: 55,
-        backgroundColor: '#F5F5F5',
         borderRadius: 15,
         paddingHorizontal: 20,
         fontFamily: 'Judson-Regular',
         fontSize: 18,
-        color: '#000000',
         marginBottom: 30,
     },
     optionsContainer: {
@@ -675,24 +677,13 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingVertical: 10,
         borderRadius: 20,
-        backgroundColor: '#F5F5F5',
         marginRight: 10,
         marginBottom: 10,
         borderWidth: 1,
-        borderColor: 'transparent',
-    },
-    selectedOption: {
-        backgroundColor: '#E6F0FF',
-        borderColor: '#0062FF',
     },
     optionText: {
         fontFamily: 'Judson-Regular',
         fontSize: 16,
-        color: '#666',
-    },
-    selectedOptionText: {
-        color: '#0062FF',
-        fontFamily: 'Judson-Bold',
     },
     editButtons: {
         flexDirection: 'row',
@@ -709,12 +700,10 @@ const styles = StyleSheet.create({
     cancelButtonText: {
         fontFamily: 'Judson-Bold',
         fontSize: 16,
-        color: '#666666',
     },
     saveButton: {
         flex: 1,
         height: 55,
-        backgroundColor: '#0062FF',
         borderRadius: 15,
         justifyContent: 'center',
         alignItems: 'center',
@@ -729,13 +718,11 @@ const styles = StyleSheet.create({
     modalTitle: {
         fontFamily: 'Judson-Bold',
         fontSize: 22,
-        color: '#000000',
         marginBottom: 10,
     },
     modalSubtitle: {
         fontFamily: 'Judson-Regular',
         fontSize: 15,
-        color: '#666666',
         marginBottom: 20,
     },
     // Avatar Modal Styles
@@ -749,16 +736,10 @@ const styles = StyleSheet.create({
         width: width * 0.25,
         height: width * 0.25,
         borderRadius: 20,
-        backgroundColor: '#F5F9FF',
         marginBottom: 15,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 2,
-        borderColor: 'transparent',
-    },
-    selectedAvatarOption: {
-        borderColor: '#0062FF',
-        backgroundColor: '#E6F0FF',
     },
     avatarChoice: {
         width: '80%',
@@ -769,7 +750,6 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: -5,
         right: -5,
-        backgroundColor: '#0062FF',
         width: 24,
         height: 24,
         borderRadius: 12,
@@ -789,7 +769,6 @@ const styles = StyleSheet.create({
         marginTop: 20,
         paddingTop: 15,
         borderTopWidth: 1,
-        borderTopColor: '#F0F0F0',
     },
     avatarCancelButton: {
         flex: 1,
@@ -801,18 +780,14 @@ const styles = StyleSheet.create({
     avatarCancelText: {
         fontFamily: 'Judson-Bold',
         fontSize: 16,
-        color: '#666666',
     },
     avatarDoneButton: {
-        flex: 2,
+        flex: 1,
         height: 50,
-        backgroundColor: '#0062FF',
         borderRadius: 15,
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    avatarDoneDisabled: {
-        backgroundColor: '#CCC',
+        marginLeft: 10,
     },
     avatarDoneText: {
         fontFamily: 'Judson-Bold',
