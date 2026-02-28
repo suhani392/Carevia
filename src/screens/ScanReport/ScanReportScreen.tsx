@@ -353,23 +353,42 @@ const ScanReportScreen = () => {
                                                 }
 
                                                 if (!screenParams?.memberId) {
-                                                    await addReport(
-                                                        finalName,
-                                                        publicUrl,
-                                                        "Report saved for analysis."
-                                                    );
+                                                    const { data: reportData } = await supabase
+                                                        .from('reports')
+                                                        .insert({
+                                                            user_id: user.id,
+                                                            name: finalName,
+                                                            uri: publicUrl,
+                                                            analysis: "Reading report..."
+                                                        })
+                                                        .select('id')
+                                                        .single();
+
+                                                    if (reportData) {
+                                                        // Trigger AI OCR Pipeline
+                                                        await supabase.functions.invoke('process-report', {
+                                                            body: { report_id: reportData.id }
+                                                        });
+                                                    }
                                                 } else {
-                                                    // Manual insert for family members to bypass local state management for now
-                                                    const { error: dbError } = await supabase
+                                                    // Manual insert for family members
+                                                    const { data: reportData } = await supabase
                                                         .from('reports')
                                                         .insert({
                                                             user_id: screenParams.memberId,
                                                             name: finalName,
                                                             uri: publicUrl,
-                                                            analysis: "Report saved for analysis."
-                                                        });
+                                                            analysis: "Reading report..."
+                                                        })
+                                                        .select('id')
+                                                        .single();
 
-                                                    if (dbError) throw dbError;
+                                                    if (reportData) {
+                                                        // Trigger AI OCR Pipeline
+                                                        await supabase.functions.invoke('process-report', {
+                                                            body: { report_id: reportData.id }
+                                                        });
+                                                    }
                                                 }
 
                                                 setShowSaveModal(false);
