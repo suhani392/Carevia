@@ -11,13 +11,9 @@ serve(async (req) => {
 
     try {
         const { report_id } = await req.json()
-        const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '')
         const geminiKey = Deno.env.get('GEMINI_API_KEY')
 
-        const supabase = createClient(supabaseUrl, supabaseKey)
-
-        // 1. Fetch report details
         const { data: report } = await supabase.from('reports').select('uri, user_id').eq('id', report_id).single()
         if (!report) throw new Error(`Report not found`)
 
@@ -29,15 +25,36 @@ serve(async (req) => {
         const arrayBuffer = await fileData.arrayBuffer()
         const base64Image = toBase64(arrayBuffer)
 
-        // 2. OCR Stage
+        // Using gemini-flash-latest (This is the stable Flash alias in your project list)
         const model = 'gemini-flash-latest';
+        console.log(`Using Stable Model: ${model}`)
+
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [{
                     parts: [
-                        { text: "Extract all visible text exactly as it appears. Raw text only." },
+                        {
+                            text: `You are an advanced medical OCR extraction engine.
+Your task is to extract all visible and readable text exactly as it appears from the provided medical report image.
+STRICT INSTRUCTIONS:
+•	Extract every readable word, number, symbol, abbreviation, handwritten note, table value, reference range and unit.
+•	Preserve original spelling, capitalization, punctuation, line breaks, spacing, and formatting as closely as possible.
+•	Maintain the exact reading order (left to right, top to bottom).
+•	If text is unclear but partially readable, extract the readable portion without guessing and mention in bracket that “text is not clear”.
+•	Do NOT correct spelling.
+•	Do NOT summarize.
+•	Do NOT interpret.
+•	Do NOT explain.
+•	Do NOT add labels.
+•	Do NOT structure into JSON or sections.
+•	Do NOT omit repeated text.
+•	Do NOT hallucinate missing content.
+Important:
+We do NOT explain here.
+We do NOT generate JSON here.
+Only raw text extraction.` },
                         { inline_data: { mime_type: mimeType, data: base64Image } }
                     ]
                 }]
@@ -46,26 +63,30 @@ serve(async (req) => {
 
         const result = await response.json()
         const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text
-        if (!rawText) throw new Error("OCR failed")
 
-        // 3. Save Raw Text
+        if (!rawText) {
+            console.error("Gemini Error:", JSON.stringify(result))
+            throw new Error(result?.error?.message || "Gemini failed to return text.")
+        }
+
+        // Update Database
         await supabase.from('reports').update({
             raw_text: rawText,
-            analysis: "Perception Complete. Starting Structuring..."
+            analysis: "Intelligence Perception Complete. Starting Stage 2..."
         }).eq('id', report_id)
 
-        // 4. CHAINING - Automatically trigger Stage 2 (Structuring)
-        console.log("Chaining: Triggering structure-report...")
-
-        // We call the other function asynchronously (don't wait for it to finish)
-        fetch(`${supabaseUrl}/functions/v1/structure-report`, {
+        // CHAINING: Trigger Stage 2 (Structuring)
+        console.log("Triggering Stage 2: structure-report...")
+        const chainResp = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/structure-report`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${supabaseKey}`
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
             },
             body: JSON.stringify({ report_id })
-        }).catch(err => console.error("Chaining error:", err))
+        })
+
+        console.log(`Stage 2 trigger response status: ${chainResp.status}`)
 
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
