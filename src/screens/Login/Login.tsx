@@ -4,6 +4,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '../../context/NavigationContext';
 import { useAppContext } from '../../context/AppContext';
 import { supabase } from '../../lib/supabase';
+import { EyeIcon, EyeClosedIcon } from '../../components/common/PasswordIcons';
+
 
 
 const { width } = Dimensions.get('window');
@@ -14,7 +16,9 @@ const Login = () => {
     const [email, setEmail] = useState('');
 
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+
 
     const handleLogin = async () => {
         if (!email || !password) {
@@ -71,14 +75,26 @@ const Login = () => {
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>{t('password')} :</Text>
 
-                        <TextInput
-                            style={styles.input}
-                            placeholderTextColor="rgba(0,0,0,0.5)"
-                            secureTextEntry={true}
-                            placeholder=""
-                            value={password}
-                            onChangeText={setPassword}
-                        />
+                        <View style={styles.passwordContainer}>
+                            <TextInput
+                                style={styles.passwordInput}
+                                placeholderTextColor="rgba(0,0,0,0.5)"
+                                secureTextEntry={!showPassword}
+                                placeholder=""
+                                value={password}
+                                onChangeText={setPassword}
+                            />
+                            <TouchableOpacity
+                                style={styles.eyeButton}
+                                onPress={() => setShowPassword(!showPassword)}
+                            >
+                                {showPassword ? (
+                                    <EyeIcon size={22} color="#0062FF" />
+                                ) : (
+                                    <EyeClosedIcon size={22} color="#0062FF" />
+                                )}
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     <TouchableOpacity
@@ -170,6 +186,28 @@ const styles = StyleSheet.create({
         color: '#000000',
         borderWidth: 1,
         borderColor: '#FFFFFF',
+    },
+    passwordContainer: {
+        width: 330,
+        height: 55,
+        backgroundColor: 'rgba(255, 255, 255, 0.6)',
+        borderRadius: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingLeft: 20,
+        paddingRight: 10,
+        borderWidth: 1,
+        borderColor: '#FFFFFF',
+    },
+    passwordInput: {
+        flex: 1,
+        height: '100%',
+        fontSize: 16,
+        fontFamily: 'Judson-Regular',
+        color: '#000000',
+    },
+    eyeButton: {
+        padding: 5,
     },
     loginBtn: {
         width: 200,

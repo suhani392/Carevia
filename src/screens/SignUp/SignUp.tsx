@@ -3,7 +3,10 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, Dimensions,
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from '../../context/NavigationContext';
+import { useAppContext } from '../../context/AppContext';
 import { supabase } from '../../lib/supabase';
+import { EyeIcon, EyeClosedIcon } from '../../components/common/PasswordIcons';
+
 
 const { width } = Dimensions.get('window');
 
@@ -15,7 +18,10 @@ const SignUp = () => {
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
     const [dob, setDob] = useState(new Date());
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [dobText, setDobText] = useState('');
@@ -169,27 +175,51 @@ const SignUp = () => {
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>{t('password')} :</Text>
 
-                        <TextInput
-                            style={styles.input}
-                            placeholderTextColor="rgba(0,0,0,0.5)"
-                            secureTextEntry={true}
-                            placeholder=""
-                            value={password}
-                            onChangeText={setPassword}
-                        />
+                        <View style={styles.passwordContainer}>
+                            <TextInput
+                                style={styles.passwordInput}
+                                placeholderTextColor="rgba(0,0,0,0.5)"
+                                secureTextEntry={!showPassword}
+                                placeholder=""
+                                value={password}
+                                onChangeText={setPassword}
+                            />
+                            <TouchableOpacity
+                                style={styles.eyeButton}
+                                onPress={() => setShowPassword(!showPassword)}
+                            >
+                                {showPassword ? (
+                                    <EyeIcon size={22} color="#0062FF" />
+                                ) : (
+                                    <EyeClosedIcon size={22} color="#0062FF" />
+                                )}
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>{t('confirm_password')} :</Text>
 
-                        <TextInput
-                            style={styles.input}
-                            placeholderTextColor="rgba(0,0,0,0.5)"
-                            secureTextEntry={true}
-                            placeholder=""
-                            value={confirmPassword}
-                            onChangeText={setConfirmPassword}
-                        />
+                        <View style={styles.passwordContainer}>
+                            <TextInput
+                                style={styles.passwordInput}
+                                placeholderTextColor="rgba(0,0,0,0.5)"
+                                secureTextEntry={!showConfirmPassword}
+                                placeholder=""
+                                value={confirmPassword}
+                                onChangeText={setConfirmPassword}
+                            />
+                            <TouchableOpacity
+                                style={styles.eyeButton}
+                                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                            >
+                                {showConfirmPassword ? (
+                                    <EyeIcon size={22} color="#0062FF" />
+                                ) : (
+                                    <EyeClosedIcon size={22} color="#0062FF" />
+                                )}
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     <TouchableOpacity
@@ -277,6 +307,28 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#FFFFFF',
         justifyContent: 'center',
+    },
+    passwordContainer: {
+        width: 330,
+        height: 55,
+        backgroundColor: 'rgba(255, 255, 255, 0.6)',
+        borderRadius: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingLeft: 20,
+        paddingRight: 10,
+        borderWidth: 1,
+        borderColor: '#FFFFFF',
+    },
+    passwordInput: {
+        flex: 1,
+        height: '100%',
+        fontSize: 16,
+        fontFamily: 'Judson-Regular',
+        color: '#000000',
+    },
+    eyeButton: {
+        padding: 5,
     },
     dateText: {
         fontSize: 16,

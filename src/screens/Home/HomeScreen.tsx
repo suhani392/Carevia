@@ -52,7 +52,7 @@ const HomeScreen = () => {
                                 colors={themeMode === 'dark' ? ['#1A2A47', '#001A4D'] : ['#E6F0FF', '#C7DFFF']}
                                 style={styles.cardGradient}
                             >
-                                <Text style={[styles.modernCardTitle, themeMode === 'dark' && { color: '#8AB4FF' }]}>{t('documents')}</Text>
+                                <Text style={[styles.modernCardTitle, { color: themeMode === 'dark' ? '#8AB4FF' : '#0047BA' }]}>{t('documents')}</Text>
 
                                 <View style={[styles.modernDocIconContainer, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
                                     <Image

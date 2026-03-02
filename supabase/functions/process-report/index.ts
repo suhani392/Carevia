@@ -6,102 +6,84 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+function uint8ToBase64(data: Uint8Array): string {
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let result = ""; let i = 0; const len = data.length;
+    for (i = 0; i < len - 2; i += 3) {
+        result += alphabet[data[i] >> 2];
+        result += alphabet[((data[i] & 0x03) << 4) | (data[i + 1] >> 4)];
+        result += alphabet[((data[i + 1] & 0x0f) << 2) | (data[i + 2] >> 6)];
+        result += alphabet[data[i + 2] & 0x3f];
+    }
+    if (i < len) {
+        result += alphabet[data[i] >> 2];
+        if (i === len - 1) { result += alphabet[(data[i] & 0x03) << 4]; result += "=="; }
+        else { result += alphabet[((data[i] & 0x03) << 4) | (data[i + 1] >> 4)]; result += alphabet[(data[i + 1] & 0x0f) << 2]; result += "="; }
+    }
+    return result;
+}
+
 serve(async (req) => {
-    if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-
+    if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+    let reportId: string | null = null;
     try {
-        const { report_id } = await req.json()
-        const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '')
-        const geminiKey = Deno.env.get('GEMINI_API_KEY')
+        const body = await req.json().catch(() => ({}));
+        reportId = body.report_id;
+        const supUrl = Deno.env.get('SUPABASE_URL') || "";
+        const supKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || "";
+        const aiKey = Deno.env.get('GEMINI_API_KEY') || "";
+        const supabase = createClient(supUrl, supKey);
 
-        const { data: report } = await supabase.from('reports').select('uri, user_id').eq('id', report_id).single()
-        if (!report) throw new Error(`Report not found`)
+        console.log(`[Stage 1] Started for ${reportId}`);
+        await supabase.from('reports').update({ analysis: "Waiting for cloud response..." }).eq('id', reportId);
 
-        const fileName = report.uri.split('/').pop()
-        const { data: fileData } = await supabase.storage.from('reports').download(`${report.user_id}/${fileName}`)
-        if (!fileData) throw new Error(`Download failed`)
+        const { data: report } = await supabase.from('reports').select('uri, user_id').eq('id', reportId).single();
+        const fileName = report.uri.split('?')[0].split('/').pop();
+        const { data: fileData } = await supabase.storage.from('reports').download(`${report.user_id}/${fileName}`);
 
-        const mimeType = fileName.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'
-        const arrayBuffer = await fileData.arrayBuffer()
-        const base64Image = toBase64(arrayBuffer)
+        await supabase.from('reports').update({ analysis: "Reading your report..." }).eq('id', reportId);
 
-        // Using gemini-flash-latest (This is the stable Flash alias in your project list)
-        const model = 'gemini-flash-latest';
-        console.log(`Using Stable Model: ${model}`)
+        const arrayBuffer = await fileData.arrayBuffer();
+        const base64Content = uint8ToBase64(new Uint8Array(arrayBuffer));
+        const mimeType = fileName?.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg';
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${aiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [{
                     parts: [
-                        {
-                            text: `You are an advanced medical OCR extraction engine.
-Your task is to extract all visible and readable text exactly as it appears from the provided medical report image.
-STRICT INSTRUCTIONS:
-•	Extract every readable word, number, symbol, abbreviation, handwritten note, table value, reference range and unit.
-•	Preserve original spelling, capitalization, punctuation, line breaks, spacing, and formatting as closely as possible.
-•	Maintain the exact reading order (left to right, top to bottom).
-•	If text is unclear but partially readable, extract the readable portion without guessing and mention in bracket that “text is not clear”.
-•	Do NOT correct spelling.
-•	Do NOT summarize.
-•	Do NOT interpret.
-•	Do NOT explain.
-•	Do NOT add labels.
-•	Do NOT structure into JSON or sections.
-•	Do NOT omit repeated text.
-•	Do NOT hallucinate missing content.
-Important:
-We do NOT explain here.
-We do NOT generate JSON here.
-Only raw text extraction.` },
-                        { inline_data: { mime_type: mimeType, data: base64Image } }
+                        { text: "Extract all text from this medical report. Raw text only." },
+                        { inline_data: { mime_type: mimeType, data: base64Content } }
                     ]
                 }]
             })
-        })
+        });
 
-        const result = await response.json()
-        const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text
+        const result = await response.json();
+        if (result.error) throw new Error(result.error.message);
 
-        if (!rawText) {
-            console.error("Gemini Error:", JSON.stringify(result))
-            throw new Error(result?.error?.message || "Gemini failed to return text.")
-        }
+        const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+        await supabase.from('reports').update({ raw_text: rawText, analysis: "Organizing data..." }).eq('id', reportId);
 
-        // Update Database
-        await supabase.from('reports').update({
-            raw_text: rawText,
-            analysis: "Intelligence Perception Complete. Starting Stage 2..."
-        }).eq('id', report_id)
+        // 2-second delay to protect Quota
+        await new Promise(r => setTimeout(r, 2000));
 
-        // CHAINING: Trigger Stage 2 (Structuring)
-        console.log("Triggering Stage 2: structure-report...")
-        const chainResp = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/structure-report`, {
+        console.log(`[Stage 1] Triggering Stage 2 for ${reportId}`);
+        // Triggers Stage 2
+        fetch(`${supUrl}/functions/v1/structure-report`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
-            },
-            body: JSON.stringify({ report_id })
-        })
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supKey}` },
+            body: JSON.stringify({ report_id: reportId })
+        }).catch(e => console.error("[Stage 1] Trigger failed:", e));
 
-        console.log(`Stage 2 trigger response status: ${chainResp.status}`)
-
-        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
-
-    } catch (error) {
-        console.error(`ERROR: ${error.message}`)
-        return new Response(JSON.stringify({ error: error.message }), { status: 200, headers: corsHeaders })
+        return new Response(JSON.stringify({ success: true, status: "Stage 2 Triggered" }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    } catch (err: any) {
+        console.error("[Stage 1] Error:", err.message);
+        if (reportId) {
+            const supabase = createClient(Deno.env.get('SUPABASE_URL') || "", Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || "");
+            await supabase.from('reports').update({ analysis: `Error: ${err.message}` }).eq('id', reportId);
+        }
+        return new Response(JSON.stringify({ error: err.message }), { status: 200, headers: corsHeaders });
     }
 })
-
-function toBase64(buffer: ArrayBuffer) {
-    const bytes = new Uint8Array(buffer)
-    let binary = ''
-    const chunkSize = 0x8000
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-        binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
-    }
-    return btoa(binary)
-}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Dimensions, TouchableOpacity, StatusBar, Image, Animated, Modal, TextInput, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Dimensions, TouchableOpacity, StatusBar, Image, Animated, Modal, TextInput, ScrollView, Alert, Platform } from 'react-native';
 import Pdf from 'react-native-pdf';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -53,9 +53,103 @@ const ScanReportScreen = () => {
     const [analysisResult, setAnalysisResult] = useState<any>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [pollingStatus, setPollingStatus] = useState('');
-
+    const [isSaved, setIsSaved] = useState(false);
     const cameraRef = useRef<CameraView>(null);
     const scrollY = useRef(new Animated.Value(0)).current;
+
+    const handleStartAnalysis = async () => {
+        try {
+            setLoading(true);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Auth required");
+
+            // 1. Upload logic
+            const timestamp = new Date().toLocaleDateString();
+            const defaultName = `Report Analysis - ${timestamp}`;
+            const extension = isPdf ? 'pdf' : 'jpg';
+            const mimeType = isPdf ? 'application/pdf' : 'image/jpeg';
+            const fileName = `${Date.now()}.${extension}`;
+            const filePath = `${user.id}/${fileName}`;
+            const base64 = await FileSystem.readAsStringAsync(capturedImages[0], { encoding: 'base64' });
+            const arrayBuffer = decodeBase64(base64);
+
+            await supabase.storage.from('reports').upload(filePath, arrayBuffer, { contentType: mimeType });
+            const { data: { publicUrl } } = supabase.storage.from('reports').getPublicUrl(filePath);
+
+            // 2. Create initial record
+            const { data: reportData, error: insErr } = await supabase.from('reports').insert({
+                user_id: user.id,
+                name: defaultName,
+                uri: publicUrl,
+                analysis: "Waiting for cloud response..."
+            }).select('id').single();
+
+            if (insErr) throw insErr;
+
+            if (reportData) {
+                const reportId = reportData.id;
+                setCurrentReportId(reportId);
+                setPollingStatus("Waiting for cloud response...");
+                setIsAnalyzing(true);
+
+                // 3. Trigger AI Chain (non-blocking)
+                console.log("[Invoke] Starting process-report for:", reportId);
+
+                // Get the anon key from our config to send explicitly
+                const anonKey = supabase['supabaseKey'];
+
+                supabase.functions.invoke('process-report', {
+                    body: { report_id: reportId },
+                    headers: {
+                        'apikey': anonKey,
+                        'Authorization': `Bearer ${anonKey}`
+                    }
+                })
+                    .then(({ data, error: invErr }) => {
+                        console.log("[Invoke] Raw Response:", JSON.stringify({ data, error: invErr }));
+
+                        if (invErr) {
+                            console.error("[Invoke] Error Object:", invErr);
+                            setIsAnalyzing(false);
+                            setLoading(false);
+
+                            let userMessage = "The AI server encountered an issue.";
+                            if (invErr.message?.includes("non-2xx")) {
+                                userMessage = "Cloud function crashed (500). Please check Supabase logs.";
+                            }
+
+                            Alert.alert("Analysis Failed", userMessage);
+                            return;
+                        }
+
+                        if (data && data.error) {
+                            setIsAnalyzing(false);
+                            setLoading(false);
+                            const isQuota = data.error.toLowerCase().includes("quota") || data.error.toLowerCase().includes("limit");
+                            Alert.alert(
+                                "AI Limit Reached",
+                                isQuota
+                                    ? "You've used your free AI scans for the moment. Please wait 1 minute and try again."
+                                    : data.error
+                            );
+                            return;
+                        }
+
+                        console.log("[Invoke] Success!");
+                    })
+                    .catch(e => {
+                        console.error("[Invoke] Critical Catch:", e);
+                        setIsAnalyzing(false);
+                        setLoading(false);
+                        Alert.alert("Fatal Error", "Check your internet and Supabase project status.");
+                    });
+            }
+        } catch (error: any) {
+            Alert.alert("Error", error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Polling logic with heavy logging to debug
     useEffect(() => {
@@ -88,6 +182,11 @@ const ScanReportScreen = () => {
                             setIsAnalyzing(false);
                             clearInterval(interval);
                         }
+                    } else if (data?.analysis?.toLowerCase().includes("error")) {
+                        console.error("[Status] Analysis failed:", data.analysis);
+                        setIsAnalyzing(false);
+                        clearInterval(interval);
+                        Alert.alert("Analysis Failed", data.analysis || "An unexpected error occurred during processing.");
                     }
                 } catch (err) {
                     console.error("[Polling] Error:", err);
@@ -144,8 +243,7 @@ const ScanReportScreen = () => {
         return (
             <View style={[styles.analysisContainer, { backgroundColor: colors.background }]}>
                 <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-                <Animated.View style={[styles.stickyHeader, { height: 110 }]}>
-                    <LinearGradient colors={colors.headerGradient as any} style={StyleSheet.absoluteFill} />
+                <Animated.View style={[styles.stickyHeader, { height: Platform.OS === 'ios' ? 140 : 120, position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, backgroundColor: '#0062FF' }]}>
                     <View style={styles.analysisTopIcons}>
                         <Pressable style={styles.analysisIconBlock} onPress={() => setIsAnalysisMode(false)}><BackIcon size={24} color="#FFFFFF" /></Pressable>
                         <View style={{ alignItems: 'center' }}>
@@ -186,32 +284,78 @@ const ScanReportScreen = () => {
                             <>
                                 <View style={styles.contentSection}>
                                     <Text style={[styles.sectionHeading, { color: colors.primary }]}>Your Report Analysis</Text>
-                                    <Text style={[styles.sectionPara, { color: colors.textSecondary }]}>{analysisResult.introduction}</Text>
+                                    <Text style={[styles.sectionPara, { color: colors.textSecondary }]}>{analysisResult?.introduction || "Analysis complete."}</Text>
                                 </View>
-                                {analysisResult.explanations.map((item: any, idx: number) => (
-                                    <View key={idx} style={styles.contentSection}>
-                                        {item.category && item.category !== "null" && <Text style={[styles.categoryHeading, { color: colors.textSecondary }]}>{item.category}</Text>}
-                                        <Text style={[styles.testHeading, { color: item.heading.toLowerCase().includes('high') || item.heading.toLowerCase().includes('low') ? colors.error : colors.text }]}>{item.heading}</Text>
-                                        {item.explanation_lines.map((line: string, lIdx: number) => <Text key={lIdx} style={[styles.sectionPara, { color: colors.text }]}>• {line}</Text>)}
-                                    </View>
-                                ))}
+                                {(analysisResult?.explanations || []).map((item: any, idx: number) => {
+                                    const getTestHeadingColor = (heading: string) => {
+                                        if (!heading) return colors.text;
+                                        const lower = heading.toLowerCase();
+                                        // 1. Borderline / Warnings (Yellow) - prioritized check
+                                        if (lower.includes('borderline') || lower.includes('caution') || lower.includes('warning') || lower.includes('risk')) {
+                                            return colors.warning;
+                                        }
+                                        // 2. High/Low/Danger (Red)
+                                        if (lower.includes('high') || lower.includes('low') || lower.includes('danger') || lower.includes('abnormal') || lower.includes('critical')) {
+                                            return colors.error;
+                                        }
+                                        // 3. Normal/Perfect (Green)
+                                        if (lower.includes('normal') || lower.includes('perfect') || lower.includes('optimal') || lower.includes('stable') || lower.includes('good')) {
+                                            return colors.success;
+                                        }
+                                        // Default (Black/Standard Text)
+                                        return colors.text;
+                                    };
+
+                                    return (
+                                        <View key={idx} style={styles.contentSection}>
+                                            {item?.category && item.category !== "null" && <Text style={[styles.categoryHeading, { color: colors.textSecondary }]}>{item.category}</Text>}
+                                            <Text style={[styles.testHeading, { color: getTestHeadingColor(item?.heading) }]}>{item?.heading || "Medical Test"}</Text>
+                                            {(item?.explanation_lines || []).map((line: string, lIdx: number) => <Text key={lIdx} style={[styles.sectionPara, { color: colors.text }]}>• {line}</Text>)}
+                                        </View>
+                                    );
+                                })}
                                 <View style={styles.contentSection}>
                                     <Text style={[styles.sectionHeading, { color: colors.text }]}>Overall Summary</Text>
-                                    <Text style={[styles.sectionPara, { color: colors.textSecondary, fontFamily: 'Judson-Bold' }]}>{analysisResult.summary}</Text>
+                                    <Text style={[styles.sectionPara, { color: colors.textSecondary, fontFamily: 'Judson-Bold' }]}>{analysisResult?.summary || "Your report has been processed successfully."}</Text>
                                 </View>
                             </>
                         ) : (
                             <View style={styles.analysisFooter}>
-                                <TouchableOpacity style={[styles.analyzeButton, { backgroundColor: colors.primary }]} onPress={() => setShowSaveModal(true)}>
-                                    <BotIcon size={22} color="#FFFFFF" /><Text style={styles.analyzeButtonText}>Start AI Analysis</Text>
+                                <TouchableOpacity
+                                    style={[styles.analyzeButton, { backgroundColor: colors.primary }]}
+                                    disabled={loading}
+                                    onPress={handleStartAnalysis}
+                                >
+                                    {loading ? (
+                                        <Text style={styles.analyzeButtonText}>Preparing...</Text>
+                                    ) : (
+                                        <>
+                                            <BotIcon size={22} color="#FFFFFF" />
+                                            <Text style={styles.analyzeButtonText}>Start AI Analysis</Text>
+                                        </>
+                                    )}
                                 </TouchableOpacity>
                             </View>
                         )}
 
                         {analysisResult && (
-                            <TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.card, borderColor: colors.cardBorder, borderWidth: 1 }]} onPress={goBack}>
-                                <DownloadIcon size={20} color={colors.primary} /><Text style={[styles.saveButtonText, { color: colors.text }]}>Back to Reports</Text>
-                            </TouchableOpacity>
+                            <View style={{ gap: 15, marginTop: 10 }}>
+                                {!isSaved && (
+                                    <TouchableOpacity
+                                        style={[styles.analyzeButton, { backgroundColor: colors.primary }]}
+                                        onPress={() => setShowSaveModal(true)}
+                                    >
+                                        <DownloadIcon size={20} color="#FFFFFF" />
+                                        <Text style={[styles.analyzeButtonText, { fontSize: 16 }]}>Save Report</Text>
+                                    </TouchableOpacity>
+                                )}
+                                <TouchableOpacity
+                                    style={[styles.saveButton, { backgroundColor: colors.card, borderColor: colors.cardBorder, borderWidth: 1, width: '100%', justifyContent: 'center' }]}
+                                    onPress={goBack}
+                                >
+                                    <Text style={[styles.saveButtonText, { color: colors.text }]}>Done</Text>
+                                </TouchableOpacity>
+                            </View>
                         )}
                     </View>
                     <View style={{ height: 100 }} />
@@ -238,34 +382,19 @@ const ScanReportScreen = () => {
                                     style={[styles.confirmBtn, { backgroundColor: colors.primary }]}
                                     disabled={loading}
                                     onPress={async () => {
-                                        if (!reportName.trim()) return;
+                                        if (!reportName.trim() || !currentReportId) return;
                                         try {
                                             setLoading(true);
-                                            const { data: { user } } = await supabase.auth.getUser();
-                                            if (!user) throw new Error("Auth required");
+                                            const { error } = await supabase
+                                                .from('reports')
+                                                .update({ name: reportName.trim() })
+                                                .eq('id', currentReportId);
 
-                                            const fileName = `${Date.now()}.jpg`;
-                                            const filePath = `${user.id}/${fileName}`;
-                                            const base64 = await FileSystem.readAsStringAsync(capturedImages[0], { encoding: 'base64' });
-                                            const arrayBuffer = decodeBase64(base64);
+                                            if (error) throw error;
 
-                                            await supabase.storage.from('reports').upload(filePath, arrayBuffer, { contentType: 'image/jpeg' });
-                                            const { data: { publicUrl } } = supabase.storage.from('reports').getPublicUrl(filePath);
-
-                                            const { data: reportData } = await supabase.from('reports').insert({
-                                                user_id: user.id,
-                                                name: reportName.trim(),
-                                                uri: publicUrl,
-                                                analysis: "Reading report..."
-                                            }).select('id').single();
-
-                                            if (reportData) {
-                                                setCurrentReportId(reportData.id);
-                                                setIsAnalyzing(true);
-                                                setShowSaveModal(false);
-                                                // Trigger AI Chain
-                                                supabase.functions.invoke('process-report', { body: { report_id: reportData.id } });
-                                            }
+                                            setIsSaved(true);
+                                            setShowSaveModal(false);
+                                            Alert.alert("Success", "Report saved to history!");
                                         } catch (error: any) {
                                             Alert.alert("Error", error.message);
                                         } finally {
@@ -273,7 +402,7 @@ const ScanReportScreen = () => {
                                         }
                                     }}
                                 >
-                                    <Text style={{ color: '#FFF', fontWeight: 'bold' }}>{loading ? t('uploading') : t('save_now')}</Text>
+                                    <Text style={{ color: '#FFF', fontWeight: 'bold' }}>{loading ? t('saving') : t('save_now')}</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -322,18 +451,18 @@ const styles = StyleSheet.create({
     finishGradient: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 15 },
     finishText: { color: '#FFF', fontFamily: 'Judson-Bold' },
     analysisContainer: { flex: 1 },
-    stickyHeader: { width: '100%', justifyContent: 'center', paddingBottom: 15 },
+    stickyHeader: { width: '100%', justifyContent: 'flex-end', paddingBottom: 15 },
     analysisTopIcons: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', alignItems: 'center', paddingHorizontal: 25 },
     analysisIconBlock: { width: 46, height: 46, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
     analysisTitle: { color: '#FFF', fontSize: 20, fontFamily: 'Judson-Bold' },
-    analysisImageWrapper: { paddingBottom: 40, alignItems: 'center', borderBottomLeftRadius: 40, borderBottomRightRadius: 40 },
+    analysisImageWrapper: { paddingTop: Platform.OS === 'ios' ? 140 : 120, paddingBottom: 40, alignItems: 'center', borderBottomLeftRadius: 40, borderBottomRightRadius: 40 },
     multiImageScroll: { paddingHorizontal: 25 },
     capturedImageContainer: { width: width * 0.72, height: width * 1.0, backgroundColor: '#FFF', borderRadius: 20, overflow: 'hidden', marginHorizontal: 10, elevation: 10, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 10 },
     capturedImage: { width: '100%', height: '100%' },
     pdfView: { flex: 1, width: width * 0.8 },
     pageIndicator: { position: 'absolute', bottom: 15, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 5, borderRadius: 10 },
     pageIndicatorText: { color: '#FFF', fontSize: 10 },
-    analysisContent: { padding: 25 },
+    analysisContent: { padding: 25, paddingTop: 30 },
     contentSection: { marginBottom: 30 },
     sectionHeading: { fontSize: 22, fontFamily: 'Judson-Bold', marginBottom: 10 },
     categoryHeading: { fontSize: 13, fontFamily: 'Judson-Bold', color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 5 },
@@ -354,7 +483,9 @@ const styles = StyleSheet.create({
     modalInput: { width: '100%', height: 55, borderRadius: 15, paddingHorizontal: 20, fontFamily: 'Judson-Regular', fontSize: 16, marginBottom: 25, borderWidth: 1 },
     modalButtons: { flexDirection: 'row', width: '100%', justifyContent: 'space-between' },
     cancelBtn: { padding: 15 },
-    confirmBtn: { flex: 1, height: 50, borderRadius: 15, justifyContent: 'center', alignItems: 'center', marginLeft: 15 }
+    confirmBtn: { flex: 1, height: 50, borderRadius: 15, justifyContent: 'center', alignItems: 'center', marginLeft: 15 },
+    analysisFooter: { marginTop: 20, width: '100%' }
+
 });
 
 export default ScanReportScreen;

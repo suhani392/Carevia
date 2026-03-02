@@ -106,6 +106,8 @@ export interface ThemeColors {
     inputBg: string;
     modalBg: string;
     divider: string;
+    success: string;
+    warning: string;
     headerGradient: string[];
 }
 
@@ -124,6 +126,8 @@ const lightColors: ThemeColors = {
     inputBg: '#F5F9FF',
     modalBg: '#FFFFFF',
     divider: '#F0F0F0',
+    success: '#4CAF50',
+    warning: '#FFC107',
     headerGradient: ['#0055FF', '#6A9EFF'],
 };
 
@@ -142,6 +146,8 @@ const darkColors: ThemeColors = {
     inputBg: '#2A2A2A',
     modalBg: '#1E1E1E',
     divider: '#2A2A2A',
+    success: '#81C784',
+    warning: '#FFD54F',
     headerGradient: ['#001A4D', '#003399'],
 };
 
