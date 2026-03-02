@@ -1,43 +1,36 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Dimensions, TouchableOpacity, StatusBar, Image, Animated, Modal, TextInput, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Dimensions, TouchableOpacity, StatusBar, Image, Animated, Modal, TextInput, ScrollView, Alert } from 'react-native';
 import Pdf from 'react-native-pdf';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as Haptics from 'expo-haptics';
 import { BackIcon, FlashlightIcon, ScanFrameIcon, CrossIcon, DownloadIcon, BotIcon } from '../Home/Icons';
-import { Alert } from 'react-native';
 import { useNavigation } from '../../context/NavigationContext';
 import { useAppContext } from '../../context/AppContext';
 import { supabase } from '../../lib/supabase';
 import * as FileSystem from 'expo-file-system/legacy';
 
-// Helper to convert base64 to ArrayBuffer (more reliable for RN uploads)
+const { width, height } = Dimensions.get('window');
+
+// Helper to convert base64 to ArrayBuffer
 const decodeBase64 = (base64: string) => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
     const lookup = new Uint8Array(256);
-    for (let i = 0; i < chars.length; i++) {
-        lookup[chars.charCodeAt(i)] = i;
-    }
-
+    for (let i = 0; i < chars.length; i++) lookup[chars.charCodeAt(i)] = i;
     let bufferLength = base64.length * 0.75;
     let len = base64.length, i, p = 0;
-    let encoded1, encoded2, encoded3, encoded4;
-
     if (base64[base64.length - 1] === "=") {
         bufferLength--;
         if (base64[base64.length - 2] === "=") bufferLength--;
     }
-
     const arraybuffer = new ArrayBuffer(bufferLength);
     const bytes = new Uint8Array(arraybuffer);
-
     for (i = 0; i < len; i += 4) {
-        encoded1 = lookup[base64.charCodeAt(i)];
-        encoded2 = lookup[base64.charCodeAt(i + 1)];
-        encoded3 = lookup[base64.charCodeAt(i + 2)];
-        encoded4 = lookup[base64.charCodeAt(i + 3)];
-
+        let encoded1 = lookup[base64.charCodeAt(i)];
+        let encoded2 = lookup[base64.charCodeAt(i + 1)];
+        let encoded3 = lookup[base64.charCodeAt(i + 2)];
+        let encoded4 = lookup[base64.charCodeAt(i + 3)];
         bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
         bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
         bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
@@ -45,11 +38,9 @@ const decodeBase64 = (base64: string) => {
     return arraybuffer;
 };
 
-const { width, height } = Dimensions.get('window');
-
 const ScanReportScreen = () => {
     const { goBack, navigate, screenParams } = useNavigation();
-    const { addReport, colors, themeMode, t } = useAppContext();
+    const { colors, themeMode, t } = useAppContext();
     const [permission, requestPermission] = useCameraPermissions();
     const [torch, setTorch] = useState(false);
     const [capturedImages, setCapturedImages] = useState<string[]>([]);
@@ -58,25 +49,62 @@ const ScanReportScreen = () => {
     const [showSaveModal, setShowSaveModal] = useState(false);
     const [reportName, setReportName] = useState('');
     const [loading, setLoading] = useState(false);
+    const [currentReportId, setCurrentReportId] = useState<string | null>(null);
+    const [analysisResult, setAnalysisResult] = useState<any>(null);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [pollingStatus, setPollingStatus] = useState('');
+
     const cameraRef = useRef<CameraView>(null);
     const scrollY = useRef(new Animated.Value(0)).current;
 
+    // Polling logic with heavy logging to debug
     useEffect(() => {
-        if (!permission) {
-            requestPermission();
+        let interval: any;
+        if (isAnalyzing && currentReportId) {
+            console.log("[Status] Starting polling for report:", currentReportId);
+            interval = setInterval(async () => {
+                try {
+                    const { data, error } = await supabase
+                        .from('reports')
+                        .select('analysis')
+                        .eq('id', currentReportId)
+                        .single();
+
+                    if (data?.analysis) {
+                        setPollingStatus(data.analysis);
+                        console.log("[Status] Current:", data.analysis);
+                    }
+
+                    if (data?.analysis?.includes("Complete") || data?.analysis?.includes("ready")) {
+                        const { data: structData } = await supabase
+                            .from('structured_reports')
+                            .select('explanation_json')
+                            .eq('report_id', currentReportId)
+                            .maybeSingle();
+
+                        if (structData?.explanation_json) {
+                            console.log("[Status] Explanation found! Loading UI.");
+                            setAnalysisResult(structData.explanation_json);
+                            setIsAnalyzing(false);
+                            clearInterval(interval);
+                        }
+                    }
+                } catch (err) {
+                    console.error("[Polling] Error:", err);
+                }
+            }, 3000);
         }
+        return () => clearInterval(interval);
+    }, [isAnalyzing, currentReportId]);
+
+    useEffect(() => {
+        if (!permission) requestPermission();
     }, [permission]);
 
     useEffect(() => {
         if (screenParams?.uploadedAssets && screenParams.uploadedAssets.length > 0) {
-            const uris = screenParams.uploadedAssets.map((a: any) => a.uri);
-            setCapturedImages(uris);
+            setCapturedImages(screenParams.uploadedAssets.map((a: any) => a.uri));
             setIsPdf(screenParams.uploadedAssets[0].fileType === 'application/pdf');
-            setIsAnalysisMode(true);
-        } else if (screenParams?.uploadedUri) {
-            // Legacy support for single upload
-            setCapturedImages([screenParams.uploadedUri]);
-            setIsPdf(screenParams.fileType === 'application/pdf');
             setIsAnalysisMode(true);
         }
     }, [screenParams]);
@@ -84,69 +112,30 @@ const ScanReportScreen = () => {
     const handleCapture = async () => {
         if (cameraRef.current) {
             try {
-                const photo = await cameraRef.current.takePictureAsync({
-                    quality: 1,
-                    base64: false,
-                    skipProcessing: false,
-                });
-
+                const photo = await cameraRef.current.takePictureAsync({ quality: 1 });
                 if (photo) {
-                    // Ultra-tight cropping to remove 98% of background
-                    // Focuses purely on the document area defined by the scan-frame
-                    const cropWidth = photo.width * 0.88; // Covers the inner area of the scan-frame
-                    const cropHeight = Math.min(photo.height, photo.width * 1.4); // Taller A4-style aspect ratio
-                    const originX = (photo.width - cropWidth) / 2;
-                    const originY = Math.max(0, (photo.height - cropHeight) / 2);
-
                     const manipulatedImage = await ImageManipulator.manipulateAsync(
                         photo.uri,
-                        [
-                            {
-                                crop: {
-                                    originX: originX,
-                                    originY: originY,
-                                    width: cropWidth,
-                                    height: cropHeight,
-                                },
-                            },
-                        ],
+                        [{ crop: { originX: photo.width * 0.06, originY: 0, width: photo.width * 0.88, height: Math.min(photo.height, photo.width * 1.4) } }],
                         { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
                     );
-
                     setCapturedImages(prev => [...prev, manipulatedImage.uri]);
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 }
             } catch (error) {
-                console.error("Failed to take picture:", error);
+                console.error("Capture failed:", error);
             }
         }
     };
 
-    const headerHeight = scrollY.interpolate({
-        inputRange: [0, 100],
-        outputRange: [130, 95],
-        extrapolate: 'clamp',
-    });
-
-    const titleFontSize = scrollY.interpolate({
-        inputRange: [0, 100],
-        outputRange: [20, 18],
-        extrapolate: 'clamp',
-    });
-
-    if (!permission) {
-        return <View style={[styles.container, { backgroundColor: colors.background }]} />;
-    }
-
+    if (!permission) return <View style={styles.container} />;
     if (!permission.granted) {
         return (
-            <View style={[styles.container, { backgroundColor: colors.background }]}>
-                <View style={[styles.permissionContent, { backgroundColor: colors.background }]}>
-                    <Text style={[styles.permissionText, { color: colors.text }]}>{t('permission_camera')}</Text>
-                    <Pressable onPress={requestPermission} style={[styles.permissionButton, { backgroundColor: colors.primary }]}>
-                        <Text style={styles.permissionButtonText}>{t('grant_permission')}</Text>
-                    </Pressable>
-                </View>
+            <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+                <Text style={{ color: colors.text, marginBottom: 20 }}>{t('permission_camera')}</Text>
+                <TouchableOpacity onPress={requestPermission} style={{ backgroundColor: colors.primary, padding: 15, borderRadius: 10 }}>
+                    <Text style={{ color: '#FFF' }}>{t('grant_permission')}</Text>
+                </TouchableOpacity>
             </View>
         );
     }
@@ -155,264 +144,138 @@ const ScanReportScreen = () => {
         return (
             <View style={[styles.analysisContainer, { backgroundColor: colors.background }]}>
                 <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-
-                <Animated.View style={[styles.stickyHeader, { height: headerHeight }]}>
-                    <LinearGradient
-                        colors={colors.headerGradient as any}
-                        style={StyleSheet.absoluteFill}
-                    />
+                <Animated.View style={[styles.stickyHeader, { height: 110 }]}>
+                    <LinearGradient colors={colors.headerGradient as any} style={StyleSheet.absoluteFill} />
                     <View style={styles.analysisTopIcons}>
-                        <Pressable style={styles.analysisIconBlock} onPress={() => {
-                            setIsAnalysisMode(false);
-                            if (isPdf) setCapturedImages([]); // Clear if it was an upload
-                        }}>
-                            <BackIcon size={24} color="#FFFFFF" />
-                        </Pressable>
-                        <View style={styles.analysisHeaderText}>
-                            <Animated.Text style={[styles.analysisTitle, { fontSize: titleFontSize }]}>{t('report_analysis')}</Animated.Text>
+                        <Pressable style={styles.analysisIconBlock} onPress={() => setIsAnalysisMode(false)}><BackIcon size={24} color="#FFFFFF" /></Pressable>
+                        <View style={{ alignItems: 'center' }}>
+                            <Text style={styles.analysisTitle}>{t('report_analysis')}</Text>
                         </View>
-                        <Pressable style={styles.analysisIconBlock} onPress={goBack}>
-                            <CrossIcon size={24} color="#FFFFFF" />
-                        </Pressable>
+                        <Pressable style={styles.analysisIconBlock} onPress={goBack}><CrossIcon size={24} color="#FFFFFF" /></Pressable>
                     </View>
                 </Animated.View>
 
                 <Animated.ScrollView
-                    showsVerticalScrollIndicator={false}
-                    onScroll={Animated.event(
-                        [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-                        { useNativeDriver: false }
-                    )}
+                    onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
                     scrollEventThrottle={16}
+                    showsVerticalScrollIndicator={false}
                 >
-                    <View>
-                        <LinearGradient
-                            colors={colors.headerGradient as any}
-                            style={styles.analysisImageWrapper}
-                        >
-                            {isPdf ? (
-                                <View style={[styles.capturedImageContainer, { alignSelf: 'center', marginRight: 0, backgroundColor: themeMode === 'dark' ? '#1A1A1A' : '#FFFFFF' }]}>
-                                    <Pdf
-                                        source={{ uri: capturedImages[0] || '' }}
-                                        style={[styles.pdfView, { backgroundColor: themeMode === 'dark' ? '#1A1A1A' : '#FFFFFF' }]}
-                                        trustAllCerts={false}
-                                        onLoadComplete={(numberOfPages) => {
-                                            console.log(`Number of pages: ${numberOfPages}`);
-                                        }}
-                                    />
-                                </View>
-                            ) : (
-                                <ScrollView
-                                    horizontal
-                                    showsHorizontalScrollIndicator={false}
-                                    snapToInterval={width * 0.7 + 20}
-                                    decelerationRate="fast"
-                                    contentContainerStyle={styles.multiImageScroll}
-                                >
-                                    {capturedImages.map((uri, index) => (
-                                        <View
-                                            key={index}
-                                            style={[
-                                                styles.capturedImageContainer,
-                                                { backgroundColor: themeMode === 'dark' ? '#1A1A1A' : '#FFFFFF' },
-                                                index === capturedImages.length - 1 && { marginRight: 0 }
-                                            ]}
-                                        >
-                                            <Image
-                                                source={{ uri: uri }}
-                                                style={styles.capturedImage}
-                                                resizeMode="cover"
-                                            />
-                                            <View style={styles.pageIndicator}>
-                                                <Text style={styles.pageIndicatorText}>{index + 1} / {capturedImages.length}</Text>
-                                            </View>
-                                        </View>
-                                    ))}
-                                </ScrollView>
-                            )}
-                        </LinearGradient>
-                    </View>
+                    <LinearGradient colors={colors.headerGradient as any} style={styles.analysisImageWrapper}>
+                        {isPdf ? (
+                            <View style={styles.capturedImageContainer}><Pdf source={{ uri: capturedImages[0] }} style={styles.pdfView} /></View>
+                        ) : (
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={width * 0.72} decelerationRate="fast" contentContainerStyle={styles.multiImageScroll}>
+                                {capturedImages.map((uri, index) => (
+                                    <View key={index} style={styles.capturedImageContainer}>
+                                        <Image source={{ uri }} style={styles.capturedImage} resizeMode="cover" />
+                                        <View style={styles.pageIndicator}><Text style={styles.pageIndicatorText}>{index + 1} / {capturedImages.length}</Text></View>
+                                    </View>
+                                ))}
+                            </ScrollView>
+                        )}
+                    </LinearGradient>
 
                     <View style={styles.analysisContent}>
-                        <View style={styles.contentSection}>
-                            <Text style={[styles.sectionHeading, { color: colors.text }]}>{t('report_summary')}</Text>
-                            <Text style={[styles.sectionPara, { color: colors.textSecondary }]}>Vitamin B12 & D3 deficiency observed, along with a spike in WBCs count and low haemoglobin.</Text>
-                        </View>
+                        {isAnalyzing ? (
+                            <View style={styles.loadingContainer}>
+                                <Text style={[styles.loadingText, { color: colors.text }]}>AI is analyzing your report...</Text>
+                                <Text style={[styles.pollingSubtext, { color: colors.primary, marginBottom: 15 }]}>{pollingStatus || "Waiting for cloud response..."}</Text>
+                                <Text style={[styles.loadingSubtext, { color: colors.textSecondary }]}>This usually takes 20-30 seconds.</Text>
+                            </View>
+                        ) : analysisResult ? (
+                            <>
+                                <View style={styles.contentSection}>
+                                    <Text style={[styles.sectionHeading, { color: colors.primary }]}>Your Report Analysis</Text>
+                                    <Text style={[styles.sectionPara, { color: colors.textSecondary }]}>{analysisResult.introduction}</Text>
+                                </View>
+                                {analysisResult.explanations.map((item: any, idx: number) => (
+                                    <View key={idx} style={styles.contentSection}>
+                                        {item.category && item.category !== "null" && <Text style={[styles.categoryHeading, { color: colors.textSecondary }]}>{item.category}</Text>}
+                                        <Text style={[styles.testHeading, { color: item.heading.toLowerCase().includes('high') || item.heading.toLowerCase().includes('low') ? colors.error : colors.text }]}>{item.heading}</Text>
+                                        {item.explanation_lines.map((line: string, lIdx: number) => <Text key={lIdx} style={[styles.sectionPara, { color: colors.text }]}>• {line}</Text>)}
+                                    </View>
+                                ))}
+                                <View style={styles.contentSection}>
+                                    <Text style={[styles.sectionHeading, { color: colors.text }]}>Overall Summary</Text>
+                                    <Text style={[styles.sectionPara, { color: colors.textSecondary, fontFamily: 'Judson-Bold' }]}>{analysisResult.summary}</Text>
+                                </View>
+                            </>
+                        ) : (
+                            <View style={styles.analysisFooter}>
+                                <TouchableOpacity style={[styles.analyzeButton, { backgroundColor: colors.primary }]} onPress={() => setShowSaveModal(true)}>
+                                    <BotIcon size={22} color="#FFFFFF" /><Text style={styles.analyzeButtonText}>Start AI Analysis</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
 
-                        <View style={styles.contentSection}>
-                            <Text style={[styles.sectionHeading, { color: colors.text }]}>Vitamins</Text>
-                            <Text style={[styles.sectionPara, { color: colors.textSecondary }]}>Vitamin B12 : 5.3 (deficient)</Text>
-                            <Text style={[styles.sectionPara, { color: colors.textSecondary }]}>Vitamin D3 : 6.6 (deficient)</Text>
-                        </View>
-
-                        <View style={styles.contentSection}>
-                            <Text style={[styles.sectionHeading, { color: colors.text }]}>Blood Cells</Text>
-                            <Text style={[styles.sectionPara, { color: colors.textSecondary }]}>WBCs : 5.3 (high)</Text>
-                        </View>
-
-                        <View style={styles.contentSection}>
-                            <Text style={[styles.sectionHeading, { color: colors.text }]}>Other Blood Factors</Text>
-                            <Text style={[styles.sectionPara, { color: colors.textSecondary }]}>Haemoglobin : 5.3 (low)</Text>
-                        </View>
-
-                        <View style={styles.contentSection}>
-                            <Text style={[styles.sectionHeading, { color: colors.text }]}>{t('ai_suggestions')}</Text>
-                            <Text style={[styles.sectionPara, { color: colors.textSecondary }]}>Prefer fish, and other fermented food items to balance your vitamin B12 levels.</Text>
-                            <Text style={[styles.sectionPara, { color: colors.textSecondary }]}>For balancing vitamin D3, morning sunlight is the best!</Text>
-                            <Text style={[styles.sectionPara, { color: colors.textSecondary }]}>Keep your health proper including proper medications if you are sick currently, as being sick makes the WBCs count to spike up for body recovery.</Text>
-                            <Text style={[styles.sectionPara, { color: colors.textSecondary }]}>Include beetroot, dates, raisins & spinach in your diet to regain the required haemoglobin level.</Text>
-                        </View>
-
-                        <View style={styles.analysisFooter}>
-                            <TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.card, borderColor: colors.cardBorder, borderWidth: 1 }]} onPress={() => setShowSaveModal(true)}>
-                                <DownloadIcon size={20} color={colors.primary} />
-                                <Text style={[styles.saveButtonText, { color: colors.text }]}>{t('save_report')}</Text>
+                        {analysisResult && (
+                            <TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.card, borderColor: colors.cardBorder, borderWidth: 1 }]} onPress={goBack}>
+                                <DownloadIcon size={20} color={colors.primary} /><Text style={[styles.saveButtonText, { color: colors.text }]}>Back to Reports</Text>
                             </TouchableOpacity>
-                        </View>
+                        )}
                     </View>
                     <View style={{ height: 100 }} />
                 </Animated.ScrollView>
 
-                <TouchableOpacity
-                    style={[styles.fixedChatButton, { backgroundColor: colors.card, borderColor: colors.cardBorder, borderWidth: 1 }]}
-                    onPress={() => navigate('ai_assistant')}
-                >
-                    <BotIcon size={28} color={colors.primary} />
-                </TouchableOpacity>
-
-                {/* Save Report Modal */}
-                <Modal
-                    visible={showSaveModal}
-                    transparent={true}
-                    animationType="fade"
-                    onRequestClose={() => setShowSaveModal(false)}
-                >
+                <Modal visible={showSaveModal} transparent animationType="fade" onRequestClose={() => setShowSaveModal(false)}>
                     <View style={styles.modalOverlay}>
                         <View style={[styles.modalContent, { backgroundColor: colors.modalBg }]}>
                             <Text style={[styles.modalTitle, { color: colors.text }]}>{t('save_report')}</Text>
                             <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>{t('enter_report_name')}</Text>
-
                             <TextInput
-                                style={[styles.modalInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border, borderWidth: 1 }]}
+                                style={[styles.modalInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.primary }]}
                                 placeholder={t('report_name_placeholder')}
                                 placeholderTextColor={colors.textSecondary}
                                 value={reportName}
                                 onChangeText={setReportName}
-                                autoFocus={true}
+                                autoFocus
                             />
-
                             <View style={styles.modalButtons}>
-                                <TouchableOpacity
-                                    style={[styles.cancelButton, { backgroundColor: colors.surface }]}
-                                    onPress={() => setShowSaveModal(false)}
-                                >
-                                    <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>{t('cancel')}</Text>
+                                <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowSaveModal(false)}>
+                                    <Text style={{ color: colors.textSecondary }}>{t('cancel')}</Text>
                                 </TouchableOpacity>
-
                                 <TouchableOpacity
-                                    style={styles.confirmButton}
+                                    style={[styles.confirmBtn, { backgroundColor: colors.primary }]}
+                                    disabled={loading}
                                     onPress={async () => {
-                                        if (reportName.trim() && capturedImages.length > 0) {
-                                            try {
-                                                setLoading(true);
-                                                const uri = capturedImages[0];
-                                                const extension = isPdf ? '.pdf' : '.jpg';
-                                                const contentType = isPdf ? 'application/pdf' : 'image/jpeg';
-                                                const fileName = `${Date.now()}${extension}`;
+                                        if (!reportName.trim()) return;
+                                        try {
+                                            setLoading(true);
+                                            const { data: { user } } = await supabase.auth.getUser();
+                                            if (!user) throw new Error("Auth required");
 
-                                                const { data: { user } } = await supabase.auth.getUser();
-                                                if (!user) throw new Error('User not found');
+                                            const fileName = `${Date.now()}.jpg`;
+                                            const filePath = `${user.id}/${fileName}`;
+                                            const base64 = await FileSystem.readAsStringAsync(capturedImages[0], { encoding: 'base64' });
+                                            const arrayBuffer = decodeBase64(base64);
 
-                                                const targetUserId = screenParams?.memberId || user.id;
-                                                const filePath = `${targetUserId}/${fileName}`;
+                                            await supabase.storage.from('reports').upload(filePath, arrayBuffer, { contentType: 'image/jpeg' });
+                                            const { data: { publicUrl } } = supabase.storage.from('reports').getPublicUrl(filePath);
 
-                                                // Read file as base64
-                                                const base64 = await FileSystem.readAsStringAsync(uri, {
-                                                    encoding: 'base64'
-                                                });
+                                            const { data: reportData } = await supabase.from('reports').insert({
+                                                user_id: user.id,
+                                                name: reportName.trim(),
+                                                uri: publicUrl,
+                                                analysis: "Reading report..."
+                                            }).select('id').single();
 
-                                                const arrayBuffer = decodeBase64(base64);
-
-                                                const { data: uploadData, error: uploadError } = await supabase.storage
-                                                    .from('reports')
-                                                    .upload(filePath, arrayBuffer, {
-                                                        contentType: contentType,
-                                                        upsert: true
-                                                    });
-
-                                                if (uploadError) throw uploadError;
-
-                                                const { data: { publicUrl } } = supabase.storage
-                                                    .from('reports')
-                                                    .getPublicUrl(filePath);
-
-                                                // Append extension to name if not present to help viewer
-                                                let finalName = reportName.trim();
-                                                if (isPdf && !finalName.toLowerCase().endsWith('.pdf')) {
-                                                    finalName += '.pdf';
-                                                }
-
-                                                if (!screenParams?.memberId) {
-                                                    const { data: reportData } = await supabase
-                                                        .from('reports')
-                                                        .insert({
-                                                            user_id: user.id,
-                                                            name: finalName,
-                                                            uri: publicUrl,
-                                                            analysis: "Reading report..."
-                                                        })
-                                                        .select('id')
-                                                        .single();
-
-                                                    if (reportData) {
-                                                        // Trigger AI OCR Pipeline
-                                                        await supabase.functions.invoke('process-report', {
-                                                            body: { report_id: reportData.id }
-                                                        });
-                                                    }
-                                                } else {
-                                                    // Manual insert for family members
-                                                    const { data: reportData } = await supabase
-                                                        .from('reports')
-                                                        .insert({
-                                                            user_id: screenParams.memberId,
-                                                            name: finalName,
-                                                            uri: publicUrl,
-                                                            analysis: "Reading report..."
-                                                        })
-                                                        .select('id')
-                                                        .single();
-
-                                                    if (reportData) {
-                                                        // Trigger AI OCR Pipeline
-                                                        await supabase.functions.invoke('process-report', {
-                                                            body: { report_id: reportData.id }
-                                                        });
-                                                    }
-                                                }
-
+                                            if (reportData) {
+                                                setCurrentReportId(reportData.id);
+                                                setIsAnalyzing(true);
                                                 setShowSaveModal(false);
-                                                navigate('reports');
-                                            } catch (error: any) {
-                                                Alert.alert(t('upload_error'), error.message);
-                                            } finally {
-                                                setLoading(false);
+                                                // Trigger AI Chain
+                                                supabase.functions.invoke('process-report', { body: { report_id: reportData.id } });
                                             }
+                                        } catch (error: any) {
+                                            Alert.alert("Error", error.message);
+                                        } finally {
+                                            setLoading(false);
                                         }
                                     }}
-                                    disabled={loading}
                                 >
-                                    <LinearGradient
-                                        colors={colors.headerGradient as any}
-                                        style={styles.confirmButtonGradient}
-                                    >
-                                        <Text style={styles.confirmButtonText}>
-                                            {loading ? t('uploading') : t('save_now')}
-                                        </Text>
-                                    </LinearGradient>
+                                    <Text style={{ color: '#FFF', fontWeight: 'bold' }}>{loading ? t('uploading') : t('save_now')}</Text>
                                 </TouchableOpacity>
                             </View>
-
                         </View>
                     </View>
                 </Modal>
@@ -422,93 +285,22 @@ const ScanReportScreen = () => {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-
-            <CameraView
-                ref={cameraRef}
-                style={styles.camera}
-                facing="back"
-                enableTorch={torch}
-            >
+            <CameraView ref={cameraRef} style={styles.camera} facing="back" enableTorch={torch}>
                 <View style={styles.overlay}>
                     <View style={styles.header}>
-                        <Pressable onPress={() => navigate('home')}>
-                            <LinearGradient
-                                colors={colors.headerGradient as any}
-                                style={styles.iconBlock}
-                            >
-                                <BackIcon size={24} color="#FFFFFF" />
-                            </LinearGradient>
-                        </Pressable>
-
-                        <Pressable
-                            onPress={() => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                setTorch(!torch);
-                            }}
-                        >
-                            <LinearGradient
-                                colors={torch ? ['#FFD700', '#FFA500'] : colors.headerGradient as any}
-                                style={styles.iconBlock}
-                            >
-                                <FlashlightIcon size={24} color={torch ? "#000000" : "#FFFFFF"} />
-                            </LinearGradient>
-                        </Pressable>
+                        <Pressable onPress={() => navigate('home')} style={styles.iconCircle}><BackIcon size={24} color="#FFFFFF" /></Pressable>
+                        <Pressable onPress={() => setTorch(!torch)} style={styles.iconCircle}><FlashlightIcon size={24} color={torch ? "#FFD700" : "#FFFFFF"} /></Pressable>
                     </View>
-
-                    <View style={styles.scanFrameContainer} pointerEvents="none">
-                        <ScanFrameIcon color="#FFFFFF" size={width * 0.85} />
-                    </View>
-
-                    <View style={styles.instructionContainer}>
-                        <Text style={styles.instructionText}>
-                            {t('capture_instruction')}
-                        </Text>
-                    </View>
-
+                    <View style={styles.scanFrameContainer} pointerEvents="none"><ScanFrameIcon color="#FFFFFF" size={width * 0.85} /></View>
                     <View style={styles.bottomContainer}>
-                        <View style={styles.captureControls}>
-                            <View style={styles.previewContainer}>
-                                {capturedImages.length > 0 && (
-                                    <View style={styles.previewContainer}>
-                                        <View style={styles.thumbnailWrapper}>
-                                            <Image
-                                                source={{ uri: capturedImages[capturedImages.length - 1] }}
-                                                style={styles.thumbnail}
-                                            />
-                                        </View>
-                                        <View style={styles.countBadge}>
-                                            <Text style={styles.countText}>{capturedImages.length}</Text>
-                                        </View>
-                                    </View>
-                                )}
-                            </View>
-
-                            <TouchableOpacity style={styles.captureButton} onPress={handleCapture}>
-                                <LinearGradient
-                                    colors={colors.headerGradient as any}
-                                    style={styles.gradientCircle}
-                                >
-                                    <View style={styles.whiteInnerCircle} />
+                        <TouchableOpacity style={styles.captureButton} onPress={handleCapture}><View style={styles.whiteInnerCircle} /></TouchableOpacity>
+                        {capturedImages.length > 0 && (
+                            <TouchableOpacity style={styles.finishBtnContainer} onPress={() => setIsAnalysisMode(true)}>
+                                <LinearGradient colors={colors.headerGradient as any} style={styles.finishGradient}>
+                                    <Text style={styles.finishText}>{t('finish')} ({capturedImages.length})</Text>
                                 </LinearGradient>
                             </TouchableOpacity>
-
-                            <View style={styles.finishContainer}>
-                                {capturedImages.length > 0 && (
-                                    <TouchableOpacity
-                                        style={styles.finishButton}
-                                        onPress={() => setIsAnalysisMode(true)}
-                                    >
-                                        <LinearGradient
-                                            colors={colors.headerGradient as any}
-                                            style={styles.finishGradient}
-                                        >
-                                            <Text style={styles.finishText}>{t('finish')}</Text>
-                                        </LinearGradient>
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-                        </View>
+                        )}
                     </View>
                 </View>
             </CameraView>
@@ -517,376 +309,52 @@ const ScanReportScreen = () => {
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#000',
-    },
-    camera: {
-        flex: 1,
-    },
-    permissionContent: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
-        backgroundColor: '#FFFFFF',
-    },
-    permissionText: {
-        textAlign: 'center',
-        fontFamily: 'Judson-Regular',
-        fontSize: 18,
-        color: '#000000',
-        marginBottom: 20,
-    },
-    overlay: {
-        flex: 1,
-        paddingTop: 50,
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingHorizontal: 25,
-        marginBottom: 20,
-    },
-    iconBlock: {
-        width: 46,
-        height: 46,
-        borderRadius: 15,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    instructionContainer: {
-        backgroundColor: 'rgba(180, 180, 180, 0.6)',
-        paddingVertical: 12,
-        alignItems: 'center',
-        width: '100%',
-        marginBottom: 40,
-    },
-    instructionText: {
-        fontFamily: 'Judson-Regular',
-        fontSize: 16,
-        color: '#FFFFFF',
-        textShadowColor: 'rgba(0, 0, 0, 0.3)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 2,
-    },
-    scanFrameContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    bottomContainer: {
-        width: '100%',
-        alignItems: 'center',
-        paddingBottom: 50,
-    },
-    captureButton: {
-        width: 80,
-        height: 80,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    gradientCircle: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    whiteInnerCircle: {
-        width: 62,
-        height: 62,
-        borderRadius: 31,
-        backgroundColor: '#FFFFFF',
-    },
-    permissionButton: {
-        backgroundColor: '#0062FF',
-        paddingHorizontal: 30,
-        paddingVertical: 12,
-        borderRadius: 15,
-    },
-    permissionButtonText: {
-        color: '#FFFFFF',
-        fontFamily: 'Judson-Bold',
-        fontSize: 16,
-    },
-    analysisContainer: {
-        flex: 1,
-        backgroundColor: '#FFFFFF',
-    },
-    stickyHeader: {
-        width: '100%',
-        paddingHorizontal: 25,
-        justifyContent: 'flex-end',
-        paddingBottom: 12,
-        zIndex: 10,
-        overflow: 'hidden',
-    },
-    analysisImageWrapper: {
-        width: '100%',
-        paddingBottom: 40,
-        borderBottomLeftRadius: 50,
-        borderBottomRightRadius: 50,
-    },
-    analysisTopIcons: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        width: '100%',
-    },
-    analysisIconBlock: {
-        width: 46,
-        height: 46,
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-        borderRadius: 15,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    analysisHeaderText: {
-        alignItems: 'center',
-    },
-    analysisTitle: {
-        fontFamily: 'Judson-Bold',
-        color: '#FFFFFF',
-    },
-    analysisDate: {
-        display: 'none',
-    },
-    capturedImageContainer: {
-        width: width * 0.7,
-        height: width * 0.7 * 1.4, // A4 Aspect Ratio (approx 1:1.4)
-        backgroundColor: '#FFFFFF',
-        borderRadius: 20,
-        elevation: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 5 },
-        shadowOpacity: 0.3,
-        shadowRadius: 10,
-        overflow: 'hidden',
-        marginRight: 20,
-    },
-    capturedImage: {
-        width: '100%',
-        height: '100%',
-    },
-    analysisContent: {
-        paddingHorizontal: 25,
-        marginTop: 30,
-    },
-    contentSection: {
-        marginBottom: 25,
-    },
-    sectionHeading: {
-        fontFamily: 'Judson-Bold',
-        fontSize: 18,
-        color: '#000000',
-        marginBottom: 8,
-    },
-    sectionPara: {
-        fontFamily: 'Judson-Regular',
-        fontSize: 15,
-        color: '#333333',
-        lineHeight: 22,
-        marginBottom: 4,
-    },
-    analysisFooter: {
-        marginTop: 20,
-    },
-    saveButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#D9E8FF',
-        alignSelf: 'flex-start',
-        paddingHorizontal: 25,
-        paddingVertical: 14,
-        borderRadius: 15,
-    },
-    saveButtonText: {
-        fontFamily: 'Judson-Bold',
-        fontSize: 16,
-        color: '#000000',
-        marginLeft: 10,
-    },
-    fixedChatButton: {
-        position: 'absolute',
-        bottom: 30,
-        right: 25,
-        width: 64,
-        height: 64,
-        backgroundColor: '#D9E8FF',
-        borderRadius: 32,
-        justifyContent: 'center',
-        alignItems: 'center',
-        elevation: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 5,
-    },
-    pdfView: {
-        flex: 1,
-        width: '100%',
-        height: '100%',
-        backgroundColor: '#FFFFFF',
-    },
-    multiImageScroll: {
-        paddingHorizontal: (width - (width * 0.7)) / 2,
-        paddingTop: 10,
-    },
-    pageIndicator: {
-        position: 'absolute',
-        bottom: 15,
-        alignSelf: 'center',
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        paddingHorizontal: 12,
-        paddingVertical: 4,
-        borderRadius: 12,
-    },
-    pageIndicatorText: {
-        color: '#FFFFFF',
-        fontFamily: 'Judson-Bold',
-        fontSize: 12,
-    },
-    captureControls: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        width: '100%',
-        paddingHorizontal: 30,
-    },
-    previewContainer: {
-        width: 60,
-        height: 60,
-    },
-    thumbnailWrapper: {
-        width: 54,
-        height: 54,
-        borderRadius: 10,
-        borderWidth: 2,
-        borderColor: '#FFFFFF',
-        overflow: 'hidden',
-    },
-    thumbnail: {
-        width: '100%',
-        height: '100%',
-    },
-    countBadge: {
-        position: 'absolute',
-        top: -8,
-        right: -8,
-        backgroundColor: '#0062FF',
-        width: 22,
-        height: 22,
-        borderRadius: 11,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 1.5,
-        borderColor: '#FFFFFF',
-    },
-    countText: {
-        color: '#FFFFFF',
-        fontSize: 12,
-        fontFamily: 'Judson-Bold',
-    },
-    finishContainer: {
-        width: 80,
-        height: 50,
-        justifyContent: 'center',
-    },
-    finishButton: {
-        width: '100%',
-        height: 44,
-    },
-    finishGradient: {
-        flex: 1,
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    finishText: {
-        color: '#FFFFFF',
-        fontFamily: 'Judson-Bold',
-        fontSize: 15,
-    },
-    // Modal Styles
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 25,
-    },
-    modalContent: {
-        width: '100%',
-        backgroundColor: '#FFFFFF',
-        borderRadius: 25,
-        padding: 25,
-        alignItems: 'center',
-        elevation: 15,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.25,
-        shadowRadius: 10,
-    },
-    modalTitle: {
-        fontFamily: 'Judson-Bold',
-        fontSize: 22,
-        color: '#000000',
-        marginBottom: 10,
-    },
-    modalSubtitle: {
-        fontFamily: 'Judson-Regular',
-        fontSize: 15,
-        color: '#666666',
-        textAlign: 'center',
-        marginBottom: 20,
-    },
-    modalInput: {
-        width: '100%',
-        height: 55,
-        backgroundColor: '#F5F9FF',
-        borderRadius: 15,
-        borderWidth: 1,
-        borderColor: '#0062FF',
-        paddingHorizontal: 15,
-        fontFamily: 'Judson-Regular',
-        fontSize: 16,
-        color: '#333333',
-        marginBottom: 25,
-    },
-    modalButtons: {
-        flexDirection: 'row',
-        width: '100%',
-        justifyContent: 'space-between',
-    },
-    cancelButton: {
-        flex: 1,
-        height: 50,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 10,
-    },
-    cancelButtonText: {
-        fontFamily: 'Judson-Bold',
-        fontSize: 16,
-        color: '#666666',
-    },
-    confirmButton: {
-        flex: 1.5,
-        height: 50,
-    },
-    confirmButtonGradient: {
-        width: '100%',
-        height: '100%',
-        borderRadius: 15,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    confirmButtonText: {
-        fontFamily: 'Judson-Bold',
-        fontSize: 16,
-        color: '#FFFFFF',
-    }
+    container: { flex: 1, backgroundColor: '#000' },
+    camera: { flex: 1 },
+    overlay: { flex: 1, paddingTop: 50 },
+    header: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 25 },
+    iconCircle: { width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
+    scanFrameContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    bottomContainer: { paddingBottom: 60, alignItems: 'center', width: '100%', flexDirection: 'row', justifyContent: 'center' },
+    captureButton: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.3)', justifyContent: 'center', alignItems: 'center' },
+    whiteInnerCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#FFF' },
+    finishBtnContainer: { position: 'absolute', right: 30, height: 50 },
+    finishGradient: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 15 },
+    finishText: { color: '#FFF', fontFamily: 'Judson-Bold' },
+    analysisContainer: { flex: 1 },
+    stickyHeader: { width: '100%', justifyContent: 'center', paddingBottom: 15 },
+    analysisTopIcons: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', alignItems: 'center', paddingHorizontal: 25 },
+    analysisIconBlock: { width: 46, height: 46, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
+    analysisTitle: { color: '#FFF', fontSize: 20, fontFamily: 'Judson-Bold' },
+    analysisImageWrapper: { paddingBottom: 40, alignItems: 'center', borderBottomLeftRadius: 40, borderBottomRightRadius: 40 },
+    multiImageScroll: { paddingHorizontal: 25 },
+    capturedImageContainer: { width: width * 0.72, height: width * 1.0, backgroundColor: '#FFF', borderRadius: 20, overflow: 'hidden', marginHorizontal: 10, elevation: 10, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 10 },
+    capturedImage: { width: '100%', height: '100%' },
+    pdfView: { flex: 1, width: width * 0.8 },
+    pageIndicator: { position: 'absolute', bottom: 15, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 5, borderRadius: 10 },
+    pageIndicatorText: { color: '#FFF', fontSize: 10 },
+    analysisContent: { padding: 25 },
+    contentSection: { marginBottom: 30 },
+    sectionHeading: { fontSize: 22, fontFamily: 'Judson-Bold', marginBottom: 10 },
+    categoryHeading: { fontSize: 13, fontFamily: 'Judson-Bold', color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 5 },
+    testHeading: { fontSize: 18, fontFamily: 'Judson-Bold', marginBottom: 5 },
+    sectionPara: { fontSize: 15, fontFamily: 'Judson-Regular', lineHeight: 22 },
+    loadingContainer: { paddingVertical: 60, alignItems: 'center' },
+    loadingText: { fontSize: 20, fontFamily: 'Judson-Bold', marginBottom: 5 },
+    pollingSubtext: { fontSize: 14, fontFamily: 'Judson-Bold' },
+    loadingSubtext: { fontSize: 14, fontFamily: 'Judson-Regular' },
+    analyzeButton: { paddingVertical: 16, borderRadius: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%' },
+    analyzeButtonText: { color: '#FFF', fontFamily: 'Judson-Bold', fontSize: 18, marginLeft: 12 },
+    saveButton: { flexDirection: 'row', alignItems: 'center', padding: 15, borderRadius: 15, alignSelf: 'center' },
+    saveButtonText: { fontSize: 16, fontFamily: 'Judson-Bold', marginLeft: 10 },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 25 },
+    modalContent: { borderRadius: 30, padding: 30, alignItems: 'center' },
+    modalTitle: { fontSize: 24, fontFamily: 'Judson-Bold', marginBottom: 5 },
+    modalSubtitle: { fontSize: 15, fontFamily: 'Judson-Regular', marginBottom: 20, textAlign: 'center' },
+    modalInput: { width: '100%', height: 55, borderRadius: 15, paddingHorizontal: 20, fontFamily: 'Judson-Regular', fontSize: 16, marginBottom: 25, borderWidth: 1 },
+    modalButtons: { flexDirection: 'row', width: '100%', justifyContent: 'space-between' },
+    cancelBtn: { padding: 15 },
+    confirmBtn: { flex: 1, height: 50, borderRadius: 15, justifyContent: 'center', alignItems: 'center', marginLeft: 15 }
 });
 
 export default ScanReportScreen;

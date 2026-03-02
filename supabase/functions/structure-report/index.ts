@@ -135,11 +135,24 @@ ${report.raw_text}`
             console.log("[Stage 3] No previous report found to compare with.")
         }
 
+        // Update status for Stage 3 completion
         await supabase.from('reports').update({
-            analysis: "Trends & Structuring Complete."
+            analysis: "Trends & Structuring Complete. Starting Stage 4..."
         }).eq('id', report_id)
 
-        return new Response(JSON.stringify({ success: true }), {
+        // 6. CHAINING: Call Stage 4 (Explanation Generation) - Non-blocking to avoid timeouts
+        console.log(`[Stage 4] Triggering explanation engine for report: ${report_id}...`)
+        fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-explanation`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+            },
+            body: JSON.stringify({ report_id })
+        }).then(resp => console.log(`[Stage 4] Background trigger response status: ${resp.status}`))
+            .catch(err => console.error(`[Stage 4] Failed to trigger explanation: ${err.message}`));
+
+        return new Response(JSON.stringify({ success: true, report_id }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
 

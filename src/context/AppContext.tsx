@@ -10,6 +10,48 @@ export interface Report {
     timestamp: number;
     uri?: string;
     analysis?: string;
+    raw_text?: string;
+}
+
+export interface LabTest {
+    test_name: string;
+    value: string | number;
+    unit: string | null;
+    normal_min: number | null;
+    normal_max: number | null;
+    status: 'Normal' | 'High' | 'Low' | 'Borderline' | 'Abnormal' | 'Unknown';
+}
+
+export interface StructuredReport {
+    id: string;
+    report_id: string;
+    user_id: string;
+    parsed_json: {
+        patient_info: {
+            age: number | null;
+            gender: string | null;
+            blood_group: string | null;
+        };
+        lab_tests: LabTest[];
+        doctor_notes: string | null;
+    };
+    explanation_json?: {
+        summary: string;
+        detailed_explanation: string;
+        disclaimer: string;
+    };
+    created_at: string;
+}
+
+export interface TrendData {
+    id: string;
+    report_id: string;
+    test_name: string;
+    previous_value: number;
+    current_value: number;
+    trend_status: 'Increased' | 'Decreased' | 'Stable';
+    percentage_change: number;
+    created_at: string;
 }
 
 export interface Document {
