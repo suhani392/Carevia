@@ -275,6 +275,7 @@ export const translations = {
         docs_subtitle_me: "Your uploaded medical documents",
         docs_subtitle_other: " uploaded medical documents",
         docs_title_other: "'s Documents",
+        docs_title_me: "My Documents",
 
         sort_newest: "Newest First",
         sort_oldest: "Oldest First",
@@ -490,6 +491,7 @@ export const translations = {
         docs_subtitle_me: "तुमचे अपलोड केलेले वैद्यकीय दस्तऐवज",
         docs_subtitle_other: " ने अपलोड केलेले वैद्यकीय दस्तऐवज",
         docs_title_other: "चे दस्तऐवज",
+        docs_title_me: "माझे दस्तऐवज",
 
         sort_newest: "नवीन प्रथम",
         sort_oldest: "जुने प्रथम",
@@ -705,6 +707,7 @@ export const translations = {
         docs_subtitle_me: "आपके अपलोड किए गए चिकित्सा दस्तावेज़",
         docs_subtitle_other: " के अपलोड किए गए चिकित्सा दस्तावेज़",
         docs_title_other: " के दस्तावेज़",
+        docs_title_me: "मेरे दस्तावेज़",
 
         sort_newest: "नवीनतम पहले",
         sort_oldest: "सबसे पुराने पहले",
@@ -920,6 +923,7 @@ export const translations = {
         docs_subtitle_me: "ನಿಮ್ಮ ಅಪ್‌ಲೋಡ್ ಮಾಡಲಾದ ವೈದ್ಯಕೀಯ ದಾಖಲೆಗಳು",
         docs_subtitle_other: " ಅಪ್‌ಲೋಡ್ ಮಾಡಲಾದ ವೈದ್ಯಕೀಯ ದಾಖಲೆಗಳು",
         docs_title_other: " ರ ದಾಖಲೆಗಳು",
+        docs_title_me: "ನನ್ನ ದಾಖಲೆಗಳು",
 
         sort_newest: "ಇತ್ತೀಚಿನವು ಮೊದಲು",
         sort_oldest: "ಹಳೆಯವು ಮೊದಲು",
@@ -1135,6 +1139,7 @@ export const translations = {
         docs_subtitle_me: "ਤੁਹਾਡੇ ਅਪਲੋਡ ਕੀਤੇ ਡਾਕਟਰੀ ਦਸਤਾਵੇਜ਼",
         docs_subtitle_other: " ਅਪਲੋਡ ਕੀਤੇ ਡਾਕਟਰੀ ਦਸਤਾਵੇਜ਼",
         docs_title_other: " ਦੇ ਦਸਤਾਵੇਜ਼",
+        docs_title_me: "ਮੇਰੇ ਦਸਤਾਵੇਜ਼",
 
         sort_newest: "ਸਭ ਤੋਂ ਨਵੇਂ ਪਹਿਲਾਂ",
         sort_oldest: "ਸਭ ਤੋਂ ਪੁਰਾਣੇ ਪਹਿਲਾਂ",
@@ -1350,6 +1355,7 @@ export const translations = {
         docs_subtitle_me: "நீங்கள் பதிவேற்றிய மருத்துவ ஆவணங்கள்",
         docs_subtitle_other: " பதிவேற்றிய மருத்துவ ஆவணங்கள்",
         docs_title_other: " இன் ஆவணங்கள்",
+        docs_title_me: "எனது ஆவணங்கள்",
 
         sort_newest: "புதியவை முதலில்",
         sort_oldest: "பழையவை முதலில்",
@@ -1565,6 +1571,7 @@ export const translations = {
         docs_subtitle_me: "તમારા અપલોડ કરેલા તબીબી દસ્તાવેજો",
         docs_subtitle_other: " અપલોડ કરેલા તબીબી દસ્તાવેજો",
         docs_title_other: " ના દસ્તાવેજો",
+        docs_title_me: "મારા દસ્તાવેજો",
 
         sort_newest: "નવા રિપોર્ટ્સ પહેલા",
         sort_oldest: "જૂના રિપોર્ટ્સ પહેલા",
@@ -1778,6 +1785,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     .from('reports')
                     .select('*')
                     .eq('user_id', user.id)
+                    .eq('is_saved', true)
                     .order('created_at', { ascending: false });
 
                 if (reportsData) {
@@ -1989,7 +1997,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                     user_id: user.id,
                     name,
                     uri,
-                    analysis: analysis || 'No analysis available'
+                    analysis: analysis || 'No analysis available',
+                    is_saved: true
                 })
                 .select()
                 .single();

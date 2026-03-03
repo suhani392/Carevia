@@ -40,7 +40,7 @@ const decodeBase64 = (base64: string) => {
 
 const ScanReportScreen = () => {
     const { goBack, navigate, screenParams } = useNavigation();
-    const { colors, themeMode, t } = useAppContext();
+    const { colors, themeMode, t, refreshData } = useAppContext();
     const [permission, requestPermission] = useCameraPermissions();
     const [torch, setTorch] = useState(false);
     const [capturedImages, setCapturedImages] = useState<string[]>([]);
@@ -53,9 +53,29 @@ const ScanReportScreen = () => {
     const [analysisResult, setAnalysisResult] = useState<any>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [pollingStatus, setPollingStatus] = useState('');
+    const [displayStatus, setDisplayStatus] = useState('');
+    const lastStatusChange = useRef(Date.now());
     const [isSaved, setIsSaved] = useState(false);
     const cameraRef = useRef<CameraView>(null);
     const scrollY = useRef(new Animated.Value(0)).current;
+
+    const subMessages: { [key: string]: string[] } = {
+        'Reading your report...': [
+            'Scanning medical terms...',
+            'Extracting lab values...',
+            'Processing report text...'
+        ],
+        'Organizing medical data...': [
+            'Structuring data tables...',
+            'Identifying reference ranges...',
+            'Organizing clinical findings...'
+        ],
+        'Carevia is writing insights...': [
+            'Simplifying complex terms...',
+            'Finalizing your analysis...',
+            'Double-checking results...'
+        ]
+    };
 
     const handleStartAnalysis = async () => {
         try {
@@ -81,7 +101,8 @@ const ScanReportScreen = () => {
                 user_id: user.id,
                 name: defaultName,
                 uri: publicUrl,
-                analysis: "Waiting for cloud response..."
+                analysis: "Preparing report...",
+                is_saved: false
             }).select('id').single();
 
             if (insErr) throw insErr;
@@ -89,7 +110,7 @@ const ScanReportScreen = () => {
             if (reportData) {
                 const reportId = reportData.id;
                 setCurrentReportId(reportId);
-                setPollingStatus("Waiting for cloud response...");
+                setPollingStatus("Preparing report...");
                 setIsAnalyzing(true);
 
                 // 3. Trigger AI Chain (non-blocking)
@@ -151,7 +172,9 @@ const ScanReportScreen = () => {
         }
     };
 
-    // Polling logic with heavy logging to debug
+    // Track triggered stages to prevent double-triggering
+    const stageTriggered = useRef<{ [key: string]: boolean }>({});
+
     useEffect(() => {
         let interval: any;
         if (isAnalyzing && currentReportId) {
@@ -165,36 +188,92 @@ const ScanReportScreen = () => {
                         .single();
 
                     if (data?.analysis) {
-                        setPollingStatus(data.analysis);
-                        console.log("[Status] Current:", data.analysis);
-                    }
+                        const isNewStage = data.analysis !== pollingStatus;
 
-                    if (data?.analysis?.includes("Complete") || data?.analysis?.includes("ready")) {
-                        const { data: structData } = await supabase
-                            .from('structured_reports')
-                            .select('explanation_json')
-                            .eq('report_id', currentReportId)
-                            .maybeSingle();
+                        if (isNewStage) {
+                            setPollingStatus(data.analysis);
+                            setDisplayStatus(data.analysis);
+                            lastStatusChange.current = Date.now();
+                            console.log("[Status] New Stage:", data.analysis);
+                        } else {
+                            // If status is same for > 3 seconds (1 poll), show a sub-message
+                            const timePassed = Date.now() - lastStatusChange.current;
+                            if (timePassed >= 3000) {
+                                const msgs = subMessages[data.analysis] || [];
+                                if (msgs.length > 0) {
+                                    // Rotate sub-messages every poll (3s)
+                                    const index = Math.floor(timePassed / 3000) % (msgs.length + 1);
 
-                        if (structData?.explanation_json) {
-                            console.log("[Status] Explanation found! Loading UI.");
-                            setAnalysisResult(structData.explanation_json);
+                                    // Index 0 is original, others are sub-messages
+                                    const nextStatus = index === 0 ? data.analysis : msgs[index - 1];
+                                    if (nextStatus !== displayStatus) {
+                                        setDisplayStatus(nextStatus);
+                                        console.log("[Status] Update:", nextStatus);
+                                    }
+                                }
+                            }
+                        }
+
+                        const anonKey = (supabase as any).supabaseKey;
+
+                        // 1. If OCR is done, trigger Structuring
+                        if (data.analysis === 'Organizing medical data...' && !stageTriggered.current['structuring']) {
+                            stageTriggered.current['structuring'] = true;
+                            console.log("[Orchestrator] Triggering Structuring...");
+                            supabase.functions.invoke('process-report', {
+                                body: { report_id: currentReportId, stage: 'structuring' },
+                                headers: {
+                                    'apikey': anonKey,
+                                    'Authorization': `Bearer ${anonKey}`
+                                }
+                            });
+                        }
+
+                        // 2. If Structuring is done, trigger Explanation
+                        if (data.analysis === 'Carevia is writing insights...' && !stageTriggered.current['explanation']) {
+                            stageTriggered.current['explanation'] = true;
+                            console.log("[Orchestrator] Triggering Explanation...");
+                            supabase.functions.invoke('process-report', {
+                                body: { report_id: currentReportId, stage: 'explanation' },
+                                headers: {
+                                    'apikey': anonKey,
+                                    'Authorization': `Bearer ${anonKey}`
+                                }
+                            });
+                        }
+
+                        if (data?.analysis?.includes("ready") || data?.analysis?.includes("Insights")) {
+                            // Special check: Only finish if we actually HAVE the explanation in the DB
+                            const { data: structData } = await supabase
+                                .from('structured_reports')
+                                .select('explanation_json')
+                                .eq('report_id', currentReportId)
+                                .maybeSingle();
+
+                            if (structData?.explanation_json) {
+                                console.log("[Status] Explanation found! Loading UI.");
+                                setAnalysisResult(structData.explanation_json);
+                                setIsAnalyzing(false);
+                                clearInterval(interval);
+                            }
+                        } else if (data?.analysis?.toLowerCase().includes("error")) {
+                            console.error("[Status] Analysis failed:", data.analysis);
                             setIsAnalyzing(false);
                             clearInterval(interval);
+                            Alert.alert("Analysis Failed", data.analysis || "An unexpected error occurred during processing.");
                         }
-                    } else if (data?.analysis?.toLowerCase().includes("error")) {
-                        console.error("[Status] Analysis failed:", data.analysis);
-                        setIsAnalyzing(false);
-                        clearInterval(interval);
-                        Alert.alert("Analysis Failed", data.analysis || "An unexpected error occurred during processing.");
                     }
                 } catch (err) {
                     console.error("[Polling] Error:", err);
                 }
             }, 3000);
         }
-        return () => clearInterval(interval);
-    }, [isAnalyzing, currentReportId]);
+        return () => {
+            clearInterval(interval);
+            // Reset triggers when component unmounts or analysis stops
+            if (!isAnalyzing) stageTriggered.current = {};
+        };
+    }, [isAnalyzing, currentReportId, pollingStatus, displayStatus]);
 
     useEffect(() => {
         if (!permission) requestPermission();
@@ -277,7 +356,7 @@ const ScanReportScreen = () => {
                         {isAnalyzing ? (
                             <View style={styles.loadingContainer}>
                                 <Text style={[styles.loadingText, { color: colors.text }]}>AI is analyzing your report...</Text>
-                                <Text style={[styles.pollingSubtext, { color: colors.primary, marginBottom: 15 }]}>{pollingStatus || "Waiting for cloud response..."}</Text>
+                                <Text style={[styles.pollingSubtext, { color: colors.primary, marginBottom: 15 }]}>{displayStatus || pollingStatus || "Preparing report..."}</Text>
                                 <Text style={[styles.loadingSubtext, { color: colors.textSecondary }]}>This usually takes 20-30 seconds.</Text>
                             </View>
                         ) : analysisResult ? (
@@ -290,19 +369,22 @@ const ScanReportScreen = () => {
                                     const getTestHeadingColor = (heading: string) => {
                                         if (!heading) return colors.text;
                                         const lower = heading.toLowerCase();
-                                        // 1. Borderline / Warnings (Yellow) - prioritized check
-                                        if (lower.includes('borderline') || lower.includes('caution') || lower.includes('warning') || lower.includes('risk')) {
-                                            return colors.warning;
-                                        }
-                                        // 2. High/Low/Danger (Red)
-                                        if (lower.includes('high') || lower.includes('low') || lower.includes('danger') || lower.includes('abnormal') || lower.includes('critical')) {
+
+                                        // 1. High/Low/Danger/Abnormal (Red) - Priority 1
+                                        if (lower.includes('high') || lower.includes('low') || lower.includes('danger') || lower.includes('abnormal') || lower.includes('critical') || lower.includes('urgent')) {
                                             return colors.error;
                                         }
-                                        // 3. Normal/Perfect (Green)
-                                        if (lower.includes('normal') || lower.includes('perfect') || lower.includes('optimal') || lower.includes('stable') || lower.includes('good')) {
+
+                                        // 2. Borderline/Moderate/Warning (Yellow) - Priority 2
+                                        if (lower.includes('borderline') || lower.includes('moderate') || lower.includes('caution') || lower.includes('warning') || lower.includes('risk')) {
+                                            return colors.warning;
+                                        }
+
+                                        // 3. Normal/Perfect/Stable (Green) - Priority 3
+                                        if (lower.includes('normal') || lower.includes('perfect') || lower.includes('optimal') || lower.includes('stable') || lower.includes('good') || lower.includes('healthy')) {
                                             return colors.success;
                                         }
-                                        // Default (Black/Standard Text)
+
                                         return colors.text;
                                     };
 
@@ -387,10 +469,16 @@ const ScanReportScreen = () => {
                                             setLoading(true);
                                             const { error } = await supabase
                                                 .from('reports')
-                                                .update({ name: reportName.trim() })
+                                                .update({
+                                                    name: reportName.trim(),
+                                                    is_saved: true
+                                                })
                                                 .eq('id', currentReportId);
 
                                             if (error) throw error;
+
+                                            // Sync global state
+                                            await refreshData();
 
                                             setIsSaved(true);
                                             setShowSaveModal(false);

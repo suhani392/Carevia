@@ -84,6 +84,7 @@ const ReportsScreen = () => {
                 .from('reports')
                 .select('*')
                 .eq('user_id', memberId)
+                .eq('is_saved', true)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
