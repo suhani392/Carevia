@@ -23,6 +23,17 @@ function uint8ToBase64(data: Uint8Array): string {
     return result;
 }
 
+// STAGE 3 HELPER: Standardize test names for matching (e.g., Hb = Haemoglobin)
+function standardize(name: string): string {
+    if (!name) return "";
+    return name.toLowerCase()
+        .replace(/[^a-z0-9]/g, '')
+        .replace('haemoglobin', 'hb')
+        .replace('hemoglobin', 'hb')
+        .replace('bloodglucose', 'sugar')
+        .replace('fastingbloodsugar', 'fbs');
+}
+
 serve(async (req) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -40,6 +51,9 @@ serve(async (req) => {
         const supKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || "";
         const aiKey = Deno.env.get('GEMINI_API_KEY') || "";
         const supabase = createClient(supUrl, supKey);
+
+        // DEBUG: Check which key we are actually using (BW WU should be the new one)
+        console.log(`[AUTH] Using AI Key ending in: ...${aiKey.slice(-4)}`);
 
         if (stage === 'ocr') {
             const { data: report, error: fetchErr } = await supabase.from('reports').select('uri, user_id').eq('id', reportId).single();
@@ -73,7 +87,7 @@ STRICT INSTRUCTIONS:
 • Do NOT hallucinate missing content.
 Important: We do NOT explain here. We do NOT generate JSON here. Only raw text extraction.`;
 
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${aiKey}`, {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${aiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -87,7 +101,10 @@ Important: We do NOT explain here. We do NOT generate JSON here. Only raw text e
             });
 
             const result = await response.json();
-            if (result.error) throw new Error(`Gemini OCR: ${result.error.message}`);
+            if (result.error) {
+                console.error(`[AI ERROR] OCR Failed: ${JSON.stringify(result.error)}`);
+                throw new Error(`Gemini OCR: ${result.error.message}`);
+            }
 
             const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text;
             await supabase.from('reports').update({ raw_text: rawText, analysis: "Organizing medical data..." }).eq('id', reportId);
@@ -135,7 +152,7 @@ Return valid JSON only. No explanation. No markdown. No extra text.
 TEXT TO PARSE:
 ${report.raw_text}`;
 
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${aiKey}`, {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${aiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -145,9 +162,48 @@ ${report.raw_text}`;
             });
 
             const result = await response.json();
-            if (result.error) throw new Error(`Gemini Structuring: ${result.error.message}`);
+            if (result.error) {
+                console.error(`[AI ERROR] Structuring Failed: ${JSON.stringify(result.error)}`);
+                throw new Error(`Gemini Structuring: ${result.error.message}`);
+            }
 
             const parsedJson = JSON.parse(result.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
+
+            // --- STAGE 3: TREND CALCULATION ---
+            const { data: prevReport } = await supabase
+                .from('structured_reports')
+                .select('parsed_json')
+                .eq('user_id', report.user_id)
+                .neq('report_id', reportId)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (prevReport?.parsed_json?.lab_tests && parsedJson.lab_tests) {
+                const trends = [];
+                for (const current of parsedJson.lab_tests) {
+                    const match = prevReport.parsed_json.lab_tests.find((p: any) =>
+                        standardize(p.test_name) === standardize(current.test_name)
+                    );
+
+                    if (match && !isNaN(parseFloat(current.value)) && !isNaN(parseFloat(match.value))) {
+                        const curVal = parseFloat(current.value);
+                        const preVal = parseFloat(match.value);
+                        const diff = curVal - preVal;
+                        trends.push({
+                            report_id: reportId,
+                            test_name: current.test_name,
+                            previous_value: preVal,
+                            current_value: curVal,
+                            trend_status: diff > 0 ? "Increased" : diff < 0 ? "Decreased" : "Stable",
+                            percentage_change: preVal !== 0 ? ((diff / preVal) * 100) : 0
+                        });
+                    }
+                }
+                if (trends.length > 0) {
+                    await supabase.from('trend_cache').insert(trends);
+                }
+            }
 
             // 1. Check if structured report already exists
             const { data: existing } = await supabase
@@ -176,40 +232,90 @@ ${report.raw_text}`;
             const { data: struct, error: structErr } = await supabase.from('structured_reports').select('parsed_json').eq('report_id', reportId).maybeSingle();
             if (structErr || !struct?.parsed_json) throw new Error("Step 2 data missing from database.");
 
-            // --- PLAN STAGE 4.2 & 4.3: EXPLANATION PROMPT ---
-            const explainPrompt = `You are Carevia AI. You are a medical report explanation engine.
-You explain structured lab report data in simple, calm, and easy-to-understand language.
-You do NOT diagnose. You do NOT prescribe medication. You do NOT predict disease. You do NOT use fear-based language.
-You may suggest consulting a doctor, but only if clearly required based on abnormal values.
-You ONLY use the structured data provided. You NEVER use outside medical knowledge beyond a basic explanation of what each test measures.
-Your task is to generate a clear, structured explanation:
-Start with: “I have analysed your report and here is what I have found:”
-Then, for each test, present the heading EXACTLY as: Test Name – Value + Unit (Status) (e.g. "Hemoglobin – 12 g/dL (Low)" or "Glucose – 90 mg/dL (Normal)")
-Lines beneath:
-* One short sentence explaining what the test measures.
-* One sentence stating value vs range.
-* One sentence stating whether it is in range or outside (using: “a little lower than normal”, “a little higher than normal”, etc for minor deviations).
-Group related tests (e.g. Liver Function) under one heading.
-For normal values: Reassuring but neutral language.
-For abnormal values: Clearly state outside range. Do not speculate. Add: “You may consider discussing this with a doctor for further evaluation.”
-Overall Summary: 5-8 calm sentences summarizing normal vs abnormal findings and suggested consultation if meaningful abnormalities exist.
-Tone: Calm, Supportive, Clear, Non-judgmental, Medically responsible, 8th-grade level.
-Do not output markdown. Do not use emojis. Do not add extra formatting.
+            // Fetch calculated trends for this report
+            const { data: trends } = await supabase.from('trend_cache').select('test_name, trend_status, percentage_change').eq('report_id', reportId);
 
-Return JSON EXACTLY like this structure:
+            // --- PLAN STAGE 4.2 & 4.3: EXPLANATION PROMPT (USER BLUEPRINT) ---
+            const explainPrompt = `You are Carevia AI. 
+You are a medical report explanation engine. 
+You explain structured lab report data in simple, calm, and easy-to-understand language. 
+You do NOT diagnose. 
+You do NOT prescribe medication. 
+You do NOT predict disease. 
+You do NOT use fear-based language. 
+You may suggest consulting a doctor, but only if clearly required based on abnormal values. 
+You ONLY use the structured data provided. 
+You NEVER use outside medical knowledge beyond a basic explanation of what each test measures. 
+
+Your task is to generate a clear, structured explanation in the following style and format: 
+Start with: “I have analysed your report and here is what I have found:” 
+
+Then, for each test, present it in sections exactly in this pattern: 
+Test Name – Value + Unit (Status) 
+
+In the next lines: 
+* One short sentence explaining what the test measures (in simple language). 
+* One sentence stating the user’s value and the normal range. 
+* One sentence clearly stating whether it is within range, slightly low, slightly high, or outside range. 
+* If mildly abnormal, use phrases like: 
+  - “a little lower than normal” 
+  - “a little higher than normal” 
+  - “a bit low” 
+  - “a bit high” 
+* Avoid dramatic or alarming wording. 
+
+If multiple related tests belong to one category (for example Differential Count, RBC Indices, Liver Function, Kidney Function, Electrolytes), group them under one heading and explain each clearly beneath it. 
+
+For normal values: 
+* Use reassuring but neutral language such as: 
+  - “This is within the normal range.” 
+  - “This indicates a normal value.” 
+
+For abnormal values: 
+* Clearly state they are outside the normal range. 
+* Do not mention diseases. 
+* Do not speculate. 
+* If clearly abnormal, add one calm line: 
+“You may consider discussing this with a doctor for further evaluation.” 
+
+After explaining all parameters, provide a final section titled: Overall Summary 
+In 5–8 calm sentences: 
+* Summarize how many values are normal. 
+* Clearly list which values are slightly low or high (if any). 
+* State whether the overall report appears largely stable based on provided data. 
+* Suggest medical consultation only if meaningful abnormalities exist. 
+* If most values are normal, clearly reassure the user. 
+
+Tone must always be: Calm, Supportive, Clear, Non-judgmental, Medically responsible, Easy to understand (8th-grade level).
+Do not use emojis. Do not add extra formatting beyond clean headings and paragraphs. 
+
+Return a single valid JSON object exactly in this structure:
 {
-"introduction": "string",
-"explanations": [
-  { "category": "string | null", "test_name": "string", "heading": "string", "explanation_lines": ["string"] }
-],
-"summary": "string",
-"takeaways": { "biggest_concern": "string | null", "most_reassuring_finding": "string | null", "what_to_monitor": "string | null" }
+  "introduction": "string",
+  "explanations": [
+    {
+      "category": "string | null",
+      "test_name": "string",
+      "heading": "string",
+      "explanation_lines": ["string"]
+    }
+  ],
+  "summary": "string",
+  "takeaways": {
+    "biggest_concern": "string | null",
+    "most_reassuring_finding": "string | null",
+    "what_to_monitor": "string | null"
+  }
 }
 
 DATA TO EXPLAIN:
-${JSON.stringify(struct.parsed_json)}`;
+${JSON.stringify(struct.parsed_json)}
 
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${aiKey}`, {
+TREND DATA (COMPARISON):
+${JSON.stringify(trends || [])}
+`;
+
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${aiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -219,7 +325,10 @@ ${JSON.stringify(struct.parsed_json)}`;
             });
 
             const result = await response.json();
-            if (result.error) throw new Error(`Gemini Explanation: ${result.error.message}`);
+            if (result.error) {
+                console.error(`[AI ERROR] Explanation Failed: ${JSON.stringify(result.error)}`);
+                throw new Error(`Gemini Explanation: ${result.error.message}`);
+            }
 
             const explanationJson = JSON.parse(result.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
 
