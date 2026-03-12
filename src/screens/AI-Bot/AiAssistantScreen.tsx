@@ -19,6 +19,7 @@ const AiAssistantScreen = () => {
     const [isAttachmentMenuOpen, setIsAttachmentMenuOpen] = useState(false);
     const [selectedAttachment, setSelectedAttachment] = useState<string | null>(null);
     const [profile, setProfile] = useState<any>(null);
+    const [loadingHistory, setLoadingHistory] = useState(false);
 
     // Mock messages
     const [messages, setMessages] = useState([
@@ -27,7 +28,11 @@ const AiAssistantScreen = () => {
 
 
     useEffect(() => {
-        fetchProfile();
+        const init = async () => {
+            await fetchProfile();
+            await fetchHistory();
+        };
+        init();
     }, []);
 
     const fetchProfile = async () => {
@@ -36,32 +41,102 @@ const AiAssistantScreen = () => {
             const { data } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
             if (data) {
                 setProfile(data);
-                setMessages([{ id: 1, type: 'bot', text: `${t('greetings')} ${data.full_name}! ${t('bot_welcome')}` }]);
             }
         }
     };
 
+    const fetchHistory = async () => {
+        setLoadingHistory(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
 
-    const handleSend = () => {
+            // Fetch both report and general conversations
+            const [reportRes, generalRes] = await Promise.all([
+                supabase.from('ai_conversations').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
+                supabase.from('general_ai_conversations').select('*').eq('user_id', user.id).order('created_at', { ascending: true })
+            ]);
+
+            const allMessages: any[] = [];
+            
+            // Format report messages
+            reportRes.data?.forEach(msg => {
+                const reportName = reports.find(r => r.id === msg.report_id)?.name || "Report";
+                allMessages.push({ id: `r-u-${msg.id}`, type: 'user', text: `[Linked: ${reportName}] ${msg.user_message}`, created_at: msg.created_at });
+                allMessages.push({ id: `r-a-${msg.id}`, type: 'bot', text: msg.ai_response, created_at: msg.created_at });
+            });
+
+            // Format general messages
+            generalRes.data?.forEach(msg => {
+                allMessages.push({ id: `g-u-${msg.id}`, type: 'user', text: msg.user_message, created_at: msg.created_at });
+                allMessages.push({ 
+                    id: `g-a-${msg.id}`, 
+                    type: 'bot', 
+                    text: msg.ai_response, 
+                    created_at: msg.created_at,
+                    isEmergency: msg.risk_flag === 'emergency_detected' 
+                });
+            });
+
+            // Sort by time
+            allMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+            if (allMessages.length > 0) {
+                setMessages(allMessages);
+            } else {
+                setMessages([{ id: 1, type: 'bot', text: profile ? `${t('greetings')} ${profile.full_name}! ${t('bot_welcome')}` : t('bot_welcome') }]);
+            }
+        } catch (err) {
+            console.error("History fetch error:", err);
+        } finally {
+            setLoadingHistory(false);
+        }
+    };
+
+
+    const handleSend = async () => {
         if (inputText.trim() || selectedAttachment) {
+            const userMsgText = inputText.trim();
+            const attachment = reports.find(r => r.name === selectedAttachment);
+            const reportId = attachment?.id || null;
+
             const newMessage = {
                 id: messages.length + 1,
                 type: 'user',
-                text: selectedAttachment ? `[Linked: ${selectedAttachment}] ${inputText.trim()}` : inputText.trim(),
+                text: selectedAttachment ? `[Linked: ${selectedAttachment}] ${userMsgText}` : userMsgText,
             };
-            setMessages([...messages, newMessage]);
+            
+            setMessages(prev => [...prev, newMessage]);
             setInputText('');
-            setSelectedAttachment(null);
 
-            // Mock bot response
-            setTimeout(() => {
-                setMessages(prev => [...prev, {
-                    id: prev.length + 1,
-                    type: 'bot',
-                    text: selectedAttachment ? t('analyzing_file') : t('analyzing')
-                }]);
-            }, 1000);
+            try {
+                // Add temporary bot loading message
+                const loadingId = messages.length + 2;
+                setMessages(prev => [...prev, { id: loadingId, type: 'bot', text: '...' }]);
 
+                const { data, error } = await supabase.functions.invoke('ai-chat', {
+                    body: { 
+                        message: userMsgText,
+                        report_id: reportId
+                    }
+                });
+
+                if (error || !data) throw new Error(error?.message || "Function error");
+
+                setMessages(prev => {
+                    const filtered = prev.filter(m => m.id !== loadingId);
+                    return [...filtered, { 
+                        id: loadingId, 
+                        type: 'bot', 
+                        text: data.text,
+                        isEmergency: data.isEmergency 
+                    }];
+                });
+
+            } catch (err: any) {
+                console.error("Chat Error:", err);
+                setMessages(prev => [...prev, { id: prev.length + 1, type: 'bot', text: "Sorry, I had trouble connecting. Please try again." }]);
+            }
         }
     };
 
@@ -96,8 +171,8 @@ const AiAssistantScreen = () => {
                         </TouchableOpacity>
 
                         <View style={styles.titleContainer}>
-                            <Text style={styles.title}>{t('ai_assistant')}</Text>
-                            <Text style={styles.date}>{new Date().toLocaleDateString(language === 'mr' ? 'mr-IN' : language === 'hi' ? 'hi-IN' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
+                            <Text style={styles.title}>{selectedAttachment ? "Report Mode" : t('ai_assistant')}</Text>
+                            <Text style={styles.date}>{selectedAttachment ? `Analyzing: ${selectedAttachment}` : "General Health Mode"}</Text>
                         </View>
 
 
@@ -129,10 +204,34 @@ const AiAssistantScreen = () => {
                                     styles.bubble,
                                     msg.type === 'user'
                                         ? [styles.userBubble, { backgroundColor: colors.primaryLight }]
-                                        : [styles.botBubble, { backgroundColor: colors.card, borderColor: colors.cardBorder, borderWidth: 1 }]
+                                        : [
+                                            styles.botBubble, 
+                                            { backgroundColor: colors.card, borderColor: colors.cardBorder, borderWidth: 1 },
+                                            (msg as any).isEmergency && { backgroundColor: '#FFEEF0', borderColor: '#FF5C5C', borderWidth: 2 }
+                                          ]
                                 ]}
                             >
-                                <Text style={[styles.messageText, { color: colors.text }]}>{msg.text}</Text>
+                                {(msg as any).isEmergency && (
+                                    <View style={styles.emergencyLabel}>
+                                        <Text style={styles.emergencyLabelText}>EMERGENCY ALERT</Text>
+                                    </View>
+                                )}
+                                <Text style={[
+                                    styles.messageText, 
+                                    { color: colors.text },
+                                    (msg as any).isEmergency && { color: '#D32F2F', fontFamily: 'Judson-Bold' }
+                                ]}>
+                                    {msg.text}
+                                </Text>
+                                
+                                {(msg as any).isEmergency && (
+                                    <TouchableOpacity 
+                                        style={styles.callButton}
+                                        onPress={() => alert("Calling Emergency Services (108)...")}
+                                    >
+                                        <Text style={styles.callButtonText}>CALL 108 NOW</Text>
+                                    </TouchableOpacity>
+                                )}
                             </View>
                         </View>
                     ))}
@@ -375,6 +474,31 @@ const styles = StyleSheet.create({
     attachmentOptionText: {
         fontFamily: 'Judson-Regular',
         fontSize: 15,
+    },
+    emergencyLabel: {
+        backgroundColor: '#FF5C5C',
+        alignSelf: 'flex-start',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 4,
+        marginBottom: 8,
+    },
+    emergencyLabelText: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontFamily: 'Judson-Bold',
+    },
+    callButton: {
+        backgroundColor: '#D32F2F',
+        paddingVertical: 10,
+        borderRadius: 10,
+        marginTop: 12,
+        alignItems: 'center',
+    },
+    callButtonText: {
+        color: '#FFFFFF',
+        fontFamily: 'Judson-Bold',
+        fontSize: 14,
     },
 });
 

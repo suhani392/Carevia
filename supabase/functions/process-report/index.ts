@@ -169,7 +169,28 @@ ${report.raw_text}`;
 
             const parsedJson = JSON.parse(result.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
 
-            // --- STAGE 3: TREND CALCULATION ---
+            // 1. Save structured report FIRST to get its ID for trend cache
+            const { data: existing } = await supabase
+                .from('structured_reports')
+                .select('id')
+                .eq('report_id', reportId)
+                .maybeSingle();
+
+            let structuredReportId: string;
+            if (existing) {
+                structuredReportId = existing.id;
+                await supabase.from('structured_reports').update({ parsed_json: parsedJson }).eq('id', existing.id);
+            } else {
+                const { data: inserted, error: insErr } = await supabase.from('structured_reports').insert({
+                    report_id: reportId,
+                    user_id: report.user_id,
+                    parsed_json: parsedJson
+                }).select('id').single();
+                if (insErr) throw new Error(`DB Save Failed: ${insErr.message}`);
+                structuredReportId = inserted.id;
+            }
+
+            // 2. TREND CALCULATION
             const { data: prevReport } = await supabase
                 .from('structured_reports')
                 .select('parsed_json')
@@ -191,7 +212,7 @@ ${report.raw_text}`;
                         const preVal = parseFloat(match.value);
                         const diff = curVal - preVal;
                         trends.push({
-                            report_id: reportId,
+                            structured_report_id: structuredReportId,
                             test_name: current.test_name,
                             previous_value: preVal,
                             current_value: curVal,
@@ -201,39 +222,21 @@ ${report.raw_text}`;
                     }
                 }
                 if (trends.length > 0) {
+                    // Clear old trends for this report if re-processing
+                    await supabase.from('trend_cache').delete().eq('structured_report_id', structuredReportId);
                     await supabase.from('trend_cache').insert(trends);
                 }
             }
-
-            // 1. Check if structured report already exists
-            const { data: existing } = await supabase
-                .from('structured_reports')
-                .select('id')
-                .eq('report_id', reportId)
-                .maybeSingle();
-
-            let saveResult;
-            if (existing) {
-                saveResult = await supabase.from('structured_reports').update({ parsed_json: parsedJson }).eq('id', existing.id);
-            } else {
-                saveResult = await supabase.from('structured_reports').insert({
-                    report_id: reportId,
-                    user_id: report.user_id,
-                    parsed_json: parsedJson
-                });
-            }
-
-            if (saveResult.error) throw new Error(`DB Save Failed: ${saveResult.error.message}`);
 
             await supabase.from('reports').update({ analysis: "Carevia is writing insights..." }).eq('id', reportId);
             return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
         } else if (stage === 'explanation') {
-            const { data: struct, error: structErr } = await supabase.from('structured_reports').select('parsed_json').eq('report_id', reportId).maybeSingle();
+            const { data: struct, error: structErr } = await supabase.from('structured_reports').select('id, parsed_json').eq('report_id', reportId).maybeSingle();
             if (structErr || !struct?.parsed_json) throw new Error("Step 2 data missing from database.");
 
             // Fetch calculated trends for this report
-            const { data: trends } = await supabase.from('trend_cache').select('test_name, trend_status, percentage_change').eq('report_id', reportId);
+            const { data: trends } = await supabase.from('trend_cache').select('test_name, trend_status, percentage_change, previous_value').eq('structured_report_id', struct.id);
 
             // --- PLAN STAGE 4.2 & 4.3: EXPLANATION PROMPT (USER BLUEPRINT) ---
             const explainPrompt = `You are Carevia AI. 
@@ -257,12 +260,8 @@ In the next lines:
 * One short sentence explaining what the test measures (in simple language). 
 * One sentence stating the user’s value and the normal range. 
 * One sentence clearly stating whether it is within range, slightly low, slightly high, or outside range. 
-* If mildly abnormal, use phrases like: 
-  - “a little lower than normal” 
-  - “a little higher than normal” 
-  - “a bit low” 
-  - “a bit high” 
-* Avoid dramatic or alarming wording. 
+* If trend data is available and shows a change (Increased or Decreased), MUST add one sentence explaining the change (e.g., "This has increased by 15% compared to your previous report where it was 12.5").
+* Avoid dramatic or alarming wording.
 
 If multiple related tests belong to one category (for example Differential Count, RBC Indices, Liver Function, Kidney Function, Electrolytes), group them under one heading and explain each clearly beneath it. 
 
@@ -292,11 +291,13 @@ Do not use emojis. Do not add extra formatting beyond clean headings and paragra
 Return a single valid JSON object exactly in this structure:
 {
   "introduction": "string",
+  "summary_counts": { "normal": number, "high": number, "low": number, "borderline": number, "abnormal": number, "unknown": number },
   "explanations": [
     {
       "category": "string | null",
       "test_name": "string",
       "heading": "string",
+      "trend_tag": "string | null", // e.g. "+5.2%", "-2.1%", "Stable", or null if no trend
       "explanation_lines": ["string"]
     }
   ],
@@ -307,6 +308,9 @@ Return a single valid JSON object exactly in this structure:
     "what_to_monitor": "string | null"
   }
 }
+
+NOTE for summary_counts: Calculate these counts based on the 'status' field of each test in the provided structured data.
+NOTE for trend_tag: Use the provided TREND DATA to find the percentage change for each test. Format as "+X.X%" or "-X.X%". If Stable, use "Stable". If no trend, use null.
 
 DATA TO EXPLAIN:
 ${JSON.stringify(struct.parsed_json)}

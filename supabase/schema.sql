@@ -23,3 +23,23 @@ CREATE TABLE IF NOT EXISTS trend_cache (
   percentage_change FLOAT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
+
+-- Stage 5: Report-Based AI Conversations
+CREATE TABLE IF NOT EXISTS ai_conversations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id),
+  report_id UUID REFERENCES reports(id) ON DELETE CASCADE,
+  user_message TEXT,
+  ai_response TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Stage 6: General Health AI Mode
+CREATE TABLE IF NOT EXISTS general_ai_conversations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id),
+  user_message TEXT,
+  ai_response TEXT,
+  risk_flag TEXT DEFAULT 'normal', -- normal, emergency_detected, sensitive_topic
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);

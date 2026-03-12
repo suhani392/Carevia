@@ -363,6 +363,35 @@ const ScanReportScreen = () => {
                             <>
                                 <View style={styles.contentSection}>
                                     <Text style={[styles.sectionHeading, { color: colors.primary }]}>Your Report Analysis</Text>
+                                    {(() => {
+                                        // Fallback calculation if summary_counts is missing from old reports
+                                        const counts = analysisResult?.summary_counts || {
+                                            normal: (analysisResult?.explanations || []).filter((e: any) => e.heading?.toLowerCase().includes('normal')).length,
+                                            borderline: (analysisResult?.explanations || []).filter((e: any) => e.heading?.toLowerCase().includes('borderline')).length,
+                                            abnormal: (analysisResult?.explanations || []).filter((e: any) => 
+                                                e.heading?.toLowerCase().includes('high') || 
+                                                e.heading?.toLowerCase().includes('low') || 
+                                                e.heading?.toLowerCase().includes('abnormal')
+                                            ).length
+                                        };
+
+                                        return (
+                                            <View style={styles.summaryCard}>
+                                                <View style={styles.summaryItem}>
+                                                    <Text style={[styles.summaryCount, { color: colors.success }]}>{counts.normal}</Text>
+                                                    <Text style={styles.summaryLabel}>Normal</Text>
+                                                </View>
+                                                <View style={styles.summaryItem}>
+                                                    <Text style={[styles.summaryCount, { color: colors.warning }]}>{counts.borderline}</Text>
+                                                    <Text style={styles.summaryLabel}>Borderline</Text>
+                                                </View>
+                                                <View style={styles.summaryItem}>
+                                                    <Text style={[styles.summaryCount, { color: colors.error }]}>{counts.abnormal || (counts.high || 0) + (counts.low || 0) + (counts.abnormal || 0)}</Text>
+                                                    <Text style={styles.summaryLabel}>Abnormal</Text>
+                                                </View>
+                                            </View>
+                                        );
+                                    })()}
                                     <Text style={[styles.sectionPara, { color: colors.textSecondary }]}>{analysisResult?.introduction || "Analysis complete."}</Text>
                                 </View>
                                 {(analysisResult?.explanations || []).map((item: any, idx: number) => {
@@ -391,7 +420,16 @@ const ScanReportScreen = () => {
                                     return (
                                         <View key={idx} style={styles.contentSection}>
                                             {item?.category && item.category !== "null" && <Text style={[styles.categoryHeading, { color: colors.textSecondary }]}>{item.category}</Text>}
-                                            <Text style={[styles.testHeading, { color: getTestHeadingColor(item?.heading) }]}>{item?.heading || "Medical Test"}</Text>
+                                            <View style={styles.testHeadingRow}>
+                                                <Text style={[styles.testHeading, { color: getTestHeadingColor(item?.heading) }]}>{item?.heading || "Medical Test"}</Text>
+                                                {item?.trend_tag && (
+                                                    <View style={[styles.trendBadge, { backgroundColor: item.trend_tag.startsWith('+') ? 'rgba(255, 75, 75, 0.1)' : item.trend_tag.startsWith('-') ? 'rgba(75, 255, 75, 0.1)' : 'rgba(150, 150, 150, 0.1)' }]}>
+                                                        <Text style={[styles.trendBadgeText, { color: item.trend_tag.startsWith('+') ? colors.error : item.trend_tag.startsWith('-') ? colors.success : colors.textSecondary }]}>
+                                                            {item.trend_tag}
+                                                        </Text>
+                                                    </View>
+                                                )}
+                                            </View>
                                             {(item?.explanation_lines || []).map((line: string, lIdx: number) => <Text key={lIdx} style={[styles.sectionPara, { color: colors.text }]}>• {line}</Text>)}
                                         </View>
                                     );
@@ -572,7 +610,44 @@ const styles = StyleSheet.create({
     modalButtons: { flexDirection: 'row', width: '100%', justifyContent: 'space-between' },
     cancelBtn: { padding: 15 },
     confirmBtn: { flex: 1, height: 50, borderRadius: 15, justifyContent: 'center', alignItems: 'center', marginLeft: 15 },
-    analysisFooter: { marginTop: 20, width: '100%' }
+    analysisFooter: { marginTop: 20, width: '100%' },
+    summaryCard: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        backgroundColor: 'rgba(0, 98, 255, 0.05)',
+        borderRadius: 20,
+        padding: 20,
+        marginVertical: 15,
+    },
+    summaryItem: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    summaryCount: {
+        fontSize: 24,
+        fontFamily: 'Judson-Bold',
+    },
+    summaryLabel: {
+        fontSize: 12,
+        fontFamily: 'Judson-Regular',
+        color: '#888',
+        marginTop: 4,
+    },
+    testHeadingRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    trendBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    trendBadgeText: {
+        fontSize: 12,
+        fontFamily: 'Judson-Bold',
+    }
 
 });
 
