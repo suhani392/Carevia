@@ -63,17 +63,38 @@ const ScanReportScreen = () => {
         'Reading your report...': [
             'Scanning medical terms...',
             'Extracting lab values...',
-            'Processing report text...'
+            'Processing report text...',
+            'Detecting report sections...',
+            'Reading doctor notes...',
+            'Analyzing test parameters...',
+            'Checking units and measurements...',
+            'Interpreting medical abbreviations...',
+            'Parsing diagnostic comments...',
+            'Reviewing test identifiers...'
         ],
         'Organizing medical data...': [
             'Structuring data tables...',
             'Identifying reference ranges...',
-            'Organizing clinical findings...'
+            'Organizing clinical findings...',
+            'Grouping related test results...',
+            'Sorting abnormal values...',
+            'Mapping parameters to categories...',
+            'Aligning results with standard ranges...',
+            'Preparing data for interpretation...',
+            'Filtering important markers...',
+            'Tagging critical observations...'
         ],
         'Carevia is writing insights...': [
             'Simplifying complex terms...',
             'Finalizing your analysis...',
-            'Double-checking results...'
+            'Double-checking results...',
+            'Highlighting key health indicators...',
+            'Generating personalized insights...',
+            'Comparing results with normal ranges...',
+            'Preparing your health summary...',
+            'Translating medical jargon...',
+            'Building easy-to-read explanations...',
+            'Completing your report insights...'
         ]
     };
 
@@ -368,9 +389,9 @@ const ScanReportScreen = () => {
                                         const counts = analysisResult?.summary_counts || {
                                             normal: (analysisResult?.explanations || []).filter((e: any) => e.heading?.toLowerCase().includes('normal')).length,
                                             borderline: (analysisResult?.explanations || []).filter((e: any) => e.heading?.toLowerCase().includes('borderline')).length,
-                                            abnormal: (analysisResult?.explanations || []).filter((e: any) => 
-                                                e.heading?.toLowerCase().includes('high') || 
-                                                e.heading?.toLowerCase().includes('low') || 
+                                            abnormal: (analysisResult?.explanations || []).filter((e: any) =>
+                                                e.heading?.toLowerCase().includes('high') ||
+                                                e.heading?.toLowerCase().includes('low') ||
                                                 e.heading?.toLowerCase().includes('abnormal')
                                             ).length
                                         };
