@@ -232,8 +232,23 @@ ${report.raw_text}`;
             return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
         } else if (stage === 'explanation') {
-            const { data: struct, error: structErr } = await supabase.from('structured_reports').select('id, parsed_json').eq('report_id', reportId).maybeSingle();
+            const { data: struct, error: structErr } = await supabase.from('structured_reports').select('id, parsed_json, user_id').eq('report_id', reportId).maybeSingle();
             if (structErr || !struct?.parsed_json) throw new Error("Step 2 data missing from database.");
+
+            // Fetch user profile for context
+            let profileContext = "No prior health conditions explicitly stated.";
+            if (struct.user_id) {
+                const { data: profile } = await supabase.from('profiles').select('has_diabetes, has_bp, has_thyroid').eq('id', struct.user_id).single();
+                if (profile) {
+                    const conditions = [];
+                    if (profile.has_diabetes) conditions.push("Diabetes");
+                    if (profile.has_bp) conditions.push("Hypertension (High Blood Pressure)");
+                    if (profile.has_thyroid) conditions.push("Thyroid Issues");
+                    if (conditions.length > 0) {
+                        profileContext = `The user has indicated they have the following pre-existing conditions: ${conditions.join(', ')}. Take this into account when classifying results.`;
+                    }
+                }
+            }
 
             // Fetch calculated trends for this report
             const { data: trends } = await supabase.from('trend_cache').select('test_name, trend_status, percentage_change, previous_value').eq('structured_report_id', struct.id);
@@ -260,7 +275,7 @@ In the next lines:
 * One short sentence explaining what the test measures (in simple language). 
 * One sentence stating the user’s value and the normal range. 
 * One sentence clearly stating whether it is within range, slightly low, slightly high, or outside range. 
-* If trend data is available and shows a change (Increased or Decreased), MUST add one sentence explaining the change (e.g., "This has increased by 15% compared to your previous report where it was 12.5").
+* If trend data is available for this test, you MUST add one sentence stating the trend using the exact calculated percentage and previous value from the TREND DATA (e.g., "This has [Increased/Decreased] by X% compared to your previous report where it was Y", replacing X and Y with actual numbers from the data). Do NOT hallucinate or use example values.
 * Avoid dramatic or alarming wording.
 
 If multiple related tests belong to one category (for example Differential Count, RBC Indices, Liver Function, Kidney Function, Electrolytes), group them under one heading and explain each clearly beneath it. 
@@ -317,6 +332,9 @@ ${JSON.stringify(struct.parsed_json)}
 
 TREND DATA (COMPARISON):
 ${JSON.stringify(trends || [])}
+
+USER HEALTH CONTEXT:
+${profileContext}
 `;
 
             const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${aiKey}`, {

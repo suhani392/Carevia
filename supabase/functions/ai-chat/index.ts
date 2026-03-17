@@ -28,12 +28,12 @@ serve(async (req) => {
 
         const token = authHeader.replace('Bearer ', '');
         const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
-        
+
         if (authErr || !user) {
             console.error(`[Auth Error] ${authErr?.message || "Invalid User"}`);
             throw new Error("Your session expired. Please log in again.");
         }
-        
+
         console.log(`[User] Verified: ${user.id}`);
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
         console.log(`[Profile] Fetched for: ${profile?.full_name || "Unknown"}`);
@@ -54,10 +54,10 @@ serve(async (req) => {
             ${JSON.stringify(trends || [])}
 
             USER PROFILE:
-            ${JSON.stringify({ 
-                has_diabetes: profile?.has_diabetes, 
-                has_bp: profile?.has_bp, 
-                has_thyroid: profile?.has_thyroid 
+            ${JSON.stringify({
+                has_diabetes: profile?.has_diabetes,
+                has_bp: profile?.has_bp,
+                has_thyroid: profile?.has_thyroid
             })}
             `;
 
@@ -97,19 +97,19 @@ Tone Rules: Calm, Neutral, Supportive, Clear, Medically responsible.
             // --- STAGE 6: GENERAL HEALTH MODE ---
             // Emergency Check (Hardened List)
             const emergencyKeywords = [
-                'chest pain', 'breathing', 'unconscious', 'bleeding', 'seizure', 
-                'stroke', 'heart attack', 'suicidal', 'overdose', 'severe injury', 
+                'chest pain', 'breathing', 'unconscious', 'bleeding', 'seizure',
+                'stroke', 'heart attack', 'suicidal', 'overdose', 'severe injury',
                 'trauma', 'choking', 'poisoning'
             ];
             const isEmergency = emergencyKeywords.some(k => message.toLowerCase().includes(k));
 
             if (isEmergency) {
                 const response = "I am not able to assess emergencies. Please seek immediate medical attention or contact local emergency services.";
-                await supabase.from('general_ai_conversations').insert({ 
-                    user_id: user?.id, 
-                    user_message: message, 
-                    ai_response: response, 
-                    risk_flag: 'emergency_detected' 
+                await supabase.from('general_ai_conversations').insert({
+                    user_id: user?.id,
+                    user_message: message,
+                    ai_response: response,
+                    risk_flag: 'emergency_detected'
                 });
                 return new Response(JSON.stringify({ text: response, isEmergency: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
             }
@@ -131,7 +131,7 @@ If a user describes life-threatening symptoms (Chest pain, Breathing issues, etc
 If the user asks for diagnosis: "I cannot diagnose medical conditions. Please consult a qualified healthcare professional."
 If the user asks for medication/treatment: "I cannot prescribe or recommend medication. Please consult a qualified healthcare professional."
 Tone: Calm, Neutral, Supportive, Clear, Medically responsible.`;
-            
+
             contextData = `USER PROFILE: ${JSON.stringify(profile)}`;
         }
 

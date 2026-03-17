@@ -78,6 +78,9 @@ interface ProfileData {
     bloodGroup: string;
     emergencyContact: string;
     photo_url?: string;
+    has_diabetes: boolean;
+    has_bp: boolean;
+    has_thyroid: boolean;
 }
 
 const ProfileScreen = () => {
@@ -94,7 +97,10 @@ const ProfileScreen = () => {
         contactNumber: 'N/A',
         address: 'N/A',
         bloodGroup: 'N/A',
-        emergencyContact: 'N/A'
+        emergencyContact: 'N/A',
+        has_diabetes: false,
+        has_bp: false,
+        has_thyroid: false
     });
 
 
@@ -108,7 +114,10 @@ const ProfileScreen = () => {
                 address: userProfile.address || 'N/A',
                 bloodGroup: userProfile.blood_group || 'N/A',
                 emergencyContact: userProfile.emergency_contact || 'N/A',
-                photo_url: userProfile.photo_url
+                photo_url: userProfile.photo_url,
+                has_diabetes: userProfile.has_diabetes || false,
+                has_bp: userProfile.has_bp || false,
+                has_thyroid: userProfile.has_thyroid || false
             });
             setLoading(false);
         }
@@ -129,8 +138,10 @@ const ProfileScreen = () => {
 
 
     const openEdit = (field: keyof ProfileData) => {
+        const value = profile[field];
+        if (typeof value === 'boolean') return;
         setEditingField(field);
-        setTempValue(profile[field] || '');
+        setTempValue(value || '');
         setIsEditModalVisible(true);
     };
 
@@ -306,6 +317,42 @@ const ProfileScreen = () => {
     };
 
 
+    const HealthToggle = ({ label, value, onChange }: { label: string, value: boolean, onChange: (val: boolean) => void }) => (
+        <TouchableOpacity
+            style={[styles.profileItem, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+            onPress={() => onChange(!value)}
+        >
+            <View style={styles.itemLeft}>
+                <View style={styles.textContainer}>
+                    <Text style={[styles.itemLabel, { color: colors.primary }]}>{label}</Text>
+                    <Text style={[styles.itemValue, { color: colors.textSecondary }]}>{value ? "Yes" : "No"}</Text>
+                </View>
+            </View>
+            <View style={[styles.toggleTrack, value ? { backgroundColor: colors.primary } : { backgroundColor: 'rgba(0,0,0,0.1)' }]}>
+                <View style={[styles.toggleThumb, value ? { transform: [{ translateX: 20 }] } : { transform: [{ translateX: 0 }] }]} />
+            </View>
+        </TouchableOpacity>
+    );
+
+    const updateToggle = async (field: 'has_diabetes' | 'has_bp' | 'has_thyroid', value: boolean) => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { error } = await supabase
+                .from('profiles')
+                .update({ [field]: value })
+                .eq('id', user.id);
+
+            if (error) throw error;
+
+            setProfile(prev => ({ ...prev, [field]: value }));
+            await refreshData();
+        } catch (error: any) {
+            Alert.alert('Error', error.message);
+        }
+    };
+
     const ProfileItem = ({ icon: Icon, label, value, field, colors }: { icon: any, label: string, value: string, field: keyof ProfileData, colors: any }) => (
         <TouchableOpacity
             style={[styles.profileItem, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
@@ -407,6 +454,25 @@ const ProfileScreen = () => {
                     <ProfileItem icon={AddressIcon} label={t('address')} value={profile.address} field="address" colors={colors} />
                     <ProfileItem icon={BloodGroupIcon} label={t('blood_group')} value={profile.bloodGroup} field="bloodGroup" colors={colors} />
                     <ProfileItem icon={EmergencyContactIcon} label={t('emergency_contact')} value={profile.emergencyContact} field="emergencyContact" colors={colors} />
+                </View>
+
+                <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 25 }]}>Medical Conditions</Text>
+                <View style={styles.itemsList}>
+                    <HealthToggle 
+                        label="Diabetes" 
+                        value={profile.has_diabetes} 
+                        onChange={(val) => updateToggle('has_diabetes', val)} 
+                    />
+                    <HealthToggle 
+                        label="Hypertension (BP)" 
+                        value={profile.has_bp} 
+                        onChange={(val) => updateToggle('has_bp', val)} 
+                    />
+                    <HealthToggle 
+                        label="Thyroid" 
+                        value={profile.has_thyroid} 
+                        onChange={(val) => updateToggle('has_thyroid', val)} 
+                    />
                 </View>
 
 
@@ -793,6 +859,19 @@ const styles = StyleSheet.create({
         fontFamily: 'Judson-Bold',
         fontSize: 16,
         color: '#FFFFFF',
+    },
+    toggleTrack: {
+        width: 50,
+        height: 28,
+        borderRadius: 14,
+        padding: 4,
+        justifyContent: 'center',
+    },
+    toggleThumb: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: '#FFFFFF',
     }
 });
 

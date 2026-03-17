@@ -459,6 +459,33 @@ const ScanReportScreen = () => {
                                     <Text style={[styles.sectionHeading, { color: colors.text }]}>Overall Summary</Text>
                                     <Text style={[styles.sectionPara, { color: colors.textSecondary, fontFamily: 'Judson-Bold' }]}>{analysisResult?.summary || "Your report has been processed successfully."}</Text>
                                 </View>
+
+                                {analysisResult?.takeaways && (
+                                    <View style={styles.contentSection}>
+                                        <Text style={[styles.sectionHeading, { color: colors.text }]}>Top Insights</Text>
+                                        
+                                        {analysisResult.takeaways.biggest_concern && analysisResult.takeaways.biggest_concern !== 'null' && (
+                                            <View style={[styles.takeawayCard, { borderColor: colors.error, backgroundColor: 'rgba(255, 75, 75, 0.05)' }]}>
+                                                <Text style={[styles.takeawayTitle, { color: colors.error }]}>Biggest Concern</Text>
+                                                <Text style={[styles.takeawayText, { color: colors.text }]}>{analysisResult.takeaways.biggest_concern}</Text>
+                                            </View>
+                                        )}
+
+                                        {analysisResult.takeaways.most_reassuring_finding && analysisResult.takeaways.most_reassuring_finding !== 'null' && (
+                                            <View style={[styles.takeawayCard, { borderColor: colors.success, backgroundColor: 'rgba(75, 255, 75, 0.05)' }]}>
+                                                <Text style={[styles.takeawayTitle, { color: colors.success }]}>Most Reassuring Finding</Text>
+                                                <Text style={[styles.takeawayText, { color: colors.text }]}>{analysisResult.takeaways.most_reassuring_finding}</Text>
+                                            </View>
+                                        )}
+
+                                        {analysisResult.takeaways.what_to_monitor && analysisResult.takeaways.what_to_monitor !== 'null' && (
+                                            <View style={[styles.takeawayCard, { borderColor: colors.warning, backgroundColor: 'rgba(255, 170, 0, 0.05)' }]}>
+                                                <Text style={[styles.takeawayTitle, { color: colors.warning }]}>What to Monitor</Text>
+                                                <Text style={[styles.takeawayText, { color: colors.text }]}>{analysisResult.takeaways.what_to_monitor}</Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                )}
                             </>
                         ) : (
                             <View style={styles.analysisFooter}>
@@ -668,8 +695,23 @@ const styles = StyleSheet.create({
     trendBadgeText: {
         fontSize: 12,
         fontFamily: 'Judson-Bold',
+    },
+    takeawayCard: {
+        padding: 15,
+        borderRadius: 15,
+        borderWidth: 1,
+        marginBottom: 12,
+    },
+    takeawayTitle: {
+        fontSize: 14,
+        fontFamily: 'Judson-Bold',
+        marginBottom: 5,
+    },
+    takeawayText: {
+        fontSize: 14,
+        fontFamily: 'Judson-Regular',
+        lineHeight: 20,
     }
-
 });
 
 export default ScanReportScreen;
