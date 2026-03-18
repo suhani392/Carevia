@@ -129,13 +129,15 @@ const ReportsScreen = () => {
                         navigate('document_view', {
                             docName: selectedReport.name,
                             ownerName: userProfile?.full_name || 'Me',
-                            docUri: data?.signedUrl || selectedReport.uri
+                            docUri: data?.signedUrl || selectedReport.uri,
+                            reportId: selectedReport.id
                         });
                     } catch (e) {
                         navigate('document_view', {
                             docName: selectedReport.name,
                             ownerName: userProfile?.full_name || 'Me',
-                            docUri: selectedReport.uri
+                            docUri: selectedReport.uri,
+                            reportId: selectedReport.id
                         });
                     }
                 };
@@ -265,14 +267,16 @@ const ReportsScreen = () => {
                                     navigate('document_view', {
                                         docName: report.name,
                                         ownerName: userProfile?.full_name || 'Me',
-                                        docUri: data.signedUrl
+                                        docUri: data.signedUrl,
+                                        reportId: report.id
                                     });
                                 } catch (error) {
                                     console.error('Error signing report URL:', error);
                                     navigate('document_view', {
                                         docName: report.name,
                                         ownerName: userProfile?.full_name || 'Me',
-                                        docUri: report.uri
+                                        docUri: report.uri,
+                                        reportId: report.id
                                     });
                                 }
                             };

@@ -71,6 +71,18 @@ export interface Update {
     created_at?: string;
 }
 
+export interface HealthAlert {
+    id: string;
+    report_id: string;
+    user_id: string;
+    risk_level: string;
+    action_type: string;
+    action_message: string;
+    target_user_id: string;
+    status: string;
+    created_at: string;
+}
+
 export interface FamilyMember {
     id: string;
     name: string;
@@ -1671,6 +1683,7 @@ export const translations = {
 interface AppContextType {
 
     updates: Update[];
+    alerts: HealthAlert[];
     reports: Report[];
     documents: Document[];
     familyMembers: FamilyMember[];
@@ -1707,6 +1720,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
     const [updates, setUpdates] = useState<Update[]>([]);
+    const [alerts, setAlerts] = useState<HealthAlert[]>([]);
     const [reports, setReports] = useState<Report[]>([]);
     const [documents, setDocuments] = useState<Document[]>([]);
     const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
@@ -1904,6 +1918,23 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 console.warn("Family members fetch error:", err);
             }
 
+            // 5.5. Fetch health alerts
+            try {
+                const { data: alertsData, error: alertsError } = await supabase
+                    .from('alerts_and_actions')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(10);
+
+                if (alertsError) {
+                    console.warn("Alerts fetch error:", alertsError);
+                } else if (alertsData) {
+                    setAlerts(alertsData);
+                }
+            } catch (err) {
+                console.warn("Alerts fetch exception:", err);
+            }
+
             // 6. Fetch invitations
             if (user.email) {
                 try {
@@ -1946,6 +1977,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 setReports([]);
                 setDocuments([]);
                 setUpdates([]);
+                setAlerts([]);
                 setFamilyMembers([]);
                 setInvitations([]);
             }
@@ -2255,6 +2287,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return (
         <AppContext.Provider value={{
             updates,
+            alerts,
             reports,
             documents,
             familyMembers,

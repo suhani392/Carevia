@@ -23,6 +23,7 @@ import { FileCheckIcon } from '../Documents/Icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
+import { supabase } from '../../lib/supabase';
 
 const { width } = Dimensions.get('window');
 
@@ -38,6 +39,21 @@ const DocumentView = () => {
     const docName = screenParams?.docName || 'Document';
     const ownerName = screenParams?.ownerName || 'Suhani Badhe';
     const docUri = screenParams?.docUri;
+    const reportId = screenParams?.reportId;
+
+    const [analysisResult, setAnalysisResult] = React.useState<any>(null);
+
+    React.useEffect(() => {
+        if (reportId) {
+            const fetchAnalysis = async () => {
+                const { data, error } = await supabase.from('structured_reports').select('explanation_json').eq('report_id', reportId).maybeSingle();
+                if (data?.explanation_json) {
+                    setAnalysisResult(data.explanation_json);
+                }
+            };
+            fetchAnalysis();
+        }
+    }, [reportId]);
 
     React.useEffect(() => {
         console.log('DocumentView - Incoming URI:', docUri);
@@ -215,115 +231,140 @@ const DocumentView = () => {
                 title={ownerName}
             />
 
-            {isPdf ? (
-                <View style={styles.pdfContainer}>
-                    <Text style={[styles.docTitle, { color: colors.text }]}>{docName}</Text>
-                    <View style={[styles.imageContainer, { flex: 1, aspectRatio: undefined, backgroundColor: colors.surface, borderColor: colors.cardBorder, borderWidth: 1 }]}>
-                        <View style={[styles.imageWrapper, { height: '100%', borderRadius: 15, backgroundColor: themeMode === 'dark' ? '#1A1A1A' : '#FFFFFF' }]}>
-                            {isLoading && (
-                                <View style={[styles.loadingContainer, { backgroundColor: colors.surface }]}>
-                                    <ActivityIndicator color={colors.primary} size="large" />
-                                </View>
-                            )}
-                            <Pdf
-                                source={{ uri: docUri, cache: true }}
-                                style={[styles.pdfViewer, { backgroundColor: themeMode === 'dark' ? '#1A1A1A' : '#FFFFFF' }]}
-                                onLoadProgress={(percent) => console.log('PDF Loading...', percent)}
-                                onLoadComplete={(numberOfPages) => {
-                                    console.log(`Finished loading ${numberOfPages} pages`);
-                                    setTotalPages(numberOfPages);
-                                    setIsLoading(false);
-                                }}
-                                onPageChanged={(page) => {
-                                    console.log(`Current page: ${page}`);
-                                    setCurrentPage(page);
-                                }}
-                                onError={(error: any) => {
-                                    console.error('PDF Error:', error);
-                                    setIsLoading(false);
-                                    Alert.alert('PDF Error', error?.message || 'Unable to display this PDF.');
-                                }}
-                                trustAllCerts={false}
-                                renderActivityIndicator={() => (
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                <Text style={[styles.docTitle, { color: colors.text }]}>{docName}</Text>
+
+                <View style={[styles.imageContainer, { aspectRatio: 0.75, backgroundColor: colors.surface, borderColor: colors.cardBorder, borderWidth: 1 }]}>
+                    <View style={styles.imageWrapper}>
+                        {isPdf ? (
+                            <>
+                                {isLoading && (
                                     <View style={[styles.loadingContainer, { backgroundColor: colors.surface }]}>
                                         <ActivityIndicator color={colors.primary} size="large" />
                                     </View>
                                 )}
-                            />
-                        </View>
-                        <View style={[styles.pageIndicator, { backgroundColor: colors.modalBg }]}>
-                            <Text style={[styles.pageIndicatorText, { color: colors.text }]}>
-                                Page {currentPage}/{totalPages}
-                            </Text>
-                        </View>
-                    </View>
-                    <View style={styles.buttonRow}>
-                        <TouchableOpacity
-                            style={[styles.actionButton, { backgroundColor: colors.card }, isBusy && { opacity: 0.5 }]}
-                            onPress={handleShare}
-                            disabled={isBusy}
-                        >
-                            <ShareIcon color={colors.primary} size={22} />
-                            <Text style={[styles.actionButtonText, { color: colors.text }]}>Share</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[styles.actionButton, { backgroundColor: colors.card }, isBusy && { opacity: 0.5 }]}
-                            onPress={handleDownload}
-                            disabled={isBusy}
-                        >
-                            <DownloadIcon color={colors.primary} size={22} />
-                            <Text style={[styles.actionButtonText, { color: colors.text }]}>Download</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            ) : (
-                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                    <Text style={[styles.docTitle, { color: colors.text }]}>{docName}</Text>
-
-                    <View style={[styles.imageContainer, { backgroundColor: colors.surface, borderColor: colors.cardBorder, borderWidth: 1 }]}>
-                        <View style={styles.imageWrapper}>
+                                <Pdf
+                                    source={{ uri: docUri, cache: true }}
+                                    style={[styles.pdfViewer, { backgroundColor: themeMode === 'dark' ? '#1A1A1A' : '#FFFFFF' }]}
+                                    onLoadComplete={(numberOfPages) => {
+                                        setTotalPages(numberOfPages);
+                                        setIsLoading(false);
+                                    }}
+                                    onPageChanged={(page) => setCurrentPage(page)}
+                                    onError={(error: any) => {
+                                        setIsLoading(false);
+                                        Alert.alert('PDF Error', error?.message || 'Unable to display this PDF.');
+                                    }}
+                                    trustAllCerts={false}
+                                />
+                            </>
+                        ) : (
                             <Image
                                 source={{ uri: docUri || 'https://img.freepik.com/free-vector/medical-report-template_23-2148509372.jpg' }}
                                 style={styles.documentImage}
                                 resizeMode="contain"
                                 onLoadStart={() => setIsLoading(true)}
                                 onLoadEnd={() => setIsLoading(false)}
-                                onError={(e) => {
-                                    console.error('Image Error:', e.nativeEvent.error);
-                                    setIsLoading(false);
-                                }}
                             />
-                        </View>
-
-                        <View style={[styles.pageIndicator, { backgroundColor: colors.modalBg }]}>
-                            <Text style={[styles.pageIndicatorText, { color: colors.text }]}>Page 1/1</Text>
-                        </View>
+                        )}
                     </View>
-
-                    <View style={styles.buttonRow}>
-                        <TouchableOpacity
-                            style={[styles.actionButton, { backgroundColor: colors.card }, isBusy && { opacity: 0.5 }]}
-                            onPress={handleShare}
-                            disabled={isBusy}
-                        >
-                            <ShareIcon color={colors.primary} size={22} />
-                            <Text style={[styles.actionButtonText, { color: colors.text }]}>Share</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[styles.actionButton, { backgroundColor: colors.card }, isBusy && { opacity: 0.5 }]}
-                            onPress={handleDownload}
-                            disabled={isBusy}
-                        >
-                            <DownloadIcon color={colors.primary} size={22} />
-                            <Text style={[styles.actionButtonText, { color: colors.text }]}>Download</Text>
-                        </TouchableOpacity>
+                    <View style={[styles.pageIndicator, { backgroundColor: colors.modalBg }]}>
+                        <Text style={[styles.pageIndicatorText, { color: colors.text }]}>
+                            {isPdf ? `Page ${currentPage}/${totalPages}` : `Page 1/1`}
+                        </Text>
                     </View>
+                </View>
 
-                    <View style={{ height: 40 }} />
-                </ScrollView>
-            )}
+                <View style={styles.buttonRow}>
+                    <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.card }, isBusy && { opacity: 0.5 }]} onPress={handleShare} disabled={isBusy}>
+                        <ShareIcon color={colors.primary} size={22} />
+                        <Text style={[styles.actionButtonText, { color: colors.text }]}>Share</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.card }, isBusy && { opacity: 0.5 }]} onPress={handleDownload} disabled={isBusy}>
+                        <DownloadIcon color={colors.primary} size={22} />
+                        <Text style={[styles.actionButtonText, { color: colors.text }]}>Download</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {analysisResult && (
+                    <View style={styles.analysisContent}>
+                        <View style={styles.contentSection}>
+                            <Text style={[styles.sectionHeading, { color: colors.primary }]}>Report Analysis</Text>
+                            {(() => {
+                                const counts = analysisResult?.summary_counts || {
+                                    normal: (analysisResult?.explanations || []).filter((e: any) => e.heading?.toLowerCase().includes('normal')).length,
+                                    borderline: (analysisResult?.explanations || []).filter((e: any) => e.heading?.toLowerCase().includes('borderline')).length,
+                                    abnormal: (analysisResult?.explanations || []).filter((e: any) => e.heading?.toLowerCase().includes('high') || e.heading?.toLowerCase().includes('low') || e.heading?.toLowerCase().includes('abnormal')).length
+                                };
+                                return (
+                                    <View style={styles.summaryCard}>
+                                        <View style={styles.summaryItem}><Text style={[styles.summaryCount, { color: '#4ADE80' }]}>{counts.normal}</Text><Text style={styles.summaryLabel}>Normal</Text></View>
+                                        <View style={styles.summaryItem}><Text style={[styles.summaryCount, { color: '#FFB020' }]}>{counts.borderline}</Text><Text style={styles.summaryLabel}>Borderline</Text></View>
+                                        <View style={styles.summaryItem}><Text style={[styles.summaryCount, { color: '#FF4B4B' }]}>{counts.abnormal || (counts.high || 0) + (counts.low || 0) + (counts.abnormal || 0)}</Text><Text style={styles.summaryLabel}>Abnormal</Text></View>
+                                    </View>
+                                );
+                            })()}
+                            <Text style={[styles.sectionPara, { color: colors.textSecondary }]}>{analysisResult?.introduction || "Analysis complete."}</Text>
+                        </View>
+                        {(analysisResult?.explanations || []).map((item: any, idx: number) => {
+                            const getTestHeadingColor = (heading: string) => {
+                                if (!heading) return colors.text;
+                                const lower = heading.toLowerCase();
+                                if (lower.includes('high') || lower.includes('low') || lower.includes('danger') || lower.includes('abnormal') || lower.includes('critical') || lower.includes('urgent')) return '#FF4B4B';
+                                if (lower.includes('borderline') || lower.includes('moderate') || lower.includes('caution') || lower.includes('warning') || lower.includes('risk')) return '#FFB020';
+                                if (lower.includes('normal') || lower.includes('perfect') || lower.includes('optimal') || lower.includes('stable') || lower.includes('good') || lower.includes('healthy')) return '#4ADE80';
+                                return colors.text;
+                            };
+                            return (
+                                <View key={idx} style={styles.contentSection}>
+                                    {item?.category && item.category !== "null" && <Text style={[styles.categoryHeading, { color: colors.textSecondary }]}>{item.category}</Text>}
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                        <Text style={[styles.testHeading, { color: getTestHeadingColor(item?.heading) }]}>{item?.heading || "Medical Test"}</Text>
+                                        {item?.trend_tag && (
+                                            <View style={[{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }, { backgroundColor: item.trend_tag.startsWith('+') ? 'rgba(255, 75, 75, 0.1)' : item.trend_tag.startsWith('-') ? 'rgba(75, 255, 75, 0.1)' : 'rgba(150, 150, 150, 0.1)' }]}>
+                                                <Text style={[{ fontSize: 12, fontFamily: 'Judson-Bold' }, { color: item.trend_tag.startsWith('+') ? '#FF4B4B' : item.trend_tag.startsWith('-') ? '#4ADE80' : colors.textSecondary }]}>
+                                                    {item.trend_tag}
+                                                </Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                    {(item?.explanation_lines || []).map((line: string, lIdx: number) => <Text key={lIdx} style={[styles.sectionPara, { color: colors.text }]}>• {line}</Text>)}
+                                </View>
+                            );
+                        })}
+                        <View style={styles.contentSection}>
+                            <Text style={[styles.sectionHeading, { color: colors.text }]}>Overall Summary</Text>
+                            <Text style={[styles.sectionPara, { color: colors.textSecondary, fontFamily: 'Judson-Bold' }]}>{analysisResult?.summary}</Text>
+                        </View>
+                        {analysisResult?.takeaways && (
+                            <View style={styles.contentSection}>
+                                <Text style={[styles.sectionHeading, { color: colors.text }]}>Top Insights</Text>
+                                {analysisResult.takeaways.biggest_concern && analysisResult.takeaways.biggest_concern !== 'null' && (
+                                    <View style={[{ padding: 15, borderRadius: 15, marginBottom: 15, borderWidth: 1 }, { borderColor: '#FF4B4B', backgroundColor: 'rgba(255, 75, 75, 0.05)' }]}>
+                                        <Text style={[{ fontSize: 14, fontFamily: 'Judson-Bold', marginBottom: 5, textTransform: 'uppercase' }, { color: '#FF4B4B' }]}>Biggest Concern</Text>
+                                        <Text style={[{ fontSize: 15, fontFamily: 'Judson-Regular' }, { color: colors.text }]}>{analysisResult.takeaways.biggest_concern}</Text>
+                                    </View>
+                                )}
+                                {analysisResult.takeaways.most_reassuring_finding && analysisResult.takeaways.most_reassuring_finding !== 'null' && (
+                                    <View style={[{ padding: 15, borderRadius: 15, marginBottom: 15, borderWidth: 1 }, { borderColor: '#4ADE80', backgroundColor: 'rgba(75, 255, 75, 0.05)' }]}>
+                                        <Text style={[{ fontSize: 14, fontFamily: 'Judson-Bold', marginBottom: 5, textTransform: 'uppercase' }, { color: '#4ADE80' }]}>Most Reassuring Finding</Text>
+                                        <Text style={[{ fontSize: 15, fontFamily: 'Judson-Regular' }, { color: colors.text }]}>{analysisResult.takeaways.most_reassuring_finding}</Text>
+                                    </View>
+                                )}
+                                {analysisResult.takeaways.what_to_monitor && analysisResult.takeaways.what_to_monitor !== 'null' && (
+                                    <View style={[{ padding: 15, borderRadius: 15, marginBottom: 15, borderWidth: 1 }, { borderColor: '#FFB020', backgroundColor: 'rgba(255, 170, 0, 0.05)' }]}>
+                                        <Text style={[{ fontSize: 14, fontFamily: 'Judson-Bold', marginBottom: 5, textTransform: 'uppercase' }, { color: '#FFB020' }]}>What to Monitor</Text>
+                                        <Text style={[{ fontSize: 15, fontFamily: 'Judson-Regular' }, { color: colors.text }]}>{analysisResult.takeaways.what_to_monitor}</Text>
+                                    </View>
+                                )}
+                            </View>
+                        )}
+                    </View>
+                )}
+
+                <View style={{ height: 40 }} />
+            </ScrollView>
 
         </View>
     );
@@ -406,12 +447,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         zIndex: 10,
     },
-    pdfContainer: {
-        flex: 1,
-        paddingHorizontal: 25,
-        paddingTop: 30,
-        paddingBottom: 20,
-    },
+    analysisContent: { paddingTop: 30 },
+    contentSection: { marginBottom: 30 },
+    sectionHeading: { fontSize: 22, fontFamily: 'Judson-Bold', marginBottom: 10 },
+    categoryHeading: { fontSize: 13, fontFamily: 'Judson-Bold', color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 5 },
+    testHeading: { fontSize: 18, fontFamily: 'Judson-Bold' },
+    sectionPara: { fontSize: 15, fontFamily: 'Judson-Regular', lineHeight: 22 },
+    summaryCard: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: 'rgba(0, 98, 255, 0.05)', borderRadius: 20, padding: 20, marginVertical: 15 },
+    summaryItem: { alignItems: 'center', flex: 1 },
+    summaryCount: { fontSize: 24, fontFamily: 'Judson-Bold' },
+    summaryLabel: { fontSize: 12, fontFamily: 'Judson-Regular', color: '#888', marginTop: 4 },
 });
 
 export default DocumentView;

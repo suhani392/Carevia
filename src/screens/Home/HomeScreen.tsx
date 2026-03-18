@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Text, Image, Pressable, RefreshControl } from 'react-native';
+import { View, StyleSheet, ScrollView, Text, Image, Pressable, RefreshControl, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import HomeHeader from './HomeHeader';
 import { ReportIcon, BotIcon } from './Icons';
@@ -8,20 +8,43 @@ import Menu from '../../components/navigation/menu-drawer/menu';
 import { useNavigation } from '../../context/NavigationContext';
 import { useAppContext } from '../../context/AppContext';
 import { getAvatarSource } from '../../lib/avatars';
-
+import { supabase } from '../../lib/supabase';
 
 const HomeScreen = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const { navigate } = useNavigation();
-    const { updates, userProfile, familyMembers, refreshData, t, colors, themeMode } = useAppContext();
+    const { updates, alerts, userProfile, familyMembers, refreshData, t, colors, themeMode } = useAppContext();
     const [refreshing, setRefreshing] = useState(false);
     const [isUpdatesExpanded, setIsUpdatesExpanded] = useState(false);
+    const [isAlertsExpanded, setIsAlertsExpanded] = useState(false);
 
 
     const onRefresh = async () => {
         setRefreshing(true);
         await refreshData();
         setRefreshing(false);
+    };
+
+    const handleAlertPress = async (alert: any, subjectName: string) => {
+        if (!alert.report_id) return;
+        try {
+            const { data: report, error } = await supabase.from('reports').select('uri, name').eq('id', alert.report_id).single();
+            if (error) throw error;
+            if (report && report.uri) {
+                const pathParts = report.uri.split('/reports/');
+                const filePath = pathParts[pathParts.length - 1];
+                const { data: signData } = await supabase.storage.from('reports').createSignedUrl(filePath, 3600);
+
+                navigate('document_view', {
+                    docName: report.name,
+                    ownerName: subjectName === t('you') ? userProfile?.full_name || 'Me' : subjectName,
+                    docUri: signData?.signedUrl || report.uri,
+                    reportId: alert.report_id
+                });
+            }
+        } catch (error) {
+            console.error('Error fetching report for alert:', error);
+        }
     };
 
     return (
@@ -97,6 +120,69 @@ const HomeScreen = () => {
                         </View>
                     </View>
                 </View>
+
+                {/* Health Alerts Section */}
+                {alerts && alerts.length > 0 && (
+                    <View style={styles.section}>
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>Health Alerts</Text>
+                        <>
+                            {(isAlertsExpanded ? alerts : alerts.slice(0, 3)).map((alert) => {
+                                let alertName = "Someone";
+                                let alertPhoto = null;
+                                const subjectId = alert.target_user_id || alert.user_id;
+
+                                if (userProfile?.id === subjectId) {
+                                    alertName = t('you');
+                                    alertPhoto = userProfile.photo_url;
+                                } else {
+                                    const member = familyMembers.find(m => m.id === subjectId);
+                                    if (member) {
+                                        alertName = member.name.split(' ')[0]; // Extract first name for better UI
+                                        alertPhoto = member.image;
+                                    }
+                                }
+
+                                // Heading: "Critical Alert for Sahil" or "High Risk Alert for You"
+                                const alertType = alert.risk_level === 'High Risk' ? 'High Risk' : (alert.risk_level || 'Health');
+                                const alertHeading = `${alertType} Alert for ${alertName}`;
+
+                                return (
+                                    <TouchableOpacity
+                                        key={alert.id}
+                                        style={[styles.familyCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+                                        onPress={() => handleAlertPress(alert, alertName)}
+                                    >
+                                        <View style={styles.updateInfoRow}>
+                                            {alertPhoto && getAvatarSource(alertPhoto) ? (
+                                                <Image source={getAvatarSource(alertPhoto)} style={styles.updateAvatar} />
+                                            ) : (
+                                                <View style={[styles.updateAvatar, styles.updateAvatarPlaceholder, { backgroundColor: colors.primaryLight, borderColor: colors.cardBorder }]}>
+                                                    <Text style={[styles.updateAvatarPlaceholderText, { color: colors.primary }]}>
+                                                        {(alertName === t('you') ? 'Y' : (alertName || 'A').charAt(0)).toUpperCase()}
+                                                    </Text>
+                                                </View>
+                                            )}
+                                            <View style={styles.updateMeta}>
+                                                <Text style={[styles.updateName, { color: colors.text }]}>{alertHeading}</Text>
+                                                <Text style={[styles.updateText, { color: colors.textSecondary }]}>{alert.action_message || `New alert received.`}</Text>
+                                            </View>
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                            {alerts.length > 3 && (
+                                <Pressable
+                                    style={[styles.readMoreButton, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+                                    onPress={() => setIsAlertsExpanded(!isAlertsExpanded)}
+                                >
+                                    <Text style={[styles.readMoreText, { color: colors.primary }]}>
+                                        {isAlertsExpanded ? t('show_less') : t('read_more')}
+                                    </Text>
+                                </Pressable>
+                            )}
+                        </>
+                    </View>
+                )}
 
                 {/* Family Updates Section */}
                 <View style={styles.section}>

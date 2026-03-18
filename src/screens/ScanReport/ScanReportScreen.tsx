@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Dimensions, TouchableOpacity, StatusBar, Image, Animated, Modal, TextInput, ScrollView, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Dimensions, TouchableOpacity, StatusBar, Image, Animated, Modal, TextInput, ScrollView, Alert, Platform, DeviceEventEmitter } from 'react-native';
 import Pdf from 'react-native-pdf';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -109,7 +109,7 @@ const ScanReportScreen = () => {
                 .select('*')
                 .eq('report_id', currentReportId)
                 .order('created_at', { ascending: true });
-            
+
             if (error) throw error;
             setAiLogs(data || []);
             setShowAiThinkingModal(true);
@@ -155,6 +155,7 @@ const ScanReportScreen = () => {
                 setCurrentReportId(reportId);
                 setPollingStatus("Preparing report...");
                 setIsAnalyzing(true);
+                DeviceEventEmitter.emit('ANALYSIS_START');
 
                 // 3. Trigger AI Chain (non-blocking)
                 console.log("[Invoke] Starting process-report for:", reportId);
@@ -175,6 +176,7 @@ const ScanReportScreen = () => {
                         if (invErr) {
                             console.error("[Invoke] Error Object:", invErr);
                             setIsAnalyzing(false);
+                            DeviceEventEmitter.emit('ANALYSIS_END');
                             setLoading(false);
 
                             let userMessage = "The AI server encountered an issue.";
@@ -188,6 +190,7 @@ const ScanReportScreen = () => {
 
                         if (data && data.error) {
                             setIsAnalyzing(false);
+                            DeviceEventEmitter.emit('ANALYSIS_END');
                             setLoading(false);
                             const isQuota = data.error.toLowerCase().includes("quota") || data.error.toLowerCase().includes("limit");
                             Alert.alert(
@@ -204,6 +207,7 @@ const ScanReportScreen = () => {
                     .catch(e => {
                         console.error("[Invoke] Critical Catch:", e);
                         setIsAnalyzing(false);
+                        DeviceEventEmitter.emit('ANALYSIS_END');
                         setLoading(false);
                         Alert.alert("Fatal Error", "Check your internet and Supabase project status.");
                     });
@@ -297,11 +301,13 @@ const ScanReportScreen = () => {
                                 console.log("[Status] Explanation found! Loading UI.");
                                 setAnalysisResult(structData.explanation_json);
                                 setIsAnalyzing(false);
+                                DeviceEventEmitter.emit('ANALYSIS_END');
                                 clearInterval(interval);
                             }
                         } else if (data?.analysis?.toLowerCase().includes("error")) {
                             console.error("[Status] Analysis failed:", data.analysis);
                             setIsAnalyzing(false);
+                            DeviceEventEmitter.emit('ANALYSIS_END');
                             clearInterval(interval);
                             Alert.alert("Analysis Failed", data.analysis || "An unexpected error occurred during processing.");
                         }
@@ -485,7 +491,7 @@ const ScanReportScreen = () => {
                                 {analysisResult?.takeaways && (
                                     <View style={styles.contentSection}>
                                         <Text style={[styles.sectionHeading, { color: colors.text }]}>Top Insights</Text>
-                                        
+
                                         {analysisResult.takeaways.biggest_concern && analysisResult.takeaways.biggest_concern !== 'null' && (
                                             <View style={[styles.takeawayCard, { borderColor: colors.error, backgroundColor: 'rgba(255, 75, 75, 0.05)' }]}>
                                                 <Text style={[styles.takeawayTitle, { color: colors.error }]}>Biggest Concern</Text>
@@ -622,7 +628,7 @@ const ScanReportScreen = () => {
                                     <CrossIcon size={20} color={colors.textSecondary} />
                                 </Pressable>
                             </View>
-                            
+
                             <ScrollView style={{ width: '100%' }} showsVerticalScrollIndicator={false}>
                                 {aiLogs.map((log, index) => (
                                     <View key={index} style={{ flexDirection: 'row', marginBottom: 25 }}>

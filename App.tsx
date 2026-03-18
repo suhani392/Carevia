@@ -1,6 +1,6 @@
 import 'react-native-url-polyfill/auto';
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, ActivityIndicator, Modal, Text, TouchableOpacity, Vibration } from 'react-native';
+import { StyleSheet, View, ActivityIndicator, Modal, Text, TouchableOpacity, Vibration, DeviceEventEmitter } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import * as Font from 'expo-font';
@@ -39,6 +39,9 @@ function AppContent() {
     const { colors, themeMode } = useAppContext();
     const [authChecked, setAuthChecked] = useState(false);
     const [emergencyAlert, setEmergencyAlert] = useState<{ title: string; message: string } | null>(null);
+
+    const isAnalyzingRef = React.useRef(false);
+    const pendingAlertsRef = React.useRef<{ title: string; message: string }[]>([]);
 
     useEffect(() => {
         // Check initial session
@@ -102,19 +105,43 @@ function AppContent() {
                             message = message.replace("Emergency for Your", "Your Emergency");
                         }
 
-                        // Vibrate and show custom modal
-                        Vibration.vibrate([0, 500, 200, 500]);
-                        setEmergencyAlert({ title, message });
+                        const newAlert = { title, message };
+
+                        if (isAnalyzingRef.current) {
+                            pendingAlertsRef.current.push(newAlert);
+                        } else {
+                            Vibration.vibrate([0, 500, 200, 500]);
+                            setEmergencyAlert(newAlert);
+                        }
                     }
                 }
             )
             .subscribe();
+
+        const startSub = DeviceEventEmitter.addListener('ANALYSIS_START', () => {
+            isAnalyzingRef.current = true;
+        });
+
+        const endSub = DeviceEventEmitter.addListener('ANALYSIS_END', () => {
+            isAnalyzingRef.current = false;
+            if (pendingAlertsRef.current.length > 0) {
+                setTimeout(() => {
+                    const nextAlert = pendingAlertsRef.current.shift();
+                    if (nextAlert) {
+                        Vibration.vibrate([0, 500, 200, 500]);
+                        setEmergencyAlert(nextAlert);
+                    }
+                }, 1500); // Wait 1.5 seconds for UI to settle
+            }
+        });
 
         const subscription = authListener?.data?.subscription;
 
         return () => {
             if (subscription) subscription.unsubscribe();
             supabase.removeChannel(alertsSubscription);
+            startSub.remove();
+            endSub.remove();
         };
     }, []);
 
@@ -192,7 +219,18 @@ function AppContent() {
 
                             <TouchableOpacity
                                 style={styles.alertButton}
-                                onPress={() => setEmergencyAlert(null)}
+                                onPress={() => {
+                                    setEmergencyAlert(null);
+                                    if (pendingAlertsRef.current.length > 0) {
+                                        setTimeout(() => {
+                                            const nextAlert = pendingAlertsRef.current.shift();
+                                            if (nextAlert) {
+                                                Vibration.vibrate([0, 500, 200, 500]);
+                                                setEmergencyAlert(nextAlert);
+                                            }
+                                        }, 500);
+                                    }
+                                }}
                             >
                                 <Text style={styles.alertButtonText}>Okay</Text>
                             </TouchableOpacity>
