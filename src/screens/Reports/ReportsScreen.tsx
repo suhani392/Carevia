@@ -36,6 +36,7 @@ const ReportsScreen = () => {
     const currentReports = memberId ? memberReports : reports;
     const firstName = screenParams?.name ? screenParams.name.split(' ')[0] : '';
     const pageTitle = memberId ? `${firstName}${t('reports_title_other')}` : t('reports_title_me');
+    const headerOwnerName = memberId ? screenParams?.name : (userProfile?.full_name || 'Me');
 
 
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
@@ -128,14 +129,14 @@ const ReportsScreen = () => {
                         const { data, error } = await supabase.storage.from('reports').createSignedUrl(filePath, 3600);
                         navigate('document_view', {
                             docName: selectedReport.name,
-                            ownerName: userProfile?.full_name || 'Me',
+                            ownerName: headerOwnerName,
                             docUri: data?.signedUrl || selectedReport.uri,
                             reportId: selectedReport.id
                         });
                     } catch (e) {
                         navigate('document_view', {
                             docName: selectedReport.name,
-                            ownerName: userProfile?.full_name || 'Me',
+                            ownerName: headerOwnerName,
                             docUri: selectedReport.uri,
                             reportId: selectedReport.id
                         });
@@ -266,7 +267,7 @@ const ReportsScreen = () => {
 
                                     navigate('document_view', {
                                         docName: report.name,
-                                        ownerName: userProfile?.full_name || 'Me',
+                                        ownerName: headerOwnerName,
                                         docUri: data.signedUrl,
                                         reportId: report.id
                                     });
@@ -274,7 +275,7 @@ const ReportsScreen = () => {
                                     console.error('Error signing report URL:', error);
                                     navigate('document_view', {
                                         docName: report.name,
-                                        ownerName: userProfile?.full_name || 'Me',
+                                        ownerName: headerOwnerName,
                                         docUri: report.uri,
                                         reportId: report.id
                                     });

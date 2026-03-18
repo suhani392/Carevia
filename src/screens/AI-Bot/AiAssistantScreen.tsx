@@ -48,44 +48,7 @@ const AiAssistantScreen = () => {
     const fetchHistory = async () => {
         setLoadingHistory(true);
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-
-            // Fetch both report and general conversations
-            const [reportRes, generalRes] = await Promise.all([
-                supabase.from('ai_conversations').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
-                supabase.from('general_ai_conversations').select('*').eq('user_id', user.id).order('created_at', { ascending: true })
-            ]);
-
-            const allMessages: any[] = [];
-            
-            // Format report messages
-            reportRes.data?.forEach(msg => {
-                const reportName = reports.find(r => r.id === msg.report_id)?.name || "Report";
-                allMessages.push({ id: `r-u-${msg.id}`, type: 'user', text: `[Linked: ${reportName}] ${msg.user_message}`, created_at: msg.created_at });
-                allMessages.push({ id: `r-a-${msg.id}`, type: 'bot', text: msg.ai_response, created_at: msg.created_at });
-            });
-
-            // Format general messages
-            generalRes.data?.forEach(msg => {
-                allMessages.push({ id: `g-u-${msg.id}`, type: 'user', text: msg.user_message, created_at: msg.created_at });
-                allMessages.push({ 
-                    id: `g-a-${msg.id}`, 
-                    type: 'bot', 
-                    text: msg.ai_response, 
-                    created_at: msg.created_at,
-                    isEmergency: msg.risk_flag === 'emergency_detected' 
-                });
-            });
-
-            // Sort by time
-            allMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-
-            if (allMessages.length > 0) {
-                setMessages(allMessages);
-            } else {
-                setMessages([{ id: 1, type: 'bot', text: profile ? `${t('greetings')} ${profile.full_name}! ${t('bot_welcome')}` : t('bot_welcome') }]);
-            }
+            setMessages([{ id: 1, type: 'bot', text: profile ? `${t('greetings')} ${profile.full_name}! ${t('bot_welcome')}` : t('bot_welcome') }]);
         } catch (err) {
             console.error("History fetch error:", err);
         } finally {
@@ -105,7 +68,7 @@ const AiAssistantScreen = () => {
                 type: 'user',
                 text: selectedAttachment ? `[Linked: ${selectedAttachment}] ${userMsgText}` : userMsgText,
             };
-            
+
             setMessages(prev => [...prev, newMessage]);
             setInputText('');
 
@@ -115,7 +78,7 @@ const AiAssistantScreen = () => {
                 setMessages(prev => [...prev, { id: loadingId, type: 'bot', text: '...' }]);
 
                 const { data, error } = await supabase.functions.invoke('ai-chat', {
-                    body: { 
+                    body: {
                         message: userMsgText,
                         report_id: reportId
                     }
@@ -125,11 +88,11 @@ const AiAssistantScreen = () => {
 
                 setMessages(prev => {
                     const filtered = prev.filter(m => m.id !== loadingId);
-                    return [...filtered, { 
-                        id: loadingId, 
-                        type: 'bot', 
+                    return [...filtered, {
+                        id: loadingId,
+                        type: 'bot',
                         text: data.text,
-                        isEmergency: data.isEmergency 
+                        isEmergency: data.isEmergency
                     }];
                 });
 
@@ -205,10 +168,10 @@ const AiAssistantScreen = () => {
                                     msg.type === 'user'
                                         ? [styles.userBubble, { backgroundColor: colors.primaryLight }]
                                         : [
-                                            styles.botBubble, 
+                                            styles.botBubble,
                                             { backgroundColor: colors.card, borderColor: colors.cardBorder, borderWidth: 1 },
                                             (msg as any).isEmergency && { backgroundColor: '#FFEEF0', borderColor: '#FF5C5C', borderWidth: 2 }
-                                          ]
+                                        ]
                                 ]}
                             >
                                 {(msg as any).isEmergency && (
@@ -217,15 +180,20 @@ const AiAssistantScreen = () => {
                                     </View>
                                 )}
                                 <Text style={[
-                                    styles.messageText, 
+                                    styles.messageText,
                                     { color: colors.text },
                                     (msg as any).isEmergency && { color: '#D32F2F', fontFamily: 'Judson-Bold' }
                                 ]}>
-                                    {msg.text}
+                                    {msg.text.split(/(\*\*.*?\*\*)/g).map((part: string, index: number) => {
+                                        if (part.startsWith('**') && part.endsWith('**')) {
+                                            return <Text key={index} style={{ fontFamily: 'Judson-Bold' }}>{part.slice(2, -2)}</Text>;
+                                        }
+                                        return part;
+                                    })}
                                 </Text>
-                                
+
                                 {(msg as any).isEmergency && (
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         style={styles.callButton}
                                         onPress={() => alert("Calling Emergency Services (108)...")}
                                     >

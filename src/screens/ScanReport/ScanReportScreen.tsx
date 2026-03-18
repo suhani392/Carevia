@@ -371,7 +371,7 @@ const ScanReportScreen = () => {
         return (
             <View style={[styles.analysisContainer, { backgroundColor: colors.background }]}>
                 <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-                <Animated.View style={[styles.stickyHeader, { height: Platform.OS === 'ios' ? 140 : 120, position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, backgroundColor: '#0062FF' }]}>
+                <Animated.View style={[styles.stickyHeader, { height: Platform.OS === 'ios' ? 140 : 120, position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, backgroundColor: themeMode === 'dark' ? '#001A4D' : '#0062FF' }]}>
                     <View style={styles.analysisTopIcons}>
                         <Pressable style={styles.analysisIconBlock} onPress={() => setIsAnalysisMode(false)}><BackIcon size={24} color="#FFFFFF" /></Pressable>
                         <View style={{ alignItems: 'center' }}>

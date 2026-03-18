@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo } from 'react';
 import { useColorScheme } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { supabase } from '../lib/supabase';
 
@@ -193,6 +194,8 @@ export const translations = {
         // Home
         emergency_access: "Emergency Access",
         family_updates: "Family Updates",
+        trend_analysis: "Trend Analysis",
+        health_alerts: "Health Alerts",
         read_more: "Read More...",
         show_less: "Show Less",
         no_updates: "No recent family updates",
@@ -229,6 +232,12 @@ export const translations = {
         pick_character: "Pick a character that represents you",
         select_avatar: "Select Avatar",
         remove_photo: "Remove Photo",
+        medical_conditions: "Medical Conditions",
+        diabetes: "Diabetes",
+        hypertension_bp: "Hypertension (BP)",
+        thyroid: "Thyroid",
+        yes: "Yes",
+        no: "No",
 
         // Family
         family_members: "Family Members",
@@ -401,7 +410,7 @@ export const translations = {
         view: "पहा",
         status: "स्थिती",
         back: "मागे",
-        you: "तुम्ही",
+        you: "You",
         error: "त्रुटी",
         success: "यश",
         upload_error: "अपलोड त्रुटी",
@@ -409,6 +418,8 @@ export const translations = {
         // Home
         emergency_access: "तातडीचा प्रवेश",
         family_updates: "कौटुंबिक अपडेट्स",
+        trend_analysis: "ट्रेंड विश्लेषण",
+        health_alerts: "आरोग्य सूचना",
         read_more: "अधिक वाचा...",
         show_less: "कमी दाखवा",
         no_updates: "कोणतेही नवीन अपडेट्स नाहीत",
@@ -445,6 +456,12 @@ export const translations = {
         pick_character: "तुमचे प्रतिनिधित्व करणारे पात्र निवडा",
         select_avatar: "अवतार निवडा",
         remove_photo: "फोटो काढा",
+        medical_conditions: "वैद्यकीय स्थिती",
+        diabetes: "मधुमेह",
+        hypertension_bp: "उच्च रक्तदाब (BP)",
+        thyroid: "थायरॉईड",
+        yes: "होय",
+        no: "नाही",
 
         // Family
         family_members: "कुटुंब सदस्य",
@@ -617,7 +634,7 @@ export const translations = {
         view: "देखें",
         status: "स्थिति",
         back: "पीछे",
-        you: "आप",
+        you: "You",
         error: "त्रुटि",
         success: "सफलता",
         upload_error: "अपलोड त्रुटि",
@@ -625,6 +642,8 @@ export const translations = {
         // Home
         emergency_access: "आपातकालीन पहुंच",
         family_updates: "पारिवारिक अपडेट",
+        trend_analysis: "ट्रेंड विश्लेषण",
+        health_alerts: "स्वास्थ्य अलर्ट",
         read_more: "और पढ़ें...",
         show_less: "कम दिखाएं",
         no_updates: "कोई हालिया अपडेट नहीं",
@@ -661,6 +680,12 @@ export const translations = {
         pick_character: "वह पात्र चुनें जो आपका प्रतिनिधित्व करता है",
         select_avatar: "अवतार चुनें",
         remove_photo: "फोटो हटाएं",
+        medical_conditions: "चिकित्सीय स्थिति",
+        diabetes: "मधुमेह",
+        hypertension_bp: "उच्च रक्तचाप (BP)",
+        thyroid: "थायराइड",
+        yes: "हाँ",
+        no: "नहीं",
 
         // Family
         family_members: "परिवार के सदस्य",
@@ -1732,7 +1757,37 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const [currentFamilyId, setCurrentFamilyId] = useState<string | null>(null);
     const [language, setLanguage] = useState<LanguageCode>('en');
     const [themeMode, setThemeMode] = useState<ThemeMode>('system');
+    const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
     const systemColorScheme = useColorScheme();
+
+    // 🌐 Load and Save User Preferences
+    useEffect(() => {
+        const loadSettings = async () => {
+            try {
+                const savedLang = await AsyncStorage.getItem('carevia_lang');
+                const savedTheme = await AsyncStorage.getItem('carevia_theme');
+                if (savedLang) setLanguage(savedLang as LanguageCode);
+                if (savedTheme) setThemeMode(savedTheme as ThemeMode);
+            } catch (e) {
+                console.warn('Error loading settings', e);
+            } finally {
+                setIsSettingsLoaded(true);
+            }
+        };
+        loadSettings();
+    }, []);
+
+    useEffect(() => {
+        if (isSettingsLoaded) {
+            AsyncStorage.setItem('carevia_lang', language).catch(() => { });
+        }
+    }, [language, isSettingsLoaded]);
+
+    useEffect(() => {
+        if (isSettingsLoaded) {
+            AsyncStorage.setItem('carevia_theme', themeMode).catch(() => { });
+        }
+    }, [themeMode, isSettingsLoaded]);
 
     const colors = useMemo(() => {
         if (themeMode === 'system') {

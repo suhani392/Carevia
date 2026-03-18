@@ -325,7 +325,7 @@ const ProfileScreen = () => {
             <View style={styles.itemLeft}>
                 <View style={styles.textContainer}>
                     <Text style={[styles.itemLabel, { color: colors.primary }]}>{label}</Text>
-                    <Text style={[styles.itemValue, { color: colors.textSecondary }]}>{value ? "Yes" : "No"}</Text>
+                    <Text style={[styles.itemValue, { color: colors.textSecondary }]}>{value ? t('yes') : t('no')}</Text>
                 </View>
             </View>
             <View style={[styles.toggleTrack, value ? { backgroundColor: colors.primary } : { backgroundColor: 'rgba(0,0,0,0.1)' }]}>
@@ -456,22 +456,22 @@ const ProfileScreen = () => {
                     <ProfileItem icon={EmergencyContactIcon} label={t('emergency_contact')} value={profile.emergencyContact} field="emergencyContact" colors={colors} />
                 </View>
 
-                <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 25 }]}>Medical Conditions</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 25 }]}>{t('medical_conditions')}</Text>
                 <View style={styles.itemsList}>
-                    <HealthToggle 
-                        label="Diabetes" 
-                        value={profile.has_diabetes} 
-                        onChange={(val) => updateToggle('has_diabetes', val)} 
+                    <HealthToggle
+                        label={t('diabetes')}
+                        value={profile.has_diabetes}
+                        onChange={(val) => updateToggle('has_diabetes', val)}
                     />
-                    <HealthToggle 
-                        label="Hypertension (BP)" 
-                        value={profile.has_bp} 
-                        onChange={(val) => updateToggle('has_bp', val)} 
+                    <HealthToggle
+                        label={t('hypertension_bp')}
+                        value={profile.has_bp}
+                        onChange={(val) => updateToggle('has_bp', val)}
                     />
-                    <HealthToggle 
-                        label="Thyroid" 
-                        value={profile.has_thyroid} 
-                        onChange={(val) => updateToggle('has_thyroid', val)} 
+                    <HealthToggle
+                        label={t('thyroid')}
+                        value={profile.has_thyroid}
+                        onChange={(val) => updateToggle('has_thyroid', val)}
                     />
                 </View>
 

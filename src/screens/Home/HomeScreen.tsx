@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Text, Image, Pressable, RefreshControl, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, ScrollView, Text, Image, Pressable, RefreshControl, TouchableOpacity, Dimensions } from 'react-native';
+import Svg, { Line, Circle, Text as SvgText, G } from 'react-native-svg';
+
+const { width } = Dimensions.get('window');
 import { LinearGradient } from 'expo-linear-gradient';
 import HomeHeader from './HomeHeader';
 import { ReportIcon, BotIcon } from './Icons';
@@ -17,7 +20,77 @@ const HomeScreen = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [isUpdatesExpanded, setIsUpdatesExpanded] = useState(false);
     const [isAlertsExpanded, setIsAlertsExpanded] = useState(false);
+    const [trendGraphData, setTrendGraphData] = useState<{ dates: string[], lines: { name: string, color: string, points: (number | null)[] }[] } | null>(null);
 
+    const loadTrends = async () => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data: userReports } = await supabase
+                .from('reports')
+                .select('id, created_at')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: true });
+
+            if (!userReports || userReports.length < 2) return;
+
+            const { data: structs } = await supabase
+                .from('structured_reports')
+                .select('report_id, parsed_json')
+                .in('report_id', userReports.map(r => r.id));
+
+            if (!structs || structs.length === 0) return;
+
+            let validReports = userReports.filter(r => structs.some(s => s.report_id === r.id));
+            if (validReports.length > 4) validReports = validReports.slice(-4); // Keep only last 4 reports
+
+            const dates = validReports.map(r => new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }));
+            const biomarkerMap: { [key: string]: { [reportId: string]: number } } = {};
+
+            validReports.forEach(report => {
+                const struct = structs.find(s => s.report_id === report.id);
+                if (struct?.parsed_json?.lab_tests) {
+                    (struct.parsed_json.lab_tests || []).forEach((b: any) => {
+                        if (!b.test_name) return;
+                        const bName = b.test_name.toLowerCase().trim();
+                        if (!biomarkerMap[bName]) biomarkerMap[bName] = {};
+
+                        let yVal = 0;
+                        const stat = (b.status || 'Normal').toLowerCase();
+                        if (stat.includes('borderline') || stat.includes('moderate') || stat.includes('warning')) yVal = 1;
+                        else if (stat.includes('high') || stat.includes('low') || stat.includes('critical') || stat.includes('danger') || stat.includes('abnormal')) yVal = 2;
+
+                        biomarkerMap[bName][report.id] = yVal;
+                    });
+                }
+            });
+
+            const validTerms = Object.keys(biomarkerMap).filter(k => Object.keys(biomarkerMap[k]).length >= 2);
+            const topTerms = validTerms.slice(0, 4);
+
+            if (topTerms.length === 0) return;
+
+            const colorsList = ['#FF4B4B', '#4ADE80', '#0062FF', '#FFB020'];
+
+            const lines = topTerms.map((term, idx) => {
+                const points = validReports.map(r => {
+                    const val = biomarkerMap[term][r.id];
+                    return val !== undefined ? val : null;
+                });
+                return { name: term.toUpperCase(), color: colorsList[idx % colorsList.length], points };
+            });
+
+            setTrendGraphData({ dates, lines });
+
+        } catch (e) {
+            console.error("Trend err:", e);
+        }
+    };
+
+    useEffect(() => {
+        loadTrends();
+    }, []);
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -120,11 +193,91 @@ const HomeScreen = () => {
                         </View>
                     </View>
                 </View>
+                {/* Trend Analysis Section */}
+                {trendGraphData && trendGraphData.dates.length > 0 && trendGraphData.lines.length > 0 && (
+                    <View style={[styles.section, { marginTop: 40 }]}>
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('trend_analysis')}</Text>
+                        <View style={[{ paddingVertical: 20, borderRadius: 20, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 3 }, { backgroundColor: colors.card }]}>
+                            {(() => {
+                                const GRAPH_HEIGHT = 160;
+                                const GRAPH_WIDTH = width - 40; // Full container width
+                                const PADDING_TOP = 20;
+                                const PADDING_BOTTOM = 30;
+                                const PADDING_LEFT = 65;
+                                const PADDING_RIGHT = 45;
+                                const Y_MAX = 2;
+
+                                const innerWidth = GRAPH_WIDTH - PADDING_LEFT - PADDING_RIGHT;
+                                const innerHeight = GRAPH_HEIGHT - PADDING_TOP - PADDING_BOTTOM;
+
+                                const getY = (val: number, lineIndex: number) => {
+                                    const base = PADDING_TOP + innerHeight - (val / Y_MAX) * innerHeight;
+                                    // Slight offset to prevent identical values from fully overlapping
+                                    const spread = (lineIndex - (trendGraphData.lines.length / 2)) * 3;
+                                    return base + spread;
+                                };
+                                const getX = (index: number) => PADDING_LEFT + (index / Math.max(1, trendGraphData.dates.length - 1)) * innerWidth;
+
+                                return (
+                                    <View>
+                                        <Svg width={GRAPH_WIDTH} height={GRAPH_HEIGHT}>
+                                            {/* Y Axis Grid Lines */}
+                                            <Line x1={PADDING_LEFT} y1={getY(2, 0)} x2={GRAPH_WIDTH - PADDING_RIGHT} y2={getY(2, 0)} stroke={themeMode === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)'} strokeWidth="1" strokeDasharray="4 4" />
+                                            <Line x1={PADDING_LEFT} y1={getY(1, 0)} x2={GRAPH_WIDTH - PADDING_RIGHT} y2={getY(1, 0)} stroke={themeMode === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)'} strokeWidth="1" strokeDasharray="4 4" />
+                                            <Line x1={PADDING_LEFT} y1={getY(0, 0)} x2={GRAPH_WIDTH - PADDING_RIGHT} y2={getY(0, 0)} stroke={themeMode === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)'} strokeWidth="1" strokeDasharray="4 4" />
+
+                                            {/* Y Axis Labels */}
+                                            <SvgText x={PADDING_LEFT - 10} y={getY(2, 0)} fill={colors.textSecondary} fontSize="10" textAnchor="end" alignmentBaseline="middle">Critical</SvgText>
+                                            <SvgText x={PADDING_LEFT - 10} y={getY(1, 0)} fill={colors.textSecondary} fontSize="10" textAnchor="end" alignmentBaseline="middle">Moderate</SvgText>
+                                            <SvgText x={PADDING_LEFT - 10} y={getY(0, 0)} fill={colors.textSecondary} fontSize="10" textAnchor="end" alignmentBaseline="middle">Normal</SvgText>
+
+                                            {/* X Axis Labels */}
+                                            {trendGraphData.dates.map((d: string, i: number) => (
+                                                <SvgText key={`x-${i}`} x={getX(i)} y={GRAPH_HEIGHT - 10} fill={colors.textSecondary} fontSize="10" textAnchor="middle">{d}</SvgText>
+                                            ))}
+
+                                            {/* Lines & Points */}
+                                            {trendGraphData.lines.map((line: any, lIdx: number) => {
+                                                let validPoints = line.points.map((p: any, i: number) => p !== null ? { x: getX(i), y: getY(p, lIdx) } : null);
+                                                return (
+                                                    <G key={`line-${lIdx}`}>
+                                                        {validPoints.map((pt: any, i: number) => {
+                                                            if (!pt) return null;
+                                                            const nextPt = validPoints.slice(i + 1).find((p: any) => p !== null);
+                                                            if (nextPt) {
+                                                                return <Line key={`l-${i}`} x1={pt.x} y1={pt.y} x2={nextPt.x} y2={nextPt.y} stroke={line.color} strokeWidth="2" />;
+                                                            }
+                                                            return null;
+                                                        })}
+                                                        {validPoints.map((pt: any, i: number) => {
+                                                            if (!pt) return null;
+                                                            return <Circle key={`c-${i}`} cx={pt.x} cy={pt.y} r="4" fill={line.color} />;
+                                                        })}
+                                                    </G>
+                                                );
+                                            })}
+                                        </Svg>
+
+                                        {/* Legend */}
+                                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 15, paddingHorizontal: 15, justifyContent: 'center' }}>
+                                            {trendGraphData.lines.map((line: any, idx: number) => (
+                                                <View key={`legend-${idx}`} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 15, marginBottom: 5 }}>
+                                                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: line.color, marginRight: 5 }} />
+                                                    <Text style={{ color: colors.text, fontSize: 12, fontFamily: 'Judson-Bold' }}>{line.name}</Text>
+                                                </View>
+                                            ))}
+                                        </View>
+                                    </View>
+                                );
+                            })()}
+                        </View>
+                    </View>
+                )}
 
                 {/* Health Alerts Section */}
                 {alerts && alerts.length > 0 && (
-                    <View style={styles.section}>
-                        <Text style={[styles.sectionTitle, { color: colors.text }]}>Health Alerts</Text>
+                    <View style={[styles.section, { marginTop: 40 }]}>
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('health_alerts')}</Text>
                         <>
                             {(isAlertsExpanded ? alerts : alerts.slice(0, 3)).map((alert) => {
                                 let alertName = "Someone";
@@ -185,7 +338,7 @@ const HomeScreen = () => {
                 )}
 
                 {/* Family Updates Section */}
-                <View style={styles.section}>
+                <View style={[styles.section, { marginTop: 40 }]}>
                     <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('family_updates')}</Text>
 
                     {updates.length > 0 ? (
