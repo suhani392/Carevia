@@ -56,6 +56,8 @@ const ScanReportScreen = () => {
     const [displayStatus, setDisplayStatus] = useState('');
     const lastStatusChange = useRef(Date.now());
     const [isSaved, setIsSaved] = useState(false);
+    const [showAiThinkingModal, setShowAiThinkingModal] = useState(false);
+    const [aiLogs, setAiLogs] = useState<any[]>([]);
     const cameraRef = useRef<CameraView>(null);
     const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -96,6 +98,26 @@ const ScanReportScreen = () => {
             'Building easy-to-read explanations...',
             'Completing your report insights...'
         ]
+    };
+
+    const handleViewAiThinking = async () => {
+        if (!currentReportId) return;
+        setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('audit_logs')
+                .select('*')
+                .eq('report_id', currentReportId)
+                .order('created_at', { ascending: true });
+            
+            if (error) throw error;
+            setAiLogs(data || []);
+            setShowAiThinkingModal(true);
+        } catch (err: any) {
+            Alert.alert("Error", err.message);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleStartAnalysis = async () => {
@@ -508,6 +530,14 @@ const ScanReportScreen = () => {
 
                         {analysisResult && (
                             <View style={{ gap: 15, marginTop: 10 }}>
+                                <TouchableOpacity
+                                    style={[styles.analyzeButton, { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.primary }]}
+                                    onPress={handleViewAiThinking}
+                                >
+                                    <BotIcon size={20} color={colors.primary} />
+                                    <Text style={[styles.analyzeButtonText, { fontSize: 16, color: colors.primary }]}>View AI Thinking</Text>
+                                </TouchableOpacity>
+
                                 {!isSaved && (
                                     <TouchableOpacity
                                         style={[styles.analyzeButton, { backgroundColor: colors.primary }]}
@@ -579,6 +609,36 @@ const ScanReportScreen = () => {
                                     <Text style={{ color: '#FFF', fontWeight: 'bold' }}>{loading ? t('saving') : t('save_now')}</Text>
                                 </TouchableOpacity>
                             </View>
+                        </View>
+                    </View>
+                </Modal>
+
+                <Modal visible={showAiThinkingModal} transparent animationType="slide" onRequestClose={() => setShowAiThinkingModal(false)}>
+                    <View style={[styles.modalOverlay, { justifyContent: 'flex-end', padding: 0 }]}>
+                        <View style={[styles.modalContent, { backgroundColor: colors.background, width: '100%', maxHeight: '85%', borderBottomLeftRadius: 0, borderBottomRightRadius: 0, paddingHorizontal: 25, paddingTop: 30 }]}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 25 }}>
+                                <Text style={[styles.modalTitle, { color: colors.text, marginBottom: 0 }]}>System Audit Trail</Text>
+                                <Pressable onPress={() => setShowAiThinkingModal(false)} style={{ padding: 5, backgroundColor: colors.card, borderRadius: 20 }}>
+                                    <CrossIcon size={20} color={colors.textSecondary} />
+                                </Pressable>
+                            </View>
+                            
+                            <ScrollView style={{ width: '100%' }} showsVerticalScrollIndicator={false}>
+                                {aiLogs.map((log, index) => (
+                                    <View key={index} style={{ flexDirection: 'row', marginBottom: 25 }}>
+                                        <View style={{ width: 30, alignItems: 'center' }}>
+                                            <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: log.confidence === 'HIGH' ? colors.success : log.confidence === 'LOW' ? colors.border : colors.warning, zIndex: 2, marginTop: 5 }} />
+                                            {index !== aiLogs.length - 1 && <View style={{ width: 2, flex: 1, backgroundColor: colors.cardBorder || '#333', marginTop: -5, marginBottom: -30, zIndex: 1 }} />}
+                                        </View>
+                                        <View style={{ flex: 1, backgroundColor: colors.card, padding: 18, borderRadius: 20, marginLeft: 10, borderWidth: 1, borderColor: colors.cardBorder || '#333' }}>
+                                            <Text style={{ fontSize: 13, fontFamily: 'Judson-Bold', color: colors.primary, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>{log.agent_name}</Text>
+                                            <Text style={{ fontSize: 17, fontFamily: 'Judson-Bold', color: colors.text, marginBottom: 6 }}>{log.event_type}</Text>
+                                            <Text style={{ fontSize: 15, fontFamily: 'Judson-Regular', color: colors.textSecondary, lineHeight: 22 }}>{log.decision_reason}</Text>
+                                        </View>
+                                    </View>
+                                ))}
+                                <View style={{ height: 40 }} />
+                            </ScrollView>
                         </View>
                     </View>
                 </Modal>
