@@ -17,9 +17,8 @@ export class AlertAgent {
             return; // No intrusive system alerts needed
         }
 
-        const message = riskLevel === 'Critical' 
-            ? `Critical abnormalities detected (${reasons[0]}). Immediate physician consultation recommended.`
-            : `High risk patterns detected. Please review your report carefully and consult a doctor.`;
+        const concern = reasons.length > 0 ? reasons.slice(0, 2).join(', ') : 'concerning patterns';
+        const message = `Urgent: ${concern} was detected in your report. This is classified as ${riskLevel}. Please consult a doctor immediately.`;
 
         // Create the Action in the database
         const { error } = await supabase.from('alerts_and_actions').insert({

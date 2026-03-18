@@ -10,44 +10,68 @@ export class FamilyAgent {
         supabase: any,
         reportId: string,
         userId: string,
-        riskLevel: string
+        riskLevel: string,
+        reasons: string[] = []
     ) {
         // Only escalate dangerous reports
         if (riskLevel !== 'Critical' && riskLevel !== 'High Risk') {
             return;
         }
 
-        // Check if there is a caregiver linked (assuming standard profiles/links logic)
-        // Since we don't know the exact schema for family links, we look for a simple dependent flag
-        // or a shared caregiver ID. If none, we fail gracefully.
-        
-        // Example check: Does this user have a designated primary caregiver?
-        const { data: profile } = await supabase.from('profiles').select('caregiver_id, age').eq('id', userId).maybeSingle();
-        
-        if (profile && profile.caregiver_id) {
-            const isVulnerable = profile.age ? profile.age < 18 || profile.age > 65 : true;
+        // We use the existing 'family_id' in profiles to identify family members
+        const { data: userProfile } = await supabase
+            .from('profiles')
+            .select('family_id, full_name')
+            .eq('id', userId)
+            .maybeSingle();
 
-            // Create Family Escaltion Action if vulnerable or caregiver explicitly exists
-            const { error } = await supabase.from('alerts_and_actions').insert({
-                report_id: reportId,
-                user_id: profile.caregiver_id, // Target the caregiver!
-                risk_level: riskLevel,
-                action_type: 'FAMILY_ESCALATION',
-                action_message: `A report for your dependent was flagged as ${riskLevel}. Please review it immediately.`,
-                status: 'Pending'
-            });
+        const activeFamilyId = userProfile?.family_id;
 
-            if (!error) {
-                // Escalate status on the original report for the UI
-                await supabase.from('reports').update({ escalation_status: 'Escalated to Caregiver' }).eq('id', reportId);
+        if (activeFamilyId) {
+            // Find all other members of this family group
+            const { data: familyMembers } = await supabase
+                .from('profiles')
+                .select('id, full_name')
+                .or(`family_id.eq.${activeFamilyId},id.eq.${activeFamilyId}`)
+                .neq('id', userId); // Don't alert the user themselves
 
+            if (familyMembers && familyMembers.length > 0) {
+                const patientName = userProfile.full_name || 'A family member';
+                const concern = reasons.length > 0 ? reasons.slice(0, 2).join(', ') : 'abnormal patterns';
+
+                // Create an alert for EACH family member
+                const alerts = familyMembers.map((member: any) => ({
+                    report_id: reportId,
+                    user_id: member.id, // Primary target is the family member
+                    target_user_id: userId, // The person whose report it is
+                    risk_level: riskLevel,
+                    action_type: 'FAMILY_ESCALATION',
+                    action_message: `Emergency for ${patientName}: ${concern} has been flagged as ${riskLevel}. Please contact them immediately.`,
+                    status: 'Pending'
+                }));
+
+                const { error } = await supabase.from('alerts_and_actions').insert(alerts);
+
+                if (!error) {
+                    await supabase.from('reports').update({ escalation_status: `Escalated to ${familyMembers.length} members` }).eq('id', reportId);
+
+                    await AuditLogger.log(
+                        supabase,
+                        reportId,
+                        'Family Escalation Agent',
+                        'Family Notification',
+                        `Escalated ${riskLevel} report to ${familyMembers.length} family members.`,
+                        'HIGH'
+                    );
+                }
+            } else {
                 await AuditLogger.log(
                     supabase,
                     reportId,
                     'Family Escalation Agent',
-                    'Caregiver Notification',
-                    `Escalated ${riskLevel} report to assigned caregiver (${profile.caregiver_id}).`,
-                    'HIGH'
+                    'Search',
+                    `User belongs to family ${activeFamilyId} but no other members were found.`,
+                    'LOW'
                 );
             }
         } else {
@@ -56,8 +80,8 @@ export class FamilyAgent {
                 supabase,
                 reportId,
                 'Family Escalation Agent',
-                'Caregiver Search',
-                `No caregiver linked to profile. Escalation skipped.`,
+                'Skipped',
+                `No family_id linked to user profile. Escalation skipped.`,
                 'LOW'
             );
         }

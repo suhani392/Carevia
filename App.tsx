@@ -1,6 +1,7 @@
 import 'react-native-url-polyfill/auto';
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, ActivityIndicator, Alert } from 'react-native';
+import { StyleSheet, View, ActivityIndicator, Modal, Text, TouchableOpacity, Vibration } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import * as Font from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
@@ -35,8 +36,9 @@ SplashScreen.preventAutoHideAsync();
 
 function AppContent() {
     const { currentScreen, navigate } = useNavigation();
-    const { colors } = useAppContext();
+    const { colors, themeMode } = useAppContext();
     const [authChecked, setAuthChecked] = useState(false);
+    const [emergencyAlert, setEmergencyAlert] = useState<{ title: string; message: string } | null>(null);
 
     useEffect(() => {
         // Check initial session
@@ -64,7 +66,7 @@ function AppContent() {
             }
         });
 
-        // 🚨 GLOBAL ALERT LISTENER (Hackathon Frontend Proof)
+        //  GLOBAL ALERT LISTENER (Hackathon Frontend Proof)
         // This listens to the 'alerts_and_actions' table in real-time.
         // If an AI agent fires a Family Escalation or Urgent Banner, this pops up.
         const alertsSubscription = supabase
@@ -81,16 +83,28 @@ function AppContent() {
                     if (!user) return;
 
                     // Only show alert if it's for ME or targeted to ME (as a caregiver)
+                    // Only show alert if it's for ME or targeted to ME
                     if (payload.new.user_id === user.id || payload.new.target_user_id === user.id) {
-                        const title = payload.new.action_type === 'FAMILY_ESCALATION' 
-                            ? "👨‍👩‍👧 Family Emergency Alert" 
-                            : "⚠️ Urgent Report Update";
-                        
-                        Alert.alert(
-                            title,
-                            payload.new.action_message,
-                            [{ text: "View Details", onPress: () => navigate('reports') }, { text: "Dismiss", style: 'cancel' }]
-                        );
+                        const title = payload.new.action_type === 'FAMILY_ESCALATION'
+                            ? "Family Emergency"
+                            : "Urgent Update";
+
+                        let message = payload.new.action_message;
+
+                        // Personalize msg: if report belongs to me, change name to "Your"
+                        // This handles both direct alerts and potential family broadcasts where I am the patient.
+                        const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
+                        if (profile?.full_name && message.includes(profile.full_name)) {
+                            message = message.replace(profile.full_name, "Your");
+                            // Fix possessive: "Your's" -> "Your"
+                            message = message.replace("Your's", "Your");
+                            // Handle "Emergency for Your" -> "Your Emergency" if triggered by agent
+                            message = message.replace("Emergency for Your", "Your Emergency");
+                        }
+
+                        // Vibrate and show custom modal
+                        Vibration.vibrate([0, 500, 200, 500]);
+                        setEmergencyAlert({ title, message });
                     }
                 }
             )
@@ -163,6 +177,29 @@ function AppContent() {
                     onTabChange={(tab) => navigate(tab as ScreenName)}
                 />
             )}
+
+            {/*  PREMIUM EMERGENCY ALERT MODAL */}
+            <Modal
+                visible={!!emergencyAlert}
+                transparent={true}
+                animationType="slide"
+            >
+                <View style={styles.alertOverlay}>
+                    <View style={styles.alertContent}>
+                        <View style={styles.alertCard}>
+                            <Text style={styles.alertTitle}>{emergencyAlert?.title}</Text>
+                            <Text style={styles.alertMessage}>{emergencyAlert?.message}</Text>
+
+                            <TouchableOpacity
+                                style={styles.alertButton}
+                                onPress={() => setEmergencyAlert(null)}
+                            >
+                                <Text style={styles.alertButtonText}>Okay</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -215,6 +252,60 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: '#FFFFFF',
+    },
+    alertOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 25,
+    },
+    alertContent: {
+        width: '100%',
+        backgroundColor: '#FFF5F5',
+        borderRadius: 20,
+        borderWidth: 1.5,
+        borderColor: '#FF4D4D',
+        padding: 25,
+        elevation: 10,
+        shadowColor: '#FF4D4D',
+        shadowOffset: { width: 0, height: 5 },
+        shadowOpacity: 0.2,
+        shadowRadius: 10,
+    },
+    alertCard: {
+        alignItems: 'center',
+    },
+    alertIcon: {
+        fontSize: 40,
+        marginBottom: 10,
+    },
+    alertTitle: {
+        fontFamily: 'Judson-Bold',
+        fontSize: 22,
+        color: '#FF4D4D',
+        marginBottom: 12,
+        textAlign: 'center',
+    },
+    alertMessage: {
+        fontFamily: 'Judson-Regular',
+        fontSize: 16,
+        color: '#333333',
+        textAlign: 'center',
+        marginBottom: 25,
+        lineHeight: 22,
+    },
+    alertButton: {
+        backgroundColor: '#FF4D4D',
+        paddingHorizontal: 40,
+        paddingVertical: 12,
+        borderRadius: 25,
+        elevation: 3,
+    },
+    alertButtonText: {
+        fontFamily: 'Judson-Bold',
+        fontSize: 16,
+        color: '#FFFFFF',
     }
 });
 

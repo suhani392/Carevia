@@ -100,7 +100,7 @@ serve(async (req) => {
             // 🤖 4. Alert & Action Triggers
             if (riskData.riskLevel === 'High Risk' || riskData.riskLevel === 'Critical') {
                 await AlertAgent.trigger(supabase, reportId, report.user_id, riskData.riskLevel, riskData.reasons);
-                await FamilyAgent.evaluateEscalation(supabase, reportId, report.user_id, riskData.riskLevel);
+                await FamilyAgent.evaluateEscalation(supabase, reportId, report.user_id, riskData.riskLevel, riskData.reasons);
             }
 
             await supabase.from('reports').update({ analysis: "Carevia is writing insights..." }).eq('id', reportId);
