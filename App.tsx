@@ -1,6 +1,6 @@
 import 'react-native-url-polyfill/auto';
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, ActivityIndicator, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Font from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
@@ -64,10 +64,43 @@ function AppContent() {
             }
         });
 
+        // 🚨 GLOBAL ALERT LISTENER (Hackathon Frontend Proof)
+        // This listens to the 'alerts_and_actions' table in real-time.
+        // If an AI agent fires a Family Escalation or Urgent Banner, this pops up.
+        const alertsSubscription = supabase
+            .channel('global-alerts')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'alerts_and_actions',
+                },
+                async (payload) => {
+                    const { data: { user } } = await supabase.auth.getUser();
+                    if (!user) return;
+
+                    // Only show alert if it's for ME or targeted to ME (as a caregiver)
+                    if (payload.new.user_id === user.id || payload.new.target_user_id === user.id) {
+                        const title = payload.new.action_type === 'FAMILY_ESCALATION' 
+                            ? "👨‍👩‍👧 Family Emergency Alert" 
+                            : "⚠️ Urgent Report Update";
+                        
+                        Alert.alert(
+                            title,
+                            payload.new.action_message,
+                            [{ text: "View Details", onPress: () => navigate('reports') }, { text: "Dismiss", style: 'cancel' }]
+                        );
+                    }
+                }
+            )
+            .subscribe();
+
         const subscription = authListener?.data?.subscription;
 
         return () => {
             if (subscription) subscription.unsubscribe();
+            supabase.removeChannel(alertsSubscription);
         };
     }, []);
 
