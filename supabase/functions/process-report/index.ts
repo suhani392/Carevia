@@ -7,6 +7,7 @@ import { RiskAgent } from './agents/RiskAgent.ts'
 import { GuardrailAgent } from './agents/GuardrailAgent.ts'
 import { AlertAgent } from './agents/AlertAgent.ts'
 import { FamilyAgent } from './agents/FamilyAgent.ts'
+import { LanguageAgent } from './agents/LanguageAgent.ts'
 import { AuditLogger } from './services/AuditLogger.ts'
 
 const corsHeaders = {
@@ -68,25 +69,25 @@ serve(async (req) => {
 
             // 🤖 1. Call OCR Agent
             const ocrResult = await OcrAgent.run(supabase, reportId, mimeType, base64Content, aiKey);
-            
+
             if (ocrResult.confidence === 'LOW') {
-                await supabase.from('reports').update({ 
+                await supabase.from('reports').update({
                     report_confidence: 'LOW',
                     analysis: "Action Required: The report is too blurry. Please re-upload for accurate results.",
-                    raw_text: ocrResult.extracted_text 
+                    raw_text: ocrResult.extracted_text
                 }).eq('id', reportId);
                 return new Response(JSON.stringify({ success: true, confidence: 'LOW' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
             }
 
-            await supabase.from('reports').update({ 
-                raw_text: ocrResult.extracted_text, 
-                report_confidence: ocrResult.confidence, 
-                analysis: "Organizing medical data..." 
+            await supabase.from('reports').update({
+                raw_text: ocrResult.extracted_text,
+                report_confidence: ocrResult.confidence,
+                analysis: "Organizing medical data..."
             }).eq('id', reportId);
 
             return new Response(JSON.stringify({ success: true, confidence: ocrResult.confidence }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-        // --- STAGE 2: STRUCTURING & RISK EVALUATION ---
+            // --- STAGE 2: STRUCTURING & RISK EVALUATION ---
         } else if (stage === 'structuring') {
             const { data: report, error: reportErr } = await supabase.from('reports').select('raw_text, user_id').eq('id', reportId).single();
             if (reportErr || !report?.raw_text) throw new Error("Raw text not found for structuring.");
@@ -101,12 +102,16 @@ serve(async (req) => {
             if (riskData.riskLevel === 'High Risk' || riskData.riskLevel === 'Critical') {
                 await AlertAgent.trigger(supabase, reportId, report.user_id, riskData.riskLevel, riskData.reasons);
                 await FamilyAgent.evaluateEscalation(supabase, reportId, report.user_id, riskData.riskLevel, riskData.reasons);
+            } else {
+                // Log skips for transparency in audit trail
+                await AlertAgent.skip(supabase, reportId, riskData.riskLevel);
+                await FamilyAgent.skip(supabase, reportId, riskData.riskLevel);
             }
 
             await supabase.from('reports').update({ analysis: "Carevia is writing insights..." }).eq('id', reportId);
             return new Response(JSON.stringify({ success: true, riskLevel: riskData.riskLevel }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-        // --- STAGE 3: COMPLIANT EXPLANATION ---
+            // --- STAGE 3: COMPLIANT EXPLANATION ---
         } else if (stage === 'explanation') {
             const { data: struct, error: structErr } = await supabase.from('structured_reports').select('id, parsed_json, user_id').eq('report_id', reportId).maybeSingle();
             if (structErr || !struct?.parsed_json) throw new Error("Structured data missing from database.");
@@ -116,6 +121,8 @@ serve(async (req) => {
 
             // Fetch user profile for context
             let profileContext = "No prior health conditions specifically recorded.";
+            let targetLanguage = 'en';
+
             if (struct.user_id) {
                 const { data: profile } = await supabase.from('profiles').select('has_diabetes, has_bp, has_thyroid').eq('id', struct.user_id).single();
                 if (profile) {
@@ -129,21 +136,57 @@ serve(async (req) => {
                 }
             }
 
+            // Target Language comes from the body, injected by the frontend if available
+            if (body.target_language && body.target_language !== 'en') {
+                targetLanguage = body.target_language;
+            }
+
             // Fetch trends calculated by RiskAgent
             const { data: trends } = await supabase.from('trend_cache').select('test_name, trend_status, percentage_change, previous_value').eq('structured_report_id', struct.id);
 
             // 🤖 5. Call Guardrail Agent to generate explanation securely
-            await GuardrailAgent.generateSafeExplanation(
-                supabase, 
-                reportId, 
-                struct.parsed_json, 
-                trends || [], 
-                riskLevel, 
-                profileContext, 
+            const englishExplanation = await GuardrailAgent.generateSafeExplanation(
+                supabase,
+                reportId,
+                struct.parsed_json,
+                trends || [],
+                riskLevel,
+                profileContext,
                 aiKey
             );
 
-            await supabase.from('reports').update({ analysis: "Complete! Multi-Agent Insights ready." }).eq('id', reportId);
+            // 🤖 6. Multi-language Translation (Language Agent)
+            let finalExplanation = englishExplanation;
+            if (targetLanguage && targetLanguage !== 'en') {
+                finalExplanation = await LanguageAgent.translate(supabase, reportId, englishExplanation, targetLanguage, aiKey);
+            } else {
+                await LanguageAgent.skip(supabase, reportId, targetLanguage || 'en');
+            }
+
+            if (targetLanguage !== 'en') {
+                await supabase.from('reports').update({ analysis: "Analysis finalized..." }).eq('id', reportId);
+            } else {
+                await supabase.from('reports').update({ analysis: "Analysis ready" }).eq('id', reportId);
+            }
+
+            return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+            // --- STAGE 4: TRANSLATION (Dynamic) ---
+        } else if (stage === 'translation') {
+            const { data: struct, error: structErr } = await supabase.from('structured_reports').select('id, parsed_json, explanation_json').eq('report_id', reportId).maybeSingle();
+            if (structErr || !struct?.explanation_json) throw new Error("English explanation missing from database.");
+
+            let targetLanguage = 'en';
+            if (body.target_language && body.target_language !== 'en') {
+                targetLanguage = body.target_language;
+            }
+
+            if (targetLanguage !== 'en') {
+                await supabase.from('reports').update({ analysis: "Translating insights to your language..." }).eq('id', reportId);
+                await LanguageAgent.translate(supabase, reportId, struct.explanation_json, targetLanguage, aiKey);
+            }
+
+            await supabase.from('reports').update({ analysis: "Analysis ready" }).eq('id', reportId);
 
             return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
@@ -155,7 +198,7 @@ serve(async (req) => {
         if (reportId) {
             const supabase = createClient(Deno.env.get('SUPABASE_URL') || "", Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || "");
             await supabase.from('reports').update({ analysis: `Error: ${err.message}` }).eq('id', reportId);
-            
+
             // Log pipeline failures
             await AuditLogger.log(supabase, reportId, 'System Orchestrator', 'Pipeline Failure', err.message, 'LOW');
         }

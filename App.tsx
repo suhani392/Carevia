@@ -85,9 +85,10 @@ function AppContent() {
                     const { data: { user } } = await supabase.auth.getUser();
                     if (!user) return;
 
-                    // Only show alert if it's for ME or targeted to ME (as a caregiver)
-                    // Only show alert if it's for ME or targeted to ME
-                    if (payload.new.user_id === user.id || payload.new.target_user_id === user.id) {
+                    // 🦾 FIX: Only show alert if it is EXPLICITLY for ME.
+                    // Previously, it would also trigger for 'target_user_id === user.id', 
+                    // which caused the patient to receive their own family escalation alert (Double Popup).
+                    if (payload.new.user_id === user.id) {
                         const title = payload.new.action_type === 'FAMILY_ESCALATION'
                             ? "Family Emergency"
                             : "Urgent Update";

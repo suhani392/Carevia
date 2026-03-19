@@ -37,16 +37,21 @@ export class FamilyAgent {
 
             if (familyMembers && familyMembers.length > 0) {
                 const patientName = userProfile.full_name || 'A family member';
-                const concern = reasons.length > 0 ? reasons.slice(0, 2).join(', ') : 'abnormal patterns';
+                
+                // 🦾 Use the same consolidated summary logic as AlertAgent
+                const majorConcerns = reasons.slice(0, 3);
+                const concernText = majorConcerns.length > 1 
+                    ? `${majorConcerns.slice(0, -1).join(', ')} and ${majorConcerns.slice(-1)}`
+                    : majorConcerns[0] || 'abnormal patterns';
 
-                // Create an alert for EACH family member
+                // Create alert for EACH family member except the patient themselves
                 const alerts = familyMembers.map((member: any) => ({
                     report_id: reportId,
-                    user_id: member.id, // Primary target is the family member
-                    target_user_id: userId, // The person whose report it is
+                    user_id: member.id,
+                    target_user_id: userId, // Identify as patient
                     risk_level: riskLevel,
                     action_type: 'FAMILY_ESCALATION',
-                    action_message: `Emergency for ${patientName}: ${concern} has been flagged as ${riskLevel}. Please contact them immediately.`,
+                    action_message: `Emergency for ${patientName}: ${concernText} were flagged as ${riskLevel}. Please contact them immediately.`,
                     status: 'Pending'
                 }));
 
@@ -69,7 +74,7 @@ export class FamilyAgent {
                     supabase,
                     reportId,
                     'Family Escalation Agent',
-                    'Search',
+                    'Skipped: No Members',
                     `User belongs to family ${activeFamilyId} but no other members were found.`,
                     'LOW'
                 );
@@ -80,10 +85,21 @@ export class FamilyAgent {
                 supabase,
                 reportId,
                 'Family Escalation Agent',
-                'Skipped',
+                'Skipped: No Family ID',
                 `No family_id linked to user profile. Escalation skipped.`,
                 'LOW'
             );
         }
+    }
+
+    static async skip(supabase: any, reportId: string, riskLevel: string) {
+        await AuditLogger.log(
+            supabase,
+            reportId,
+            'Family Escalation Agent',
+            'Skipped: Notification',
+            `Family escalation skipped because risk level is ${riskLevel} (Below threshold).`,
+            'LOW'
+        );
     }
 }

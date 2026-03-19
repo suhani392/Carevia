@@ -40,7 +40,7 @@ const decodeBase64 = (base64: string) => {
 
 const ScanReportScreen = () => {
     const { goBack, navigate, screenParams } = useNavigation();
-    const { colors, themeMode, t, refreshData } = useAppContext();
+    const { colors, themeMode, t, refreshData, language } = useAppContext();
     const [permission, requestPermission] = useCameraPermissions();
     const [torch, setTorch] = useState(false);
     const [capturedImages, setCapturedImages] = useState<string[]>([]);
@@ -279,9 +279,22 @@ const ScanReportScreen = () => {
                         // 2. If Structuring is done, trigger Explanation
                         if (data.analysis === 'Carevia is writing insights...' && !stageTriggered.current['explanation']) {
                             stageTriggered.current['explanation'] = true;
-                            console.log("[Orchestrator] Triggering Explanation...");
+                            console.log(`[Orchestrator] Triggering Explanation... (Frontend Language Set To: ${language})`);
                             supabase.functions.invoke('process-report', {
-                                body: { report_id: currentReportId, stage: 'explanation' },
+                                body: { report_id: currentReportId, stage: 'explanation', target_language: language },
+                                headers: {
+                                    'apikey': anonKey,
+                                    'Authorization': `Bearer ${anonKey}`
+                                }
+                            });
+                        }
+
+                        // 3. If Explanation finishes in non-English mode, trigger Translation!
+                        if (data.analysis === 'Analysis finalized...' && !stageTriggered.current['translation']) {
+                            stageTriggered.current['translation'] = true;
+                            console.log("[Orchestrator] Triggering Translation...");
+                            supabase.functions.invoke('process-report', {
+                                body: { report_id: currentReportId, stage: 'translation', target_language: language },
                                 headers: {
                                     'apikey': anonKey,
                                     'Authorization': `Bearer ${anonKey}`
@@ -291,18 +304,23 @@ const ScanReportScreen = () => {
 
                         if (data?.analysis?.includes("ready") || data?.analysis?.includes("Insights")) {
                             // Special check: Only finish if we actually HAVE the explanation in the DB
-                            const { data: structData } = await supabase
+                            const { data: structData, error: dbErr } = await supabase
                                 .from('structured_reports')
-                                .select('explanation_json')
+                                .select('*')
                                 .eq('report_id', currentReportId)
                                 .maybeSingle();
 
-                            if (structData?.explanation_json) {
+                            if (dbErr) console.error("[Status] DB Fetch Error:", dbErr);
+                            console.log("[Status] Debug structData:", !!structData, "exp_json:", !!structData?.explanation_json, "trans_exp_json:", !!structData?.translated_explanation_json);
+
+                            if (structData?.explanation_json || structData?.translated_explanation_json) {
                                 console.log("[Status] Explanation found! Loading UI.");
-                                setAnalysisResult(structData.explanation_json);
+                                setAnalysisResult(structData.translated_explanation_json || structData.explanation_json);
                                 setIsAnalyzing(false);
                                 DeviceEventEmitter.emit('ANALYSIS_END');
                                 clearInterval(interval);
+                            } else {
+                                console.log("[Status] Ready state hit, but structData holds no explanation JSON! Interval restarting...");
                             }
                         } else if (data?.analysis?.toLowerCase().includes("error")) {
                             console.error("[Status] Analysis failed:", data.analysis);
@@ -322,7 +340,7 @@ const ScanReportScreen = () => {
             // Reset triggers when component unmounts or analysis stops
             if (!isAnalyzing) stageTriggered.current = {};
         };
-    }, [isAnalyzing, currentReportId, pollingStatus, displayStatus]);
+    }, [isAnalyzing, currentReportId, pollingStatus, displayStatus, language]);
 
     useEffect(() => {
         if (!permission) requestPermission();
@@ -449,19 +467,37 @@ const ScanReportScreen = () => {
                                         const lower = heading.toLowerCase();
 
                                         // 1. High/Low/Danger/Abnormal (Red) - Priority 1
-                                        if (lower.includes('high') || lower.includes('low') || lower.includes('danger') || lower.includes('abnormal') || lower.includes('critical') || lower.includes('urgent')) {
-                                            return colors.error;
-                                        }
+                                        const redKeywords = [
+                                            'high', 'low', 'danger', 'abnormal', 'critical', 'urgent',
+                                            'उच्च', 'कम', 'कमी', 'असामान्य', 'गंभीर', 'खतरा', 'धोका', 'जास्त', 'अधिक',
+                                            'ಹೆಚ್ಚು', 'ಕಡಿಮೆ', 'ಅಸಹಜ', 'ಅಪಾಯ', 'ಗಂಭೀರ',
+                                            'ਉੱਚ', 'ਘੱਟ', 'ਅਸਧਾਰਨ', 'ਖਤਰਾ', 'ਗੰਭੀਰ',
+                                            'அதிக', 'குறைவு', 'குறைந்த', 'அசாதாரண', 'ஆபத்து', 'கடுமையான',
+                                            'વધુ', 'ઓછું', 'અસામાન્ય', 'ભય', 'ગંભીર'
+                                        ];
+                                        if (redKeywords.some(kw => lower.includes(kw))) return colors.error;
 
                                         // 2. Borderline/Moderate/Warning (Yellow) - Priority 2
-                                        if (lower.includes('borderline') || lower.includes('moderate') || lower.includes('caution') || lower.includes('warning') || lower.includes('risk')) {
-                                            return colors.warning;
-                                        }
+                                        const yellowKeywords = [
+                                            'borderline', 'moderate', 'caution', 'warning', 'risk',
+                                            'मध्यम', 'चेतावनी', 'चेतावणी', 'सीमांत', 'सीमांकित', 'किरकोळ', 'हल्का', 'बॉर्डरलाइन',
+                                            'ಮಧ್ಯಮ', 'ಎಚ್ಚರಿಕೆ',
+                                            'ਮੱਧਮ', 'ਚੇਤਾਵਨੀ',
+                                            'மிதமான', 'எச்சரிக்கை',
+                                            'ચેતવણી', 'મધ્યમ'
+                                        ];
+                                        if (yellowKeywords.some(kw => lower.includes(kw))) return colors.warning;
 
                                         // 3. Normal/Perfect/Stable (Green) - Priority 3
-                                        if (lower.includes('normal') || lower.includes('perfect') || lower.includes('optimal') || lower.includes('stable') || lower.includes('good') || lower.includes('healthy')) {
-                                            return colors.success;
-                                        }
+                                        const greenKeywords = [
+                                            'normal', 'perfect', 'optimal', 'stable', 'good', 'healthy',
+                                            'सामान्य', 'स्वस्थ', 'निरोगी', 'बेहतर', 'उत्तम', 'स्थिर', 'सही', 'योग्य',
+                                            'ಸಾಮಾನ್ಯ', 'ಆರೋಗ್ಯಕರ', 'ಸ್ಥಿರ', 'ಉತ್ತಮ',
+                                            'ਆਮ', 'ਸਿਹਤਮੰਦ', 'ਸਥਿਰ', 'ਵਧੀਆ',
+                                            'சாதாரண', 'ஆரோக்கியமான', 'நிலையான', 'நல்ல',
+                                            'સામાન્ય', 'સ્વસ્થ', 'સ્થિર', 'સારું'
+                                        ];
+                                        if (greenKeywords.some(kw => lower.includes(kw))) return colors.success;
 
                                         return colors.text;
                                     };
