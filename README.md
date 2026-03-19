@@ -1,130 +1,170 @@
 # Carevia
 
-**Your Personal Healthcare Vault and AI Health Advisor.**
+**A Compliance-First Multi-Agent Healthcare Intelligence System for Medical Report Understanding, Risk Escalation, and Family-Aware Care.**
 
-Carevia is a premium mobile experience designed to bridge the gap between complex medical data and patient understanding. It combines high-performance document management with a sophisticated multi-agent AI pipeline, ensuring health records are accessible, secure, and translated into clear, actionable insights.
+Carevia is a domain-specialized healthcare AI system built for **ET Gen AI Hackathon 2026 — Problem Statement 5: Domain-Specialized AI Agents with Compliance Guardrails**.
 
----
+It helps users and families securely upload medical reports, extract structured health data, explain results in simple language, detect concerning trends, classify risk, trigger safe alerts, escalate critical findings to caregivers, and maintain a full audit trail of every important AI/system decision.
 
-## The Problem
-
-Medical reports are often filled with dense jargon, making it difficult for patients to understand their own health status. This leads to:
-* **Alert Fatigue**: Users receiving multiple, scattered notifications for the same medical event.
-* **Language Barriers**: Patients struggling to interpret reports not written in their native language.
-* **Dependent Vulnerability**: Family members (children or elderly) may have critical findings that go unnoticed by their caregivers.
-* **Opaque AI**: "Black box" AI systems that provide answers without explaining how they reached their conclusions.
+Unlike generic “upload PDF and summarize” tools, Carevia is designed as a **multi-agent healthcare workflow system** with **strict medical safety guardrails**, **auditable reasoning**, **family-aware escalation**, and **edge-case handling for uncertain or low-confidence inputs**.
 
 ---
 
-## The Solution: A Multi-Agent AI Pipeline
+## 🏛 Architecture Overview
 
-Carevia solves these issues through a coordinated network of specialized AI agents built on Supabase Edge Functions and Gemini 2.5 Flash-Lite.
+Carevia operates through a coordinated sequence of specialized agents to ensure clinical safety and data integrity.
 
-### Architecture and Flow
-
-1. **OCR Agent**: Extracts raw text from uploaded images or PDFs with high-precision medical scanning.
-2. **Structuring Agent**: Maps unstructured text into standardized medical JSON, identifying test names, values, and reference ranges.
-3. **Risk Agent**: Analyzes historical trends and current values to determine a risk level (Normal, High Risk, or Critical).
-4. **Alert Agent**: Consolidates multiple critical findings into a single, summarized emergency notification to prevent alert fatigue.
-5. **Family Agent**: Automatically identifies if the patient is a dependent and escalates critical alerts to linked family members/caregivers.
-6. **Language Agent**: Translates technical medical explanations into the user's preferred native language (supporting Marathi, Hindi, Punjabi, Tamil, Gujarati, and Kannada).
-7. **Guardrail Agent**: Ensures all explanations are safe, non-diagnostic, and follow strict medical safety protocols.
-8. **Audit Agent**: Generates a detailed "System Audit Trail" for every analysis, providing full transparency on every agent's decision or why an agent was skipped.
-
----
-
-## Impact
-
-* **Clarity**: Translates complex lab values into simple, language-agnostic color-coded UI elements and plain-text explanations.
-* **Safety**: Provides a safety net for families by ensuring critical health events are proactively communicated to the right people.
-* **Trust**: The System Audit Trail allows users and doctors to see the exact reasoning process behind the AI's insights.
-* **Efficiency**: Consolidates health data into a single vault with instant PDF viewing and smart sharing capabilities.
-
----
-
-## Technical Stack
-
-* **Frontend**: React Native (Expo) with a custom Judson typography system and high-performance native PDF rendering.
-* **Backend**: Supabase (Auth, Database, Storage, and Edge Functions).
-* **AI Engine**: Google Gemini 2.5 Flash-Lite (Multimodal).
-* **State Management**: React Context API with persistent AsyncStorage for user preferences (Language and Theme).
-* **Real-time**: Postgres Changes (CDC) for instant emergency alert dispatch.
-
----
-
-## Setup Instructions
-
-### 1. Prerequisites
-Ensure your environment is configured for Native Android Development:
-* **Node.js**: v20+ (LTS)
-* **Android Studio**: Required for the Local Build workflow.
-* **Java SDK (JDK)**: v17+ (Required for React Native 0.74+).
-* **Supabase CLI**: Required for local edge function development.
-
-### 2. Installation
-```bash
-# Clone the repository
-git clone https://github.com/suhani392/Carevia.git
-
-# Enter the project directory
-cd Carevia
-
-# Install dependencies
-npm install
-```
-
-### 3. Environment Configuration
-Create a `.env` file in the root directory and add your Supabase credentials:
-```text
-SUPABASE_URL=your_project_url
-SUPABASE_ANON_KEY=your_anon_key
-```
-
-### 4. Running the Application
-Since Carevia uses native libraries (react-native-pdf, expo-camera), standard Expo Go is not supported. Use the Development Client:
-
-#### Option A: Local Build (Recommended)
-```bash
-# Compile and install on Emulator/Device
-npx expo run:android
-```
-
-#### Option B: Development Server
-Once the native client is installed, start the bundler:
-```bash
-npx expo start --dev-client
-```
-
-### 5. Deploying AI Agents (Supabase)
-```bash
-# Login to Supabase
-npx supabase login
-
-# Deploy the multi-agent orchestrator
-npx supabase functions deploy process-report
+### 🧩 Agent Flow Diagram
+```mermaid
+graph TD
+    A[Medical Report Upload] --> B[OCR Agent]
+    B --> C[Structuring Agent]
+    C --> D[Trend Engine]
+    D --> E[Risk Evaluation Agent]
+    E --> F[Guardrail Agent]
+    F --> G[Alert Agent]
+    G --> H[Family Escalation Agent]
+    H --> I[Language Agent]
+    I --> J[User View]
+    E -.-> K[Audit Agent]
+    F -.-> K
+    H -.-> K
 ```
 
 ---
 
-## Project Structure
+## 🚀 Problem Statement Alignment
+
+**Hackathon Problem Chosen:**
+**5. Domain-Specialized AI Agents with Compliance Guardrails**
+
+Carevia directly addresses the core requirements for domain-specific AI agents:
+- **Workload Execution:** Automates the complete lifecycle of medical report analysis.
+- **Edge-Case Handling:** Specific logic for low-confidence OCR, missing reference ranges, and context-sensitive severity.
+- **Guardrails:** A dedicated Guardrail Agent filters and transforms AI responses to prevent unauthorized medical advice.
+- **Auditability:** Every decision—from trend calculation to caregiver escalation—is logged for transparency.
+
+---
+
+## 🩺 The Problem
+
+Medical reports are often difficult for ordinary people to understand. Patients and caregivers struggle with:
+- **Medical Jargon:** Interpreting complex values without a medical background.
+- **Data Fragmentation:** Reports spread across physical copies, PDFs, and emails.
+- **Lack of Continuity:** No clear visibility into how health markers change over time.
+- **Delayed Intervention:** Critical findings in elderly family members may go unnoticed by caregivers.
+- **Unregulated AI Risks:** Generic AI tools often hallucinate diagnoses or give unsafe medical advice.
+
+---
+
+## 🛠 Our Solution: The Multi-Agent Workflow
+
+Most "AI" tools simply summarize PDFs. **Carevia coordinates agents to build a trustworthy intelligence pipeline.**
+
+### 🤖 Agent Directory & Responsibilities
+
+| Agent | Responsibility | Key Feature |
+| :--- | :--- | :--- |
+| **OCR Agent** | Text extraction from images/PDFs | Confidence scores for blurry images |
+| **Structuring Agent** | Normalizes raw text to Medical JSON | Source-of-truth generation |
+| **Trend Engine** | Deterministic historical comparison | Hallucination-free math |
+| **Risk Evaluation Agent** | Contextual urgency classification | Age & profile-aware risk levels |
+| **Guardrail Agent** | Safety & Compliance enforcement | Strips diagnostic/prescription language |
+| **Alert Agent** | Actionable notification generation | Consolidates alerts to prevent fatigue |
+| **Family Escalation Agent** | Caregiver-aware notification | Automatic emergency notification |
+| **Language Agent** | Regional accessibility (Marathi, Hindi, etc.) | Simplified local terminology |
+| **Audit Agent** | Decision logging & transparency | Full reasoning trail of system actions |
+
+---
+
+## 🛡 Compliance and Guardrails
+
+Carevia is built with a **Safety-First** philosophy.
+
+### Non-Negotiable Boundaries
+- **No Diagnosis:** We explain values, we do not name diseases.
+- **No Prescriptions:** We NEVER recommend drugs or dosages.
+- **No Treatment Plans:** We do not suggest therapies.
+- **No Confidence Hallucination:** If OCR quality is low, we explicitly state uncertainty rather than guessing.
+
+### The Guardrail Agent in Action
+*   **Input:** "Your high sugar level indicates you have Diabetes Type 2."
+*   **Guardrail Filtered Output:** "Your blood glucose level is above the normal range. We recommend discussing this trend with your doctor."
+
+---
+
+## 🏗 Edge-Case Handling
+
+Proper handling of uncertainty is what makes an agent "intelligent" rather than just "automated":
+- **Low OCR Confidence:** Down-levels the severity and requests a clearer re-upload.
+- **Missing Reference Ranges:** Prevents binary "Normal/Abnormal" classifications when data is incomplete.
+- **Contextual Severity:** An abnormal value for an adult maybe be critical for an elderly dependent; our agents adapt accordingly.
+
+---
+
+## 🔍 Auditability & Transparency
+
+Unlike black-box LLMs, Carevia exposes its reasoning trail for every report:
+- **[Audit Log]** *HbA1c increased by 31% from Jan 2025.*
+- **[Audit Log]** *Risk classified as High based on trend + abnormal status.*
+- **[Audit Log]** *Guardrail Agent blocked diagnostic phrasing in explanation.*
+- **[Audit Log]** *Escalation triggered: Caregiver (Suhani) notified via high-priority alert.*
+
+---
+
+## 💻 Tech Stack
+
+- **Frontend:** React Native (Expo) - Premium Medical UI.
+- **Backend:** Supabase (Auth, Postgres, Edge Functions, RLS).
+- **AI Core:** Gemini 2.0 Multimodal (OCR, Analysis, Localization).
+- **Persistence:** Secure Postgres storage with Row Level Security.
+
+---
+
+## 📁 Project Structure
 
 ```text
 Carevia/
 ├── src/
-│   ├── assets/                 # Custom Fonts (Judson) and Branding
-│   ├── components/             # Navigation and UI Kits
-│   ├── context/                # Global State (AppContext) and Navigation
-│   └── screens/                # ScanReport, Family, Reports, Profile, etc.
+│   ├── assets/       # Icons, Logos & Branding
+│   ├── components/   # Modular UI Library
+│   ├── context/      # App & Navigation State
+│   ├── lib/          # Native Helpers (Supabase, API)
+│   ├── screens/      # Feature-specific Views
+│   └── ...
 ├── supabase/
-│   └── functions/              # Deno-based AI Agent Pipeline
-├── App.tsx                     # Entry point and Global Alert Listener
-└── app.json                    # Native Permissions and Config
+│   ├── functions/    # Agentic Edge Functions (process-report, ai-chat)
+│   └── schema.sql    # Health Data & Audit Schema
+├── App.tsx
+├── app.json
+└── README.md
 ```
 
 ---
 
-## UI and Design Guidelines
+## ⚙️ Setup & Installation
 
-* **Aesthetics**: Premium editorial medical design using the Judson font.
-* **Spacing**: Large border radii (20px to 60px) for a modern, friendly feel.
-* **Color System**: Primary gradient (#0062FF to #5C8EDF). High-risk items use Red, Borderline use Yellow, and Normal use Green across all languages.
+### Prerequisites
+- Node.js 20+
+- Android Studio / Xcode
+- Supabase CLI
+
+### Installation
+```bash
+git clone https://github.com/suhani392/Carevia.git
+cd Carevia
+npm install
+```
+
+### Run Locally
+```bash
+npx expo run:android
+# Then start the bundler
+npx expo start --dev-client
+```
+
+---
+
+## 🏆 Why Carevia Can Win
+
+Carevia stands out because it doesn't just "use AI"—it **manages AI**. By implementing a multi-agent system that prioritizes **safety, auditability, and family care**, we solve the real-world obstacles (trust and compliance) that prevent AI from being used safely in healthcare today.
