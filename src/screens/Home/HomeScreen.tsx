@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Text, Image, Pressable, RefreshControl, TouchableOpacity, Dimensions } from 'react-native';
+import { View, StyleSheet, ScrollView, Text, Image, Pressable, RefreshControl, TouchableOpacity, Dimensions, DeviceEventEmitter } from 'react-native';
 import Svg, { Line, Circle, Text as SvgText, G } from 'react-native-svg';
 
 const { width } = Dimensions.get('window');
@@ -12,6 +12,7 @@ import { useNavigation } from '../../context/NavigationContext';
 import { useAppContext } from '../../context/AppContext';
 import { getAvatarSource } from '../../lib/avatars';
 import { supabase } from '../../lib/supabase';
+import TourTarget from '../../components/tour/TourTarget';
 
 const HomeScreen = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -101,6 +102,12 @@ const HomeScreen = () => {
 
     useEffect(() => {
         loadTrends();
+        
+        // Listen for tour-driven menu closing
+        const sub = DeviceEventEmitter.addListener('CLOSE_MENU', () => {
+            setIsMenuOpen(false);
+        });
+        return () => sub.remove();
     }, []);
 
     const onRefresh = async () => {
@@ -151,62 +158,68 @@ const HomeScreen = () => {
                     <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('emergency_access')}</Text>
                     <View style={styles.emergencyRow}>
 
-                        <Pressable
-                            style={styles.modernLargeCard}
-                            onPress={() => navigate('documents')}
-                        >
-                            <LinearGradient
-                                colors={themeMode === 'dark' ? ['#1A2A47', '#001A4D'] : ['#E6F0FF', '#C7DFFF']}
-                                style={styles.cardGradient}
+                        <TourTarget id="home_docs" style={styles.modernLargeCard}>
+                            <Pressable
+                                style={{ flex: 1 }}
+                                onPress={() => navigate('documents')}
                             >
-                                <Text style={[styles.modernCardTitle, { color: themeMode === 'dark' ? '#8AB4FF' : '#0047BA' }]}>{t('documents')}</Text>
+                                <LinearGradient
+                                    colors={themeMode === 'dark' ? ['#1A2A47', '#001A4D'] : ['#E6F0FF', '#C7DFFF']}
+                                    style={styles.cardGradient}
+                                >
+                                    <Text style={[styles.modernCardTitle, { color: themeMode === 'dark' ? '#8AB4FF' : '#0047BA' }]}>{t('documents')}</Text>
 
-                                <View style={[styles.modernDocIconContainer, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-                                    <Image
-                                        source={require('../../assets/icons/home/documents.png')}
-                                        style={styles.modernDocIcon}
-                                        resizeMode="contain"
-                                    />
-                                </View>
-                            </LinearGradient>
-                        </Pressable>
+                                    <View style={[styles.modernDocIconContainer, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+                                        <Image
+                                            source={require('../../assets/icons/home/documents.png')}
+                                            style={styles.modernDocIcon}
+                                            resizeMode="contain"
+                                        />
+                                    </View>
+                                </LinearGradient>
+                            </Pressable>
+                        </TourTarget>
                         <View style={styles.modernSmallCardColumn}>
-                            <Pressable
-                                style={styles.modernSmallCard}
-                                onPress={() => navigate('reports')}
-                            >
-                                <LinearGradient
-                                    colors={themeMode === 'dark' ? ['#1A1A1A', '#2A2A2A'] : ['#F0F7FF', '#D8E9FF']}
-                                    style={styles.cardGradientSmall}
+                            <TourTarget id="home_reports" style={styles.modernSmallCard}>
+                                <Pressable
+                                    style={{ flex: 1 }}
+                                    onPress={() => navigate('reports')}
                                 >
-                                    <View style={[styles.modernIconContainer, { backgroundColor: colors.card }]}>
-                                        <ReportIcon size={24} color={colors.primary} />
-                                    </View>
-                                    <Text style={[styles.modernSmallCardText, { color: themeMode === 'dark' ? '#8AB4FF' : '#0047BA' }]}>{t('reports')}</Text>
+                                    <LinearGradient
+                                        colors={themeMode === 'dark' ? ['#1A1A1A', '#2A2A2A'] : ['#F0F7FF', '#D8E9FF']}
+                                        style={styles.cardGradientSmall}
+                                    >
+                                        <View style={[styles.modernIconContainer, { backgroundColor: colors.card }]}>
+                                            <ReportIcon size={24} color={colors.primary} />
+                                        </View>
+                                        <Text style={[styles.modernSmallCardText, { color: themeMode === 'dark' ? '#8AB4FF' : '#0047BA' }]}>{t('reports')}</Text>
 
-                                </LinearGradient>
-                            </Pressable>
-                            <Pressable
-                                style={styles.modernSmallCard}
-                                onPress={() => navigate('ai_assistant')}
-                            >
-                                <LinearGradient
-                                    colors={themeMode === 'dark' ? ['#1A1A1A', '#2A2A2A'] : ['#F0F7FF', '#D8E9FF']}
-                                    style={styles.cardGradientSmall}
+                                    </LinearGradient>
+                                </Pressable>
+                            </TourTarget>
+                            <TourTarget id="home_ai_bot" style={styles.modernSmallCard}>
+                                <Pressable
+                                    style={{ flex: 1 }}
+                                    onPress={() => navigate('ai_assistant')}
                                 >
-                                    <View style={[styles.modernIconContainer, { backgroundColor: colors.card }]}>
-                                        <BotIcon size={24} color={colors.primary} />
-                                    </View>
-                                    <Text style={[styles.modernSmallCardText, { color: themeMode === 'dark' ? '#8AB4FF' : '#0047BA' }]}>{t('ai_assistant')}</Text>
+                                    <LinearGradient
+                                        colors={themeMode === 'dark' ? ['#1A1A1A', '#2A2A2A'] : ['#F0F7FF', '#D8E9FF']}
+                                        style={styles.cardGradientSmall}
+                                    >
+                                        <View style={[styles.modernIconContainer, { backgroundColor: colors.card }]}>
+                                            <BotIcon size={24} color={colors.primary} />
+                                        </View>
+                                        <Text style={[styles.modernSmallCardText, { color: themeMode === 'dark' ? '#8AB4FF' : '#0047BA' }]}>{t('ai_assistant')}</Text>
 
-                                </LinearGradient>
-                            </Pressable>
+                                    </LinearGradient>
+                                </Pressable>
+                            </TourTarget>
                         </View>
                     </View>
                 </View>
                 {/* Trend Analysis Section */}
                 {trendGraphData && trendGraphData.dates.length > 0 && trendGraphData.lines.length > 0 && (
-                    <View style={[styles.section, { marginTop: 40 }]}>
+                    <TourTarget id="trends_section" style={[styles.section, { marginTop: 40 }]}>
                         <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('trend_analysis')}</Text>
                         <View style={[{ paddingVertical: 20, borderRadius: 20, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 3 }, { backgroundColor: colors.card }]}>
                             {(() => {
@@ -282,15 +295,15 @@ const HomeScreen = () => {
                                 );
                             })()}
                         </View>
-                    </View>
+                    </TourTarget>
                 )}
 
                 {/* Health Alerts Section */}
-                {alerts && alerts.length > 0 && (
-                    <View style={[styles.section, { marginTop: 40 }]}>
+                {alerts.length > 0 && (
+                    <TourTarget id="health_alerts" style={styles.section}>
                         <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('health_alerts')}</Text>
                         <>
-                            {(isAlertsExpanded ? alerts : alerts.slice(0, 3)).map((alert) => {
+                            {(isAlertsExpanded ? alerts : alerts.slice(0, 3)).map((alert, index) => {
                                 let alertName = "Someone";
                                 let alertPhoto = null;
                                 const subjectId = alert.target_user_id || alert.user_id;
@@ -345,11 +358,11 @@ const HomeScreen = () => {
                                 </Pressable>
                             )}
                         </>
-                    </View>
+                    </TourTarget>
                 )}
 
                 {/* Family Updates Section */}
-                <View style={[styles.section, { marginTop: 40 }]}>
+                <TourTarget id="family_updates" style={[styles.section, { marginTop: 40 }]}>
                     <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('family_updates')}</Text>
 
                     {updates.length > 0 ? (
@@ -414,7 +427,7 @@ const HomeScreen = () => {
                             <Text style={[styles.emptyUpdatesText, { color: colors.textSecondary }]}>{t('no_updates')}</Text>
                         </View>
                     )}
-                </View>
+                </TourTarget>
 
 
                 <View style={{ height: 120 }} />

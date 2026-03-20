@@ -1,18 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-    View,
-    Text,
-    StyleSheet,
-    TouchableOpacity,
-    ScrollView,
-    Image,
-    TextInput,
-    Modal,
-    Platform,
-    Dimensions,
-    KeyboardAvoidingView,
-    Alert,
-    ActivityIndicator
+    View, Text, StyleSheet, ScrollView, Image, TouchableOpacity,
+    Dimensions, Platform, DeviceEventEmitter, ActivityIndicator, Alert, Modal, TextInput, KeyboardAvoidingView
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
@@ -25,36 +14,8 @@ import AlertBox from '../../components/common/alert-box';
 import { supabase } from '../../lib/supabase';
 import { useAppContext } from '../../context/AppContext';
 import { APP_AVATAR_LIST, getAvatarSource } from '../../lib/avatars';
-
-
-// Helper to convert base64 to ArrayBuffer
-const decodeBase64 = (base64: string) => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-    const lookup = new Uint8Array(256);
-    for (let i = 0; i < chars.length; i++) lookup[chars.charCodeAt(i)] = i;
-
-    let bufferLength = base64.length * 0.75;
-    let len = base64.length, i, p = 0;
-    if (base64[base64.length - 1] === "=") {
-        bufferLength--;
-        if (base64[base64.length - 2] === "=") bufferLength--;
-    }
-
-    const arraybuffer = new ArrayBuffer(bufferLength);
-    const bytes = new Uint8Array(arraybuffer);
-
-    for (i = 0; i < len; i += 4) {
-        let encoded1 = lookup[base64.charCodeAt(i)];
-        let encoded2 = lookup[base64.charCodeAt(i + 1)];
-        let encoded3 = lookup[base64.charCodeAt(i + 2)];
-        let encoded4 = lookup[base64.charCodeAt(i + 3)];
-
-        bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
-        bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
-        bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
-    }
-    return arraybuffer;
-};
+import TourTarget from '../../components/tour/TourTarget';
+import { useTour } from '../../context/TourContext';
 import {
     NameIcon,
     AgeIcon,
@@ -67,7 +28,7 @@ import {
     ProfileEditIcon
 } from './Icons';
 
-const { width, height } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface ProfileData {
     name: string;
@@ -86,10 +47,13 @@ interface ProfileData {
 const ProfileScreen = () => {
     const { goBack, navigate } = useNavigation();
     const { updates, userProfile, refreshData, t, colors, themeMode } = useAppContext();
+    const { isTourActive, currentStep } = useTour();
 
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const scrollViewRef = useRef<ScrollView>(null);
+    
     const [profile, setProfile] = useState<ProfileData>({
         name: 'Guest User',
         age: 'N/A',
@@ -103,12 +67,41 @@ const ProfileScreen = () => {
         has_thyroid: false
     });
 
+    /**
+     * Auto-scroll during Tour
+     */
+    useEffect(() => {
+        if (isTourActive && scrollViewRef.current && currentStep) {
+            const targetId = currentStep.targetId;
+            // ONLY scroll on specific steps. For others, leave as is.
+            if (targetId === 'profile_field_emergency') {
+                // Scroll significantly more to lift the field above the dialogue box
+                scrollViewRef.current.scrollTo({ y: 280, animated: true });
+            } else if (targetId === 'profile_medical_conditions') {
+                // Scroll all the way down
+                scrollViewRef.current.scrollTo({ y: 650, animated: true });
+            }
+        }
+    }, [currentStep?.targetId, isTourActive]);
+
+    const calculateAge = (dob: string) => {
+        if (!dob || dob === 'N/A') return 'N/A';
+        const birthDate = new Date(dob);
+        if (isNaN(birthDate.getTime())) return dob;
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+        }
+        return age.toString();
+    };
 
     useEffect(() => {
         if (userProfile) {
             setProfile({
-                name: userProfile.full_name || 'N/A',
-                age: userProfile.dob || 'N/A',
+                name: userProfile.full_name || 'Guest User',
+                age: calculateAge(userProfile.dob) || 'N/A',
                 gender: userProfile.gender || 'N/A',
                 contactNumber: userProfile.phone || 'N/A',
                 address: userProfile.address || 'N/A',
@@ -123,6 +116,13 @@ const ProfileScreen = () => {
         }
     }, [userProfile]);
 
+    useEffect(() => {
+        const sub = DeviceEventEmitter.addListener('CLOSE_MENU', () => {
+            setIsMenuOpen(false);
+        });
+        return () => sub.remove();
+    }, []);
+
     const [editingField, setEditingField] = useState<keyof ProfileData | null>(null);
     const [tempValue, setTempValue] = useState('');
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -130,12 +130,6 @@ const ProfileScreen = () => {
     const [tempAvatar, setTempAvatar] = useState<string | null>(null);
 
     const APP_AVATARS = APP_AVATAR_LIST;
-
-
-
-    // Screen automatically syncs with useAppContext() via the useEffect below
-
-
 
     const openEdit = (field: keyof ProfileData) => {
         const value = profile[field];
@@ -171,6 +165,7 @@ const ProfileScreen = () => {
             if (error) throw error;
 
             setProfile({ ...profile, [editingField]: tempValue });
+            await refreshData();
             setIsEditModalVisible(false);
             setEditingField(null);
         } catch (error: any) {
@@ -232,12 +227,10 @@ const ProfileScreen = () => {
         }
     };
 
-
     const handleUpdatePhoto = () => {
         setTempAvatar(profile.photo_url || null);
         setIsAvatarModalVisible(true);
     };
-
 
     const showPhotoOptions = () => {
         Alert.alert(
@@ -245,7 +238,6 @@ const ProfileScreen = () => {
             t('pick_character'),
             [
                 { text: t('select_avatar'), onPress: handleUpdatePhoto },
-
                 {
                     text: t('remove_photo'),
                     onPress: handleRemovePhoto,
@@ -316,7 +308,6 @@ const ProfileScreen = () => {
         );
     };
 
-
     const HealthToggle = ({ label, value, onChange }: { label: string, value: boolean, onChange: (val: boolean) => void }) => (
         <TouchableOpacity
             style={[styles.profileItem, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
@@ -371,7 +362,6 @@ const ProfileScreen = () => {
         </TouchableOpacity>
     );
 
-
     if (loading) {
         return (
             <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }]}>
@@ -397,91 +387,104 @@ const ProfileScreen = () => {
                 showCrossButton={true}
             />
 
+            <ScrollView ref={scrollViewRef} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                <TourTarget id="tour_success">
+                    <LinearGradient
+                        colors={themeMode === 'dark' ? ['#1A2A47', '#003399'] : ['#8EBDFF', '#4C8DFF']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 0, y: 1 }}
+                        style={styles.profileCard}
+                    >
+                        <View style={styles.profileInfoRow}>
+                            <TourTarget id="profile_avatar">
+                                <View style={styles.avatarContainer}>
+                                    {profile.photo_url && getAvatarSource(profile.photo_url) ? (
+                                        <Image
+                                            key={profile.photo_url}
+                                            source={getAvatarSource(profile.photo_url)}
+                                            style={styles.avatar}
+                                            resizeMode="cover"
+                                        />
+                                    ) : (
+                                        <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: 'rgba(255, 255, 255, 0.3)' }]}>
+                                            <Text style={styles.avatarPlaceholderText}>
+                                                {(profile.name || 'U').charAt(0).toUpperCase()}
+                                            </Text>
+                                        </View>
+                                    )}
 
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                {/* Profile Card */}
-                <LinearGradient
-                    colors={themeMode === 'dark' ? ['#1A2A47', '#003399'] : ['#8EBDFF', '#4C8DFF']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 0, y: 1 }}
-                    style={styles.profileCard}
-                >
-                    <View style={styles.profileInfoRow}>
-                        <View style={styles.avatarContainer}>
-                            {profile.photo_url && getAvatarSource(profile.photo_url) ? (
-                                <Image
-                                    key={profile.photo_url}
-                                    source={getAvatarSource(profile.photo_url)}
-                                    style={styles.avatar}
-                                    resizeMode="cover"
-                                />
-                            ) : (
-                                <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: 'rgba(255, 255, 255, 0.3)' }]}>
-                                    <Text style={styles.avatarPlaceholderText}>
-                                        {(profile.name || 'U').charAt(0).toUpperCase()}
-                                    </Text>
+                                    <TouchableOpacity
+                                        style={[styles.editBadge, { backgroundColor: colors.primary }]}
+                                        onPress={showPhotoOptions}
+                                        disabled={saving}
+                                    >
+                                        {saving ? (
+                                            <ActivityIndicator size="small" color="#FFFFFF" />
+                                        ) : (
+                                            <ProfileEditIcon size={16} color="#FFFFFF" />
+                                        )}
+                                    </TouchableOpacity>
                                 </View>
-                            )}
-
-                            <TouchableOpacity
-                                style={[styles.editBadge, { backgroundColor: colors.primary }]}
-                                onPress={showPhotoOptions}
-                                disabled={saving}
-                            >
-                                {saving ? (
-                                    <ActivityIndicator size="small" color="#FFFFFF" />
-                                ) : (
-                                    <ProfileEditIcon size={16} color="#FFFFFF" />
-                                )}
-                            </TouchableOpacity>
+                            </TourTarget>
+                            <View style={styles.headerInfo}>
+                                <Text style={styles.profileName}>{profile.name}</Text>
+                                <Text style={styles.profileStats}>{profile.age} • {profile.gender}</Text>
+                                <Text style={styles.profileLocation}>{profile.address || 'Pune, Maharashtra'}</Text>
+                            </View>
                         </View>
-                        <View style={styles.headerInfo}>
-                            <Text style={styles.profileName}>{profile.name}</Text>
-                            <Text style={styles.profileStats}>{profile.age} • {profile.gender}</Text>
-                            <Text style={styles.profileLocation}>Pune, Maharashtra</Text>
-                        </View>
-                    </View>
-                </LinearGradient>
+                    </LinearGradient>
+                </TourTarget>
 
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('my_details')}</Text>
 
-
                 <View style={styles.itemsList}>
-                    <ProfileItem icon={NameIcon} label={t('name')} value={profile.name} field="name" colors={colors} />
-                    <ProfileItem icon={AgeIcon} label={t('age')} value={profile.age} field="age" colors={colors} />
-                    <ProfileItem icon={GenderIcon} label={t('gender')} value={t(profile.gender.toLowerCase() as any) || profile.gender} field="gender" colors={colors} />
-                    <ProfileItem icon={ContactIcon} label={t('contact_number')} value={profile.contactNumber} field="contactNumber" colors={colors} />
-                    <ProfileItem icon={AddressIcon} label={t('address')} value={profile.address} field="address" colors={colors} />
-                    <ProfileItem icon={BloodGroupIcon} label={t('blood_group')} value={profile.bloodGroup} field="bloodGroup" colors={colors} />
-                    <ProfileItem icon={EmergencyContactIcon} label={t('emergency_contact')} value={profile.emergencyContact} field="emergencyContact" colors={colors} />
+                    <TourTarget id="profile_field_name">
+                        <ProfileItem icon={NameIcon} label={t('name')} value={profile.name} field="name" colors={colors} />
+                    </TourTarget>
+                    <TourTarget id="profile_field_dob">
+                        <ProfileItem icon={AgeIcon} label={t('age')} value={profile.age} field="age" colors={colors} />
+                    </TourTarget>
+                    <TourTarget id="profile_field_gender">
+                        <ProfileItem icon={GenderIcon} label={t('gender')} value={t(profile.gender.toLowerCase() as any) || profile.gender} field="gender" colors={colors} />
+                    </TourTarget>
+                    <TourTarget id="profile_field_contact">
+                        <ProfileItem icon={ContactIcon} label={t('contact_number')} value={profile.contactNumber} field="contactNumber" colors={colors} />
+                    </TourTarget>
+                    <TourTarget id="profile_field_address">
+                        <ProfileItem icon={AddressIcon} label={t('address')} value={profile.address} field="address" colors={colors} />
+                    </TourTarget>
+                    <TourTarget id="profile_field_blood">
+                        <ProfileItem icon={BloodGroupIcon} label={t('blood_group')} value={profile.bloodGroup} field="bloodGroup" colors={colors} />
+                    </TourTarget>
+                    <TourTarget id="profile_field_emergency">
+                        <ProfileItem icon={EmergencyContactIcon} label={t('emergency_contact')} value={profile.emergencyContact} field="emergencyContact" colors={colors} />
+                    </TourTarget>
                 </View>
 
-                <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 25 }]}>{t('medical_conditions')}</Text>
-                <View style={styles.itemsList}>
-                    <HealthToggle
-                        label={t('diabetes')}
-                        value={profile.has_diabetes}
-                        onChange={(val) => updateToggle('has_diabetes', val)}
-                    />
-                    <HealthToggle
-                        label={t('hypertension_bp')}
-                        value={profile.has_bp}
-                        onChange={(val) => updateToggle('has_bp', val)}
-                    />
-                    <HealthToggle
-                        label={t('thyroid')}
-                        value={profile.has_thyroid}
-                        onChange={(val) => updateToggle('has_thyroid', val)}
-                    />
-                </View>
-
-
-
+                <TourTarget id="profile_medical_conditions" style={{ marginTop: 25 }}>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('medical_conditions')}</Text>
+                    <View style={styles.itemsList}>
+                        <HealthToggle
+                            label={t('diabetes')}
+                            value={profile.has_diabetes}
+                            onChange={(val) => updateToggle('has_diabetes', val)}
+                        />
+                        <HealthToggle
+                            label={t('hypertension_bp')}
+                            value={profile.has_bp}
+                            onChange={(val) => updateToggle('has_bp', val)}
+                        />
+                        <HealthToggle
+                            label={t('thyroid')}
+                            value={profile.has_thyroid}
+                            onChange={(val) => updateToggle('has_thyroid', val)}
+                        />
+                    </View>
+                </TourTarget>
 
                 <View style={{ height: 40 }} />
             </ScrollView>
 
-            {/* Avatar Selection Modal */}
             <Modal
                 visible={isAvatarModalVisible}
                 transparent={true}
@@ -497,7 +500,6 @@ const ProfileScreen = () => {
                             </TouchableOpacity>
                         </View>
                         <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>{t('pick_character')}</Text>
-
 
                         <ScrollView showsVerticalScrollIndicator={false}>
                             <View style={styles.avatarGrid}>
@@ -516,10 +518,8 @@ const ProfileScreen = () => {
                                                 <Text style={styles.checkIcon}>✓</Text>
                                             </View>
                                         )}
-
                                     </TouchableOpacity>
                                 ))}
-
                             </View>
                         </ScrollView>
 
@@ -538,13 +538,10 @@ const ProfileScreen = () => {
                                 {saving ? <ActivityIndicator color="#FFF" /> : <Text style={styles.avatarDoneText}>{t('done')}</Text>}
                             </TouchableOpacity>
                         </View>
-
-
                     </View>
                 </View>
             </Modal>
 
-            {/* Edit Modal */}
             <Modal
                 transparent
                 visible={isEditModalVisible}
@@ -570,8 +567,6 @@ const ProfileScreen = () => {
                     </KeyboardAvoidingView>
                 </TouchableOpacity>
             </Modal>
-
-
         </View>
     );
 };
@@ -583,6 +578,7 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingHorizontal: 25,
         paddingTop: 30,
+        paddingBottom: 100,
     },
     profileCard: {
         borderRadius: 40,
@@ -604,7 +600,6 @@ const styles = StyleSheet.create({
         borderColor: '#FFFFFF',
     },
     avatarPlaceholder: {
-        backgroundColor: 'rgba(255, 255, 255, 0.3)',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -617,7 +612,6 @@ const styles = StyleSheet.create({
         position: 'absolute',
         bottom: 5,
         right: 0,
-        backgroundColor: '#4C8DFF',
         width: 30,
         height: 30,
         borderRadius: 15,
@@ -687,61 +681,71 @@ const styles = StyleSheet.create({
         fontFamily: 'Judson-Regular',
         fontSize: 15,
     },
-
+    toggleTrack: {
+        width: 45,
+        height: 24,
+        borderRadius: 12,
+        paddingHorizontal: 2,
+        justifyContent: 'center',
+    },
+    toggleThumb: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: '#FFFFFF',
+    },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'rgba(0,0,0,0.5)',
         justifyContent: 'center',
-        paddingHorizontal: 25,
-    },
-    keyboardView: {
-        width: '100%',
         alignItems: 'center',
+        padding: 20,
     },
     modalContent: {
+        width: '100%',
         borderRadius: 30,
-        padding: 25,
-        width: '100%',
-        elevation: 5,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-    },
-    editContainer: {
-        width: '100%',
-    },
-    editHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 25,
+        padding: 20,
     },
     editTitle: {
         fontFamily: 'Judson-Bold',
         fontSize: 22,
     },
     closeText: {
-        fontSize: 20,
-        fontWeight: 'bold',
+        fontSize: 18,
     },
     input: {
-        width: '100%',
-        height: 55,
+        height: 50,
         borderRadius: 15,
-        paddingHorizontal: 20,
+        paddingHorizontal: 15,
         fontFamily: 'Judson-Regular',
-        fontSize: 18,
-        marginBottom: 30,
+        fontSize: 16,
+        marginBottom: 20,
+    },
+    editButtons: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+    },
+    cancelButton: {
+        marginRight: 15,
+        paddingVertical: 10,
+    },
+    saveButton: {
+        paddingHorizontal: 25,
+        paddingVertical: 10,
+        borderRadius: 15,
+    },
+    saveButtonText: {
+        color: '#FFFFFF',
+        fontFamily: 'Judson-Bold',
     },
     optionsContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        marginBottom: 20,
+        marginBottom: 15,
     },
     optionItem: {
-        paddingHorizontal: 20,
-        paddingVertical: 10,
+        paddingHorizontal: 15,
+        paddingVertical: 8,
         borderRadius: 20,
         marginRight: 10,
         marginBottom: 10,
@@ -749,80 +753,35 @@ const styles = StyleSheet.create({
     },
     optionText: {
         fontFamily: 'Judson-Regular',
-        fontSize: 16,
     },
-    editButtons: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 10,
-    },
-    cancelButton: {
-        flex: 1,
-        height: 55,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 10,
-    },
-    cancelButtonText: {
-        fontFamily: 'Judson-Bold',
-        fontSize: 16,
-    },
-    saveButton: {
-        flex: 1,
-        height: 55,
-        borderRadius: 15,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginLeft: 10,
-    },
-    saveButtonText: {
-        fontFamily: 'Judson-Bold',
-        fontSize: 16,
-        color: '#FFFFFF',
-    },
-    // Modal Text Styles
-    modalTitle: {
-        fontFamily: 'Judson-Bold',
-        fontSize: 22,
-        marginBottom: 10,
-    },
-    modalSubtitle: {
-        fontFamily: 'Judson-Regular',
-        fontSize: 15,
-        marginBottom: 20,
-    },
-    // Avatar Modal Styles
     avatarGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'space-between',
-        paddingVertical: 10,
+        paddingTop: 10,
     },
     avatarOption: {
-        width: width * 0.25,
-        height: width * 0.25,
+        width: '30%',
+        aspectRatio: 1,
         borderRadius: 20,
         marginBottom: 15,
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 2,
     },
     avatarChoice: {
         width: '80%',
         height: '80%',
-        borderRadius: 15,
+        resizeMode: 'contain',
     },
     selectedBadge: {
         position: 'absolute',
         top: -5,
         right: -5,
-        width: 24,
-        height: 24,
-        borderRadius: 12,
+        width: 20,
+        height: 20,
+        borderRadius: 10,
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 2,
-        borderColor: '#FFFFFF',
     },
     checkIcon: {
         color: '#FFFFFF',
@@ -836,45 +795,47 @@ const styles = StyleSheet.create({
         paddingTop: 15,
         borderTopWidth: 1,
     },
-    avatarCancelButton: {
-        flex: 1,
-        height: 50,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 10,
-    },
-    avatarCancelText: {
-        fontFamily: 'Judson-Bold',
-        fontSize: 16,
-    },
     avatarDoneButton: {
-        flex: 1,
-        height: 50,
+        paddingHorizontal: 30,
+        paddingVertical: 10,
         borderRadius: 15,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginLeft: 10,
     },
     avatarDoneText: {
-        fontFamily: 'Judson-Bold',
-        fontSize: 16,
         color: '#FFFFFF',
+        fontFamily: 'Judson-Bold',
     },
-    toggleTrack: {
-        width: 50,
-        height: 28,
-        borderRadius: 14,
-        padding: 4,
-        justifyContent: 'center',
+    editHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
     },
-    toggleThumb: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
-        backgroundColor: '#FFFFFF',
-    }
+    editContainer: {
+        width: '100%',
+    },
+    modalTitle: {
+        fontFamily: 'Judson-Bold',
+        fontSize: 22,
+    },
+    modalSubtitle: {
+        fontFamily: 'Judson-Regular',
+        fontSize: 14,
+        marginBottom: 15,
+    },
+    avatarCancelButton: {
+        paddingVertical: 10,
+    },
+    avatarCancelText: {
+        fontFamily: 'Judson-Regular',
+        fontSize: 16,
+    },
+    keyboardView: {
+        width: '100%',
+    },
+    cancelButtonText: {
+        fontFamily: 'Judson-Regular',
+        fontSize: 16,
+    },
 });
 
-
 export default ProfileScreen;
-

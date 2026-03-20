@@ -45,6 +45,11 @@ const Login = () => {
         }
     };
 
+    const handleForgotPassword = () => {
+        navigate('forgot_password');
+    };
+
+
     return (
         <LinearGradient
             colors={['#0062FF', '#5C8EDF']}
@@ -110,7 +115,10 @@ const Login = () => {
                     </TouchableOpacity>
 
 
-                    <TouchableOpacity style={styles.forgotBtn}>
+                    <TouchableOpacity 
+                        style={styles.forgotBtn}
+                        onPress={handleForgotPassword}
+                    >
                         <Text style={styles.forgotText}>{t('forgot_password')}</Text>
                     </TouchableOpacity>
 

@@ -10,6 +10,8 @@ import { supabase } from './src/lib/supabase';
 // Context
 import { NavigationProvider, useNavigation, ScreenName } from './src/context/NavigationContext';
 import { AppProvider, useAppContext } from './src/context/AppContext';
+import { TourProvider } from './src/context/TourContext';
+import TourOverlay from './src/components/tour/TourOverlay';
 
 // Screens
 import LoginScreen from './src/screens/Login/Login';
@@ -27,6 +29,7 @@ import ReportsScreen from './src/screens/Reports/ReportsScreen';
 import DocumentViewScreen from './src/screens/DocumentView/DocumentView';
 import ProfileScreen from './src/screens/Profile';
 import ScanReportScreen from './src/screens/ScanReport/ScanReportScreen';
+import ForgotPasswordOTP from './src/screens/Login/ForgotPasswordOTP';
 
 // Components
 import BottomNavbar from './src/components/navigation/bottom-navigation/bottom-navbar';
@@ -184,6 +187,8 @@ function AppContent() {
                 return <ProfileScreen />;
             case 'scan_report':
                 return <ScanReportScreen />;
+            case 'forgot_password':
+                return <ForgotPasswordOTP />;
             default:
                 return <HomeScreen />;
         }
@@ -205,6 +210,9 @@ function AppContent() {
                     onTabChange={(tab) => navigate(tab as ScreenName)}
                 />
             )}
+
+            {/* Application Tour Overlay */}
+            <TourOverlay />
 
             {/*  PREMIUM EMERGENCY ALERT MODAL */}
             <Modal
@@ -276,7 +284,9 @@ export default function App() {
     return (
         <AppProvider>
             <NavigationProvider>
-                <AppContent />
+                <TourProvider>
+                    <AppContent />
+                </TourProvider>
             </NavigationProvider>
         </AppProvider>
     );

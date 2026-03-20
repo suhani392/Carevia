@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, Dimensions, Platform, StatusBar, Pressable, Animated } from 'react-native';
+import { View, Text, StyleSheet, Image, Dimensions, Platform, StatusBar, Pressable, Animated, TouchableOpacity, DeviceEventEmitter } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import { MenuIcon, ProfileIcon, DropdownIcon, UploadIcon, BackIcon, CrossIcon } from './Icons';
@@ -7,6 +7,7 @@ import { useNavigation } from '../../context/NavigationContext';
 import { supabase } from '../../lib/supabase';
 import { useAppContext } from '../../context/AppContext';
 import { getAvatarSource } from '../../lib/avatars';
+import TourTarget from '../../components/tour/TourTarget';
 
 const { width } = Dimensions.get('window');
 
@@ -65,10 +66,14 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
 
     const getFormattedDate = () => {
         const date = new Date();
-        const localeMapping = {
+        const localeMapping: Record<string, string> = {
             en: 'en-US',
             mr: 'mr-IN',
-            hi: 'hi-IN'
+            hi: 'hi-IN',
+            kn: 'kn-IN',
+            pa: 'pa-IN',
+            ta: 'ta-IN',
+            gu: 'gu-IN'
         };
         const options: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' };
         return date.toLocaleDateString(localeMapping[language] || 'en-US', options);
@@ -106,10 +111,17 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
         outputRange: ['0deg', '180deg'],
     });
 
+    useEffect(() => {
+        // Listen for tour-triggered menu opening
+        const sub = DeviceEventEmitter.addListener('OPEN_MENU', () => {
+            if (onMenuPress) onMenuPress();
+        });
+        return () => sub.remove();
+    }, [onMenuPress]);
+
     return (
         <LinearGradient
-            colors={colors.headerGradient}
-
+            colors={colors.headerGradient as [string, string, ...string[]]}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
             style={[
@@ -124,16 +136,20 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
                     </Pressable>
                 ) : (
                     <Pressable style={styles.iconBlock} onPress={onMenuPress}>
-                        <MenuIcon />
+                        <TourTarget id="home_menu_btn">
+                            <MenuIcon />
+                        </TourTarget>
                     </Pressable>
                 )}
                 <View style={[styles.greetingContainer, centerTitle && styles.centerContainer]}>
-                    <Text style={[styles.greetingTitle, centerTitle && styles.centerText]}>{title || getGreeting()}</Text>
-                    {subtitle ? (
-                        <Text style={[styles.greetingSubtitle, centerTitle && styles.centerText]}>{subtitle}</Text>
-                    ) : !centerTitle ? (
-                        <Text style={styles.greetingSubtitle}>{getFormattedDate()}</Text>
-                    ) : null}
+                    <TourTarget id="home_overview" style={centerTitle ? { width: '100%', alignItems: 'center' } : { alignSelf: 'flex-start' }}>
+                        <Text style={[styles.greetingTitle, centerTitle && styles.centerText]}>{title || getGreeting()}</Text>
+                        {subtitle ? (
+                            <Text style={[styles.greetingSubtitle, centerTitle && styles.centerText]}>{subtitle}</Text>
+                        ) : !centerTitle ? (
+                            <Text style={styles.greetingSubtitle}>{getFormattedDate()}</Text>
+                        ) : null}
+                    </TourTarget>
                 </View>
                 {showRightIcon ? (
                     <View style={styles.iconBlock}>
@@ -143,7 +159,9 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
                             </Pressable>
                         ) : (
                             <Pressable onPress={() => navigate('profile')}>
-                                <ProfileIcon />
+                                <TourTarget id="profile_entry">
+                                    <ProfileIcon />
+                                </TourTarget>
                             </Pressable>
                         )}
                     </View>
@@ -199,7 +217,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
                 <>
                     <Text style={styles.promptText}>{t('understand_report')}</Text>
 
-                    <View style={styles.actionRow}>
+                    <TourTarget id="upload_section" style={styles.actionRow}>
                         <Pressable style={styles.actionItem} onPress={() => navigate('scan_report')}>
                             <View style={styles.actionBlock}>
                                 <Image
@@ -218,7 +236,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
                             </View>
                             <Text style={styles.actionText}>{t('upload')}{"\n"}{t('report')}</Text>
                         </Pressable>
-                    </View>
+                    </TourTarget>
                 </>
             )}
 

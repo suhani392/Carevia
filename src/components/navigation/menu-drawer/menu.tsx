@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, Dimensions, Platform, StatusBar, Pressable, Ani
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, ScreenName } from '../../../context/NavigationContext';
 import { useAppContext } from '../../../context/AppContext';
+import TourTarget from '../../tour/TourTarget';
 import AlertBox from '../../common/alert-box';
 
 import { useState, useEffect, useRef } from 'react';
@@ -127,17 +128,20 @@ const Menu: React.FC<MenuProps> = ({ onClose }) => {
 
                     <View style={styles.itemList}>
                         {menuItems.map((item, index) => (
-                            <Pressable key={index} onPress={() => handleNavigation(item.screen)}>
-                                <Text style={styles.itemText}>{item.label}</Text>
+                            <Pressable key={index} style={styles.menuItemPressable} onPress={() => handleNavigation(item.screen)}>
+                                <TourTarget id={`menu_item_${item.key}`}>
+                                    <Text style={styles.itemText}>{item.label}</Text>
+                                </TourTarget>
                             </Pressable>
                         ))}
                     </View>
 
                     <View style={styles.footer}>
                         <Pressable onPress={handleLogout}>
-                            <Text style={styles.itemText}>{t('logout')}</Text>
+                            <TourTarget id="menu_item_logout">
+                                <Text style={styles.itemText}>{t('logout')}</Text>
+                            </TourTarget>
                         </Pressable>
-
                     </View>
                 </LinearGradient>
             </Animated.View>
@@ -219,6 +223,8 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 18,
         fontFamily: 'Judson-Regular',
+    },
+    menuItemPressable: {
         marginBottom: 45,
     },
     footer: {

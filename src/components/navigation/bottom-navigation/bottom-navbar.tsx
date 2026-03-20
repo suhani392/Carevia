@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { View, StyleSheet, Pressable, Animated, Image } from 'react-native';
 import { useAppContext } from '../../../context/AppContext';
 import { HomeIcon } from './icons';
+import TourTarget from '../../tour/TourTarget';
 
 interface BottomNavbarProps {
     activeTab: 'home' | 'family';
@@ -66,13 +67,15 @@ const BottomNavbar: React.FC<BottomNavbarProps> = ({ activeTab, onTabChange }) =
                     </Pressable>
 
                     <Pressable onPress={() => toggleTab('family')} style={styles.tab}>
-                        <Animated.View style={{ transform: [{ scale: familyScale }], opacity: activeTab === 'family' ? 1 : 0.6 }}>
-                            <Image
-                                source={require('../../../assets/icons/bottom-navbar/family.png')}
-                                style={[styles.familyIcon, { tintColor: colors.primary }]}
-                                resizeMode="contain"
-                            />
-                        </Animated.View>
+                        <TourTarget id="bottom_nav_family">
+                            <Animated.View style={{ transform: [{ scale: familyScale }], opacity: activeTab === 'family' ? 1 : 0.6 }}>
+                                <Image
+                                    source={require('../../../assets/icons/bottom-navbar/family.png')}
+                                    style={[styles.familyIcon, { tintColor: colors.primary }]}
+                                    resizeMode="contain"
+                                />
+                            </Animated.View>
+                        </TourTarget>
                     </Pressable>
                 </View>
             </View>

@@ -15,7 +15,8 @@ export type ScreenName =
     | 'reports'
     | 'document_view'
     | 'profile'
-    | 'scan_report';
+    | 'scan_report'
+    | 'forgot_password';
 
 interface NavigationContextType {
     currentScreen: ScreenName;

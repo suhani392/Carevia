@@ -7,6 +7,7 @@ import Menu from '../../components/navigation/menu-drawer/menu';
 import { useNavigation } from '../../context/NavigationContext';
 import { useAppContext } from '../../context/AppContext';
 import { getAvatarSource } from '../../lib/avatars';
+import TourTarget from '../../components/tour/TourTarget';
 
 
 const { width } = Dimensions.get('window');
@@ -162,14 +163,18 @@ const FamilyScreen = () => {
 
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
-                        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('family_members')}</Text>
-                        <TouchableOpacity
-                            style={[styles.addMemberButton, { backgroundColor: colors.primary }]}
-                            activeOpacity={0.8}
-                            onPress={() => setShowAddModal(true)}
-                        >
-                            <Text style={styles.addMemberText}>{t('add_member')}</Text>
-                        </TouchableOpacity>
+                        <TourTarget id="family_overview">
+                            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('family_members')}</Text>
+                        </TourTarget>
+                        <TourTarget id="add_member">
+                            <TouchableOpacity
+                                style={[styles.addMemberButton, { backgroundColor: colors.primary }]}
+                                activeOpacity={0.8}
+                                onPress={() => setShowAddModal(true)}
+                            >
+                                <Text style={styles.addMemberText}>{t('add_member')}</Text>
+                            </TouchableOpacity>
+                        </TourTarget>
                     </View>
 
 
