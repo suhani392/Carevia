@@ -144,11 +144,16 @@ serve(async (req) => {
             // Fetch trends calculated by RiskAgent
             const { data: trends } = await supabase.from('trend_cache').select('test_name, trend_status, percentage_change, previous_value').eq('structured_report_id', struct.id);
 
-            // 🤖 5. Call Guardrail Agent to generate explanation securely
+            // 🤖 5. Call Guardrail Agent to generate explanation securely (Anonymized)
+            const sanitizedJson = JSON.parse(JSON.stringify(struct.parsed_json));
+            if (sanitizedJson.patient_info) {
+                delete sanitizedJson.patient_info.name;
+            }
+
             const englishExplanation = await GuardrailAgent.generateSafeExplanation(
                 supabase,
                 reportId,
-                struct.parsed_json,
+                sanitizedJson,
                 trends || [],
                 riskLevel,
                 profileContext,

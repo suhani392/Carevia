@@ -42,6 +42,7 @@ const DocumentView = () => {
     const reportId = screenParams?.reportId;
 
     const [analysisResult, setAnalysisResult] = React.useState<any>(null);
+    const [parentScrollEnabled, setParentScrollEnabled] = React.useState(true);
 
     React.useEffect(() => {
         if (reportId) {
@@ -231,7 +232,13 @@ const DocumentView = () => {
                 title={ownerName}
             />
 
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                scrollEnabled={parentScrollEnabled}
+                nestedScrollEnabled={true}
+                onTouchEnd={() => setParentScrollEnabled(true)}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
                 <Text style={[styles.docTitle, { color: colors.text }]}>{docName}</Text>
 
                 <View style={[styles.imageContainer, { aspectRatio: 0.75, backgroundColor: colors.surface, borderColor: colors.cardBorder, borderWidth: 1 }]}>
@@ -243,20 +250,35 @@ const DocumentView = () => {
                                         <ActivityIndicator color={colors.primary} size="large" />
                                     </View>
                                 )}
-                                <Pdf
-                                    source={{ uri: docUri, cache: true }}
-                                    style={[styles.pdfViewer, { backgroundColor: themeMode === 'dark' ? '#1A1A1A' : '#FFFFFF' }]}
-                                    onLoadComplete={(numberOfPages) => {
-                                        setTotalPages(numberOfPages);
-                                        setIsLoading(false);
+                                <View
+                                    style={{ flex: 1 }}
+                                    onStartShouldSetResponderCapture={() => {
+                                        setParentScrollEnabled(false);
+                                        return false;
                                     }}
-                                    onPageChanged={(page) => setCurrentPage(page)}
-                                    onError={(error: any) => {
-                                        setIsLoading(false);
-                                        Alert.alert('PDF Error', error?.message || 'Unable to display this PDF.');
+                                    onMoveShouldSetResponderCapture={() => {
+                                        setParentScrollEnabled(false);
+                                        return false;
                                     }}
-                                    trustAllCerts={false}
-                                />
+                                    onTouchEnd={() => setParentScrollEnabled(true)}
+                                    onTouchCancel={() => setParentScrollEnabled(true)}
+                                >
+                                    <Pdf
+                                        source={{ uri: docUri, cache: true }}
+                                        style={[styles.pdfViewer, { backgroundColor: themeMode === 'dark' ? '#1A1A1A' : '#FFFFFF' }]}
+                                        onLoadComplete={(numberOfPages) => {
+                                            setTotalPages(numberOfPages);
+                                            setIsLoading(false);
+                                        }}
+                                        onPageChanged={(page) => setCurrentPage(page)}
+                                        onError={(error: any) => {
+                                            setIsLoading(false);
+                                            Alert.alert('PDF Error', error?.message || 'Unable to display this PDF.');
+                                        }}
+                                        trustAllCerts={false}
+                                        enablePaging={true}
+                                    />
+                                </View>
                             </>
                         ) : (
                             <Image

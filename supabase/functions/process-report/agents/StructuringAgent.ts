@@ -19,11 +19,11 @@ Extract:
 2. Patient details (age, gender, blood group if available)
 3. Doctor / Pathologist notes (if present)
 Ignore:
-Clinical significance text, interpretation paragraphs, method descriptions, addresses, report headers, accession details, barcode numbers, lab certifications, repeated footers, and any educational explanations not directly tied to a specific reported test value.
+Clinical significance text, interpretation paragraphs, method descriptions, addresses, accession details, barcode numbers, lab certifications, repeated footers, and any educational explanations not directly tied to a specific reported test value.
 
 Return a single valid JSON object exactly in this format:
 {
-  "patient_info": { "age": number | null, "gender": string | null, "blood_group": string | null },
+  "patient_info": { "name": string | null, "age": number | null, "gender": string | null, "blood_group": string | null, "report_date": "YYYY-MM-DD" | null },
   "lab_tests": [
     { "test_name": string, "value": number | string, "unit": string | null, "normal_min": number | null, "normal_max": number | null, "status": "Normal" | "High" | "Low" | "Borderline" | "Abnormal" | "Unknown" }
   ],
@@ -47,7 +47,12 @@ If the result is non-numeric (e.g., "Non Reactive", "Not Detected", "Clear", "Ne
 value = raw string, unit = null, normal_min = null, normal_max = null, status = "Normal" if it matches the reference text exactly, otherwise "Abnormal".
 Determine status using: value < normal_min → "Low", value > normal_max → "High", value within range → "Normal", value slightly outside range (less than 5% deviation) → "Borderline".
 If the report explicitly marks H, L, High, or Low, respect that flag over calculated comparison.
-Extract patient information: Age must be numeric only. Gender must be normalized to "Male", "Female", or "Other". Blood group must be extracted only if explicitly mentioned.
+Extract patient information from anywhere in the document (check headers especially):
+- Name: The full name of the patient (e.g. "Sahil Sharma" or "P Name: Suhani"). Search for labels like "Patient Name", "Name of Patient", "Name:".
+- Age: Numeric only. 
+- Gender: "Male", "Female", or "Other". 
+- Blood group: Extracted only if explicitly mentioned.
+- Report Date: The actual date the medical tests were performed. Search all document corners/headers for: "Date of Collection", "Reported on", "Issue Date", "Date:", "Sample Received", "Collected On", "Date of Report", "Collected Date", "Result Date", "Sample Drawn", "Tested On". Look for DD/MM/YYYY or MM/DD/YYYY formats near these labels. Format strictly as YYYY-MM-DD. 
 Do not infer gender from name. If any field is not present, set it to null.
 Extract doctor notes only if explicitly labeled (Medical Remarks, Conclusion, etc.). Exclude method descriptions.
 
@@ -92,13 +97,20 @@ ${rawText}`;
             logMessage = 'Failed to map any valid parameters from the text.';
         }
 
-        // Leave the Reasoning Trail
+        // Identify identity metadata
+        const patientName = parsedJson.patient_info?.name || null;
+        const reportDateString = parsedJson.patient_info?.report_date || null;
+
+        // Leave the Reasoning Trail with identity metadata
+        let metaLog = `Data identified for ${patientName || 'Unknown Patient'}. Report Date: ${reportDateString || 'Not Found'}.`;
+        metaLog += ` Mapped ${metadata.parameters_mapped} parameters successfully.`;
+
         await AuditLogger.log(
             supabase,
             reportId,
             'Structuring Agent',
-            'Data Structuring & JSON Mapping',
-            logMessage,
+            'Data Structuring & Identity Mapping',
+            metaLog,
             confidence
         );
 
@@ -112,12 +124,18 @@ ${rawText}`;
         let structuredReportId: string;
         if (existing) {
             structuredReportId = existing.id;
-            await supabase.from('structured_reports').update({ parsed_json: parsedJson }).eq('id', existing.id);
+            await supabase.from('structured_reports').update({ 
+                parsed_json: parsedJson,
+                patient_name: patientName,
+                report_date: reportDateString
+            }).eq('id', existing.id);
         } else {
             const { data: inserted, error: insErr } = await supabase.from('structured_reports').insert({
                 report_id: reportId,
                 user_id: userId,
-                parsed_json: parsedJson
+                parsed_json: parsedJson,
+                patient_name: patientName,
+                report_date: reportDateString
             }).select('id').single();
             
             if (insErr) throw new Error(`DB Save Failed: ${insErr.message}`);

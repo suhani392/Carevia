@@ -40,7 +40,7 @@ Return a single valid JSON object exactly in this structure:
     {
       "category": "string | null",
       "test_name": "string",
-      "heading": "string",
+      "heading": "string - MANDATORY FORMAT: '[Test Name] - [Value] [Unit] ([Status])' e.g. 'Hemoglobin - 14.5 g/dl (Normal)'",
       "trend_tag": "string | null",
       "explanation_lines": ["string"]
     }

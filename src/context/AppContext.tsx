@@ -1718,7 +1718,7 @@ interface AppContextType {
     invitationError: boolean;
     loading: boolean;
     refreshData: () => Promise<void>;
-    addUpdate: (name: string, text: string) => Promise<void>;
+    addUpdate: (text: string) => Promise<void>;
     addReport: (name: string, uri: string, analysis?: string) => Promise<void>;
     addDocument: (name: string, uri: string) => Promise<void>;
     updateReport: (id: string, name: string) => Promise<void>;
@@ -1978,6 +1978,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 const { data: alertsData, error: alertsError } = await supabase
                     .from('alerts_and_actions')
                     .select('*')
+                    .eq('user_id', user.id)
                     .order('created_at', { ascending: false })
                     .limit(10);
 
@@ -2135,7 +2136,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             };
 
             setDocuments(prev => [newDoc, ...prev]);
-            await addUpdate(`Uploaded a document: ${name}`);
+            await addUpdate(`Uploaded a document : ${name}`);
         } catch (error) {
             console.error('Error adding document:', error);
             throw error;

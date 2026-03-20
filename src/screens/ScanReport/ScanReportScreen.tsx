@@ -40,7 +40,7 @@ const decodeBase64 = (base64: string) => {
 
 const ScanReportScreen = () => {
     const { goBack, navigate, screenParams } = useNavigation();
-    const { colors, themeMode, t, refreshData, language } = useAppContext();
+    const { colors, themeMode, t, refreshData, language, userProfile } = useAppContext();
     const [permission, requestPermission] = useCameraPermissions();
     const [torch, setTorch] = useState(false);
     const [capturedImages, setCapturedImages] = useState<string[]>([]);
@@ -56,6 +56,7 @@ const ScanReportScreen = () => {
     const [displayStatus, setDisplayStatus] = useState('');
     const lastStatusChange = useRef(Date.now());
     const [isSaved, setIsSaved] = useState(false);
+    const [extractedPatientName, setExtractedPatientName] = useState<string | null>(null);
     const [showAiThinkingModal, setShowAiThinkingModal] = useState(false);
     const [aiLogs, setAiLogs] = useState<any[]>([]);
     const cameraRef = useRef<CameraView>(null);
@@ -316,6 +317,7 @@ const ScanReportScreen = () => {
                             if (structData?.explanation_json || structData?.translated_explanation_json) {
                                 console.log("[Status] Explanation found! Loading UI.");
                                 setAnalysisResult(structData.translated_explanation_json || structData.explanation_json);
+                                setExtractedPatientName(structData.patient_name);
                                 setIsAnalyzing(false);
                                 DeviceEventEmitter.emit('ANALYSIS_END');
                                 clearInterval(interval);
@@ -580,15 +582,49 @@ const ScanReportScreen = () => {
                                     <Text style={[styles.analyzeButtonText, { fontSize: 16, color: colors.primary }]}>View AI Thinking</Text>
                                 </TouchableOpacity>
 
-                                {!isSaved && (
-                                    <TouchableOpacity
-                                        style={[styles.analyzeButton, { backgroundColor: colors.primary }]}
-                                        onPress={() => setShowSaveModal(true)}
-                                    >
-                                        <DownloadIcon size={20} color="#FFFFFF" />
-                                        <Text style={[styles.analyzeButtonText, { fontSize: 16 }]}>Save Report</Text>
-                                    </TouchableOpacity>
-                                )}
+                                {(() => {
+                                    const userFullName = userProfile?.full_name?.toLowerCase().trim() || "";
+                                    const reportName = extractedPatientName?.toLowerCase().trim() || "";
+
+                                    console.log(`[IdentityCheck] Comparing User "${userFullName}" with Report Profile "${reportName}"`);
+
+                                    // If report has a name but it doesn't match current user (with fuzzy check)
+                                    const isMismatch = reportName && reportName !== "unknown patient" &&
+                                        !reportName.includes(userFullName) &&
+                                        !userFullName.includes(reportName) &&
+                                        // Check for first name matches at least
+                                        (userFullName.split(' ')[0].length > 2 && !reportName.includes(userFullName.split(' ')[0]));
+
+                                    if (isMismatch) {
+                                        return (
+                                            <View style={[styles.mismatchCard, { backgroundColor: colors.card, borderColor: colors.warning, marginBottom: 12 }]}>
+                                                <Text style={[styles.mismatchText, { color: colors.textSecondary }]}>
+                                                    External Report Detected: This report appears to belong to <Text style={{ color: colors.text, fontWeight: 'bold' }}>{extractedPatientName}</Text>. Saving to your profile is disabled to maintain data integrity.
+                                                </Text>
+                                            </View>
+                                        );
+                                    }
+
+                                    if (!isSaved) {
+                                        return (
+                                            <View style={{ gap: 10 }}>
+                                                {extractedPatientName && extractedPatientName !== "Unknown Patient" && (
+                                                    <Text style={{ textAlign: 'center', fontSize: 13, color: colors.success, opacity: 0.9, fontFamily: 'Judson-Bold' }}>
+                                                        Identified for: {extractedPatientName}
+                                                    </Text>
+                                                )}
+                                                <TouchableOpacity
+                                                    style={[styles.analyzeButton, { backgroundColor: colors.primary }]}
+                                                    onPress={() => setShowSaveModal(true)}
+                                                >
+                                                    <DownloadIcon size={20} color="#FFFFFF" />
+                                                    <Text style={[styles.analyzeButtonText, { fontSize: 16 }]}>Save Report</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        );
+                                    }
+                                    return null;
+                                })()}
                                 <TouchableOpacity
                                     style={[styles.saveButton, { backgroundColor: colors.card, borderColor: colors.cardBorder, borderWidth: 1, width: '100%', justifyContent: 'center' }]}
                                     onPress={goBack}
@@ -797,6 +833,18 @@ const styles = StyleSheet.create({
     trendBadgeText: {
         fontSize: 12,
         fontFamily: 'Judson-Bold',
+    },
+    mismatchCard: {
+        padding: 15,
+        borderRadius: 15,
+        borderWidth: 1,
+        borderStyle: 'dashed',
+    },
+    mismatchText: {
+        fontSize: 14,
+        fontFamily: 'Judson-Regular',
+        lineHeight: 20,
+        textAlign: 'center',
     },
     takeawayCard: {
         padding: 15,

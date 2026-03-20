@@ -221,7 +221,7 @@ const DocumentsScreen = () => {
                     };
                     setMemberDocuments(prev => [newDoc, ...prev]);
 
-                    await addUpdate("Me", `You added a new document to ${screenParams.name}'s section: ${asset.name}`);
+                    await addUpdate(`Uploaded a doc on ${screenParams.name}'s documents : ${asset.name}`);
                 }
                 Alert.alert(t('done'), t('done'));
             }

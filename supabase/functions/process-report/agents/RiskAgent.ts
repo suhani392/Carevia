@@ -25,18 +25,31 @@ export class RiskAgent {
         parsedJson: any
     ) {
         // 1. Fetch user profile for context (Diabetes, BP, etc.)
-        const { data: profile } = await supabase.from('profiles').select('has_diabetes, has_bp, has_thyroid').eq('id', userId).single();
+        const { data: profile } = await supabase.from('profiles').select('full_name, has_diabetes, has_bp, has_thyroid').eq('id', userId).single();
         const hasDiabetes = profile?.has_diabetes || false;
+        const userFullName = (profile?.full_name || "").toLowerCase().trim();
+        const currentPatientName = (parsedJson.patient_info?.name || "").toLowerCase().trim();
 
-        // 2. Fetch last historical report for mathematical trend matching
-        const { data: prevReport } = await supabase
-            .from('structured_reports')
-            .select('parsed_json')
-            .eq('user_id', userId)
-            .neq('report_id', reportId)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+        // 2. Determine if we should even look for trends
+        // We only calculate trends if the current report name matches the user's profile name (fuzzy match)
+        const isSelfAnalysis = currentPatientName && 
+                               (currentPatientName.includes(userFullName) || 
+                                userFullName.includes(currentPatientName) || 
+                                currentPatientName.includes(userFullName.split(' ')[0]));
+
+        let prevReport = null;
+        if (isSelfAnalysis) {
+            const { data } = await supabase
+                .from('structured_reports')
+                .select('parsed_json')
+                .eq('user_id', userId)
+                .neq('report_id', reportId)
+                .ilike('patient_name', `%${userFullName.split(' ')[0]}%`) // Broad name match for history
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            prevReport = data;
+        }
 
         const trends: any[] = [];
         let highRiskCount = 0;

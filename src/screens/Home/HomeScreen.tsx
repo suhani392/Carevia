@@ -31,25 +31,36 @@ const HomeScreen = () => {
                 .from('reports')
                 .select('id, created_at')
                 .eq('user_id', user.id)
+                .eq('is_saved', true)
                 .order('created_at', { ascending: true });
 
             if (!userReports || userReports.length < 2) return;
 
             const { data: structs } = await supabase
                 .from('structured_reports')
-                .select('report_id, parsed_json')
+                .select('report_id, parsed_json, report_date, created_at')
                 .in('report_id', userReports.map(r => r.id));
 
             if (!structs || structs.length === 0) return;
 
-            let validReports = userReports.filter(r => structs.some(s => s.report_id === r.id));
-            if (validReports.length > 4) validReports = validReports.slice(-4); // Keep only last 4 reports
+            let validStructs = structs || [];
 
-            const dates = validReports.map(r => new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }));
+            // Sort structs by report_date (falling back to created_at)
+            validStructs.sort((a, b) => {
+                const dateA = new Date(a.report_date || a.created_at).getTime();
+                const dateB = new Date(b.report_date || b.created_at).getTime();
+                return dateA - dateB;
+            });
+
+            if (validStructs.length > 3) validStructs = validStructs.slice(-3);
+
+            const dates = validStructs.map(s => {
+                const d = new Date(s.report_date || s.created_at);
+                return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+            });
             const biomarkerMap: { [key: string]: { [reportId: string]: number } } = {};
 
-            validReports.forEach(report => {
-                const struct = structs.find(s => s.report_id === report.id);
+            validStructs.forEach(struct => {
                 if (struct?.parsed_json?.lab_tests) {
                     (struct.parsed_json.lab_tests || []).forEach((b: any) => {
                         if (!b.test_name) return;
@@ -61,7 +72,7 @@ const HomeScreen = () => {
                         if (stat.includes('borderline') || stat.includes('moderate') || stat.includes('warning')) yVal = 1;
                         else if (stat.includes('high') || stat.includes('low') || stat.includes('critical') || stat.includes('danger') || stat.includes('abnormal')) yVal = 2;
 
-                        biomarkerMap[bName][report.id] = yVal;
+                        biomarkerMap[bName][struct.report_id] = yVal;
                     });
                 }
             });
@@ -74,8 +85,8 @@ const HomeScreen = () => {
             const colorsList = ['#FF4B4B', '#4ADE80', '#0062FF', '#FFB020'];
 
             const lines = topTerms.map((term, idx) => {
-                const points = validReports.map(r => {
-                    const val = biomarkerMap[term][r.id];
+                const points = validStructs.map(s => {
+                    const val = biomarkerMap[term][s.report_id];
                     return val !== undefined ? val : null;
                 });
                 return { name: term.toUpperCase(), color: colorsList[idx % colorsList.length], points };
