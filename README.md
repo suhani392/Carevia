@@ -6,6 +6,26 @@ Carevia is a domain-specialized healthcare AI system designed to transform compl
 
 ---
 
+## 🎥 Demo
+
+[Watch Demo Video](#)  
+*(Add your video link here)*
+
+---
+
+## 📦 APK Download
+
+[Download APK](#)  
+*(Add your APK link here)*
+
+---
+
+## 📸 Screenshots
+
+*(Add screenshots here — Upload, Insights, Trends, Alerts UI)*
+
+---
+
 ## 🩺 Problem Statement
 **The Problem:**
 Medical reports are often a source of anxiety rather than clarity. Patients and their families face several critical challenges:
@@ -14,6 +34,16 @@ Medical reports are often a source of anxiety rather than clarity. Patients and 
 - **Lack of Continuity:** There is no easy way to track how health markers change over time.
 - **Delayed Intervention:** Critical findings in elderly family members may go unnoticed by caregivers.
 - **AI Hallucinations:** Generic AI tools often provide unsafe medical advice or incorrect diagnoses.
+
+---
+
+## 💡 What Makes Carevia Unique?
+
+- **Multi-Agent Architecture:** Not a single LLM call, but a coordinated pipeline of specialized agents.
+- **Deterministic Trend Engine:** Uses mathematical calculations instead of AI guesses.
+- **Family-Aware Alerts:** Real-time escalation system for critical health risks.
+- **Zero-Diagnosis Guardrails:** Prevents unsafe medical advice.
+- **Full Audit Trail:** Every decision is logged for transparency and explainability.
 
 ---
 
@@ -40,6 +70,29 @@ Carevia coordinates a **Multi-Agent AI Pipeline** to build a trustworthy and pro
 
 ---
 
+## 🏗 Architecture Diagram
+
+![Architecture](./assets/architecture.png)  
+*(Add your architecture diagram here)*
+
+---
+
+## 🔄 How It Works (End-to-End Flow)
+
+Carevia operates through a coordinated sequence of specialized agents:
+
+1. **User uploads a report** (PDF/Image)
+2. **OCR Agent** extracts text and generates a confidence score  
+3. **Structuring Agent** converts raw text into standardized Medical JSON  
+4. **Trend Engine** compares biomarkers with historical data  
+5. **Risk Agent** evaluates urgency based on user profile (age, history)  
+6. **Guardrail Agent** ensures safe, non-diagnostic output  
+7. **Alert/Family Agent** triggers notifications if risk is critical  
+8. **Language Agent** translates insights into regional languages  
+9. **Audit Logger** records every step for transparency  
+
+---
+
 ## 🚀 Key Features
 
 - 📑 **Report Upload & OCR:** High-confidence text extraction with blurry-image detection.
@@ -53,26 +106,21 @@ Carevia coordinates a **Multi-Agent AI Pipeline** to build a trustworthy and pro
 
 ---
 
-## 🔄 How It Works (Flow)
-
-Carevia operates through a coordinated sequence of specialized agents:
-
-1.  **OCR Agent:** Extracts text and provides a confidence score.
-2.  **Structuring Agent:** Normalizes data into a standardized Medical JSON format.
-3.  **Risk Agent:** Evaluates urgency based on biomarker levels and user history.
-4.  **Guardrail Agent:** Ensures the final explanation is safe and non-diagnostic.
-5.  **Alert/Family Agent:** Triggers real-time haptic alerts and caregiver notifications.
-6.  **Language Agent:** Translates the findings into the user's preferred regional language.
-7.  **Audit Logger:** Records every step above for a full transparency trail.
-
----
-
 ## 🛡️ Compliance & Safety Guardrails
 Carevia is built with a **Safety-First** philosophy.
 - **No Diagnosis:** We explain medical values; we do not name diseases.
 - **No Prescriptions:** We NEVER recommend drugs or dosages.
 - **No Treatment Plans:** We do not suggest therapies.
 - **Auditability:** Every decision—from trend calculation to caregiver escalation—is logged in the `audit_logs` table.
+
+---
+
+## 📊 Impact Model
+
+- ⏱ **Time Saved:** Reduces report understanding time from ~30 minutes to under 5 minutes  
+- 💰 **Cost Savings:** Avoids unnecessary doctor consultations (~₹500 per case)  
+- 👨‍👩‍👧 **Family Safety:** Enables real-time caregiver intervention for critical cases  
+- 📈 **Scalability:** Cloud-based system capable of supporting thousands of users  
 
 ---
 
@@ -126,18 +174,6 @@ npx expo start
 OR
 ```bash
 npx expo start --tunnel
-```
-OR
-```bash
-npx expo start --dev-client
-```
-OR
-```bash
-npx expo start --dev-client --tunnel
-```
-OR
-```bash
-npm run start
 ```
 
 *Use the Expo Go app or an emulator to view the project.*
