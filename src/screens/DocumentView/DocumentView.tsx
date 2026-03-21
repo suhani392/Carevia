@@ -46,19 +46,20 @@ const DocumentView = () => {
 
     React.useEffect(() => {
         if (reportId) {
-            const fetchAnalysis = async () => {
-                const { data, error } = await supabase.from('structured_reports').select('explanation_json').eq('report_id', reportId).maybeSingle();
+            const fetchAnalysisAndTrends = async () => {
+                const { data, error: structErr } = await supabase
+                    .from('structured_reports')
+                    .select('id, explanation_json')
+                    .eq('report_id', reportId)
+                    .maybeSingle();
+
                 if (data?.explanation_json) {
                     setAnalysisResult(data.explanation_json);
                 }
             };
-            fetchAnalysis();
+            fetchAnalysisAndTrends();
         }
     }, [reportId]);
-
-    React.useEffect(() => {
-        console.log('DocumentView - Incoming URI:', docUri);
-    }, [docUri]);
 
     const isPdf = docName.toLowerCase().endsWith('.pdf') || (docUri && docUri.toLowerCase().split('?')[0].endsWith('.pdf'));
 
@@ -479,6 +480,53 @@ const styles = StyleSheet.create({
     summaryItem: { alignItems: 'center', flex: 1 },
     summaryCount: { fontSize: 24, fontFamily: 'Judson-Bold' },
     summaryLabel: { fontSize: 12, fontFamily: 'Judson-Regular', color: '#888', marginTop: 4 },
+    trendsList: {
+        marginTop: 10,
+    },
+    trendStatusGroup: {
+        marginBottom: 25,
+    },
+    trendHeaderTag: {
+        alignSelf: 'flex-start',
+        paddingHorizontal: 12,
+        paddingVertical: 5,
+        borderRadius: 10,
+        marginBottom: 12,
+    },
+    trendHeaderText: {
+        fontSize: 12,
+        fontFamily: 'Judson-Bold',
+        letterSpacing: 1,
+    },
+    trendItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingLeft: 15,
+        borderLeftWidth: 3,
+        marginBottom: 15,
+    },
+    trendMeta: {
+        flex: 1,
+    },
+    trendTestName: {
+        fontSize: 17,
+        fontFamily: 'Judson-Bold',
+        marginBottom: 2,
+    },
+    trendValues: {
+        fontSize: 14,
+        fontFamily: 'Judson-Regular',
+    },
+    trendPercentBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    trendPercentText: {
+        fontSize: 13,
+        fontFamily: 'Judson-Bold',
+    },
 });
 
 export default DocumentView;

@@ -59,6 +59,8 @@ const ScanReportScreen = () => {
     const [extractedPatientName, setExtractedPatientName] = useState<string | null>(null);
     const [showAiThinkingModal, setShowAiThinkingModal] = useState(false);
     const [aiLogs, setAiLogs] = useState<any[]>([]);
+    const [trends, setTrends] = useState<any[]>([]);
+    const [comparisonContext, setComparisonContext] = useState<string | null>(null);
     const cameraRef = useRef<CameraView>(null);
     const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -318,6 +320,11 @@ const ScanReportScreen = () => {
                                 console.log("[Status] Explanation found! Loading UI.");
                                 setAnalysisResult(structData.translated_explanation_json || structData.explanation_json);
                                 setExtractedPatientName(structData.patient_name);
+
+                                // Fetch Trends and Context from the main record (fail-safe)
+                                if (structData?.trends_json) setTrends(structData.trends_json);
+                                if (structData?.comparison_context) setComparisonContext(structData.comparison_context);
+
                                 setIsAnalyzing(false);
                                 DeviceEventEmitter.emit('ANALYSIS_END');
                                 clearInterval(interval);
@@ -526,9 +533,77 @@ const ScanReportScreen = () => {
                                     <Text style={[styles.sectionPara, { color: colors.textSecondary, fontFamily: 'Judson-Bold' }]}>{analysisResult?.summary || "Your report has been processed successfully."}</Text>
                                 </View>
 
+                                {/* --- TRENDS SECTION (INDEPENDENT SPACED CONTAINER) --- */}
+                                <View style={[styles.contentSection, { marginTop: 35, marginBottom: 20 }]}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                                        <Text style={{ fontSize: 22, color: colors.primary, fontFamily: 'Judson-Bold' }}>Health Trends</Text>
+                                        <View style={{ marginLeft: 10, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, backgroundColor: colors.primaryLight }}>
+                                            <Text style={{ fontSize: 10, color: colors.primary, fontFamily: 'Judson-Bold' }}>HISTORICAL</Text>
+                                        </View>
+                                    </View>
+
+                                    {comparisonContext ? (
+                                        <Text style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 20, fontFamily: 'Judson-Regular', fontStyle: 'italic', paddingHorizontal: 5 }}>
+                                            {comparisonContext}
+                                        </Text>
+                                    ) : null}
+                                    
+                                    {trends.length > 0 ? (
+                                        <View style={{ marginTop: 10 }}>
+                                            {['Worsened', 'Improved', 'Stable'].map((displayStatus) => {
+                                                const dbStatus = displayStatus === 'Worsened' ? 'Increased' : displayStatus === 'Improved' ? 'Decreased' : 'Stable';
+                                                const filtered = trends.filter((t: any) => t.trend_status === dbStatus);
+                                                if (filtered.length === 0) return null;
+                                                
+                                                const statusColor = displayStatus === 'Improved' ? '#4ADE80' : displayStatus === 'Worsened' ? '#FF4B4B' : colors.textSecondary;
+                                                const statusBg = displayStatus === 'Improved' ? 'rgba(74, 222, 128, 0.1)' : displayStatus === 'Worsened' ? 'rgba(255, 75, 75, 0.1)' : 'rgba(150, 150, 150, 0.05)';
+
+                                                return (
+                                                    <View key={displayStatus} style={{ marginBottom: 30 }}>
+                                                        <View style={{ alignSelf: 'flex-start', paddingHorizontal: 15, paddingVertical: 6, borderRadius: 10, marginBottom: 15, backgroundColor: statusBg }}>
+                                                            <Text style={{ fontSize: 13, fontFamily: 'Judson-Bold', letterSpacing: 1, color: statusColor }}>{displayStatus.toUpperCase()}</Text>
+                                                        </View>
+                                                        {filtered.map((trend: any, idx: number) => {
+                                                            const sDate = trend.source_date ? new Date(trend.source_date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : '?';
+                                                            const tDate = trend.target_date ? new Date(trend.target_date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : '?';
+
+                                                            return (
+                                                                <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingLeft: 18, borderLeftWidth: 3, borderLeftColor: statusColor, marginBottom: 20 }}>
+                                                                    <View style={{ flex: 1 }}>
+                                                                        <Text style={{ fontSize: 18, fontFamily: 'Judson-Bold', color: colors.text, marginBottom: 4 }}>{trend.test_name}</Text>
+                                                                        <Text style={{ fontSize: 15, fontFamily: 'Judson-Regular', color: colors.textSecondary }}>
+                                                                            {trend.source_value} ({sDate}) → {trend.target_value} ({tDate})
+                                                                        </Text>
+                                                                    </View>
+                                                                    {trend.percentage_change !== 0 && (
+                                                                        <View style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: statusBg }}>
+                                                                            <Text style={{ fontSize: 15, fontFamily: 'Judson-Bold', color: statusColor }}>
+                                                                                {trend.percentage_change > 0 ? '+' : ''}{trend.percentage_change.toFixed(1)}%
+                                                                            </Text>
+                                                                        </View>
+                                                                    )}
+                                                                </View>
+                                                            );
+                                                        })}
+                                                    </View>
+                                                );
+                                            })}
+                                        </View>
+                                    ) : (
+                                        <View style={{ 
+                                            backgroundColor: themeMode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)', 
+                                            marginTop: 10, padding: 30, borderRadius: 15, borderStyle: 'dashed', borderWidth: 1, borderColor: colors.cardBorder 
+                                        }}>
+                                            <Text style={{ color: colors.textSecondary, fontSize: 15, textAlign: 'center', fontFamily: 'Judson-Regular' }}>
+                                                No historical comparisons available for this report.
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+
                                 {analysisResult?.takeaways && (
-                                    <View style={styles.contentSection}>
-                                        <Text style={[styles.sectionHeading, { color: colors.text }]}>Top Insights</Text>
+                                    <View style={[styles.contentSection, { marginTop: 10 }]}>
+                                        <Text style={{ fontSize: 22, color: colors.primary, fontFamily: 'Judson-Bold', marginBottom: 15 }}>Top Insights</Text>
 
                                         {analysisResult.takeaways.biggest_concern && analysisResult.takeaways.biggest_concern !== 'null' && (
                                             <View style={[styles.takeawayCard, { borderColor: colors.error, backgroundColor: 'rgba(255, 75, 75, 0.05)' }]}>

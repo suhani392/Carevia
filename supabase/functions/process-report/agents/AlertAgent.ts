@@ -31,7 +31,7 @@ export class AlertAgent {
             report_id: reportId,
             user_id: userId,
             risk_level: riskLevel,
-            action_type: 'URGENT_UI_BANNER',
+            action_type: 'Triggered Urgency Alert',
             action_message: message,
             status: 'Pending'
         });
@@ -42,7 +42,7 @@ export class AlertAgent {
                 reportId,
                 'Alert Agent',
                 'Emergency Banner Dispatch',
-                `Triggered URGENT_UI_BANNER due to ${riskLevel}. Consolidated ${reasons.length} findings.`,
+                `Triggered Urgency Alert due to ${riskLevel}. Consolidated ${reasons.length} findings.`,
                 'HIGH'
             );
         } else {
