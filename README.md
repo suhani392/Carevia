@@ -6,24 +6,21 @@ Carevia is a domain-specialized healthcare AI system designed to transform compl
 
 ---
 
-## 🎥 Demo
+## 🎥 Demo Video
 
-[Watch Demo Video](#)  
-*(Add your video link here)*
+[Watch Demo Video here](https://drive.google.com/drive/folders/1KL4UH-6W-tvcUb011RcXB3UIRZueQl0e?usp=sharing)
 
 ---
 
 ## 📦 APK Download
 
-[Download APK](#)  
-*(Add your APK link here)*
+[Download APK here](https://drive.google.com/drive/folders/1H139BSbz1BOCSpheIBpywdVzP4VaWgU7?usp=sharing)
 
 ---
 
 ## 📄 Demo Reports
 
-[Demo Reports](#)  
-*(Add Google Drive link of reports here)*
+[Get Demo Reports here](https://drive.google.com/drive/folders/1gO8AtUDGSR4-1hyfZuyE4l0dGXvcQeHp?usp=sharing)
 
 ---
 
@@ -49,7 +46,7 @@ Medical reports are often a source of anxiety rather than clarity. Patients and 
 ---
 
 ## 🏆 Hackathon Evaluation Focus
-*How Carevia meets the ET Gen AI Hackathon criteria:*
+*How Carevia meets the Hackathon criteria:*
 
 | Criterion | Implementation in Carevia |
 | :--- | :--- |
@@ -169,13 +166,18 @@ cd Carevia
 npm install
 ```
 
-### 3. Run the Application
+### 3. Install Development Build Application
 ```bash
-npx expo start
+npx expo run:android
+```
+
+### 4. Run the Application
+```bash
+npx expo start --dev-client
 ```
 OR
 ```bash
-npx expo start --tunnel
+npx expo start --dev-client --tunnel
 ```
 
 *Use the Expo Go app or an emulator to view the project.*
