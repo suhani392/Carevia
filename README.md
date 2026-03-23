@@ -20,9 +20,10 @@ Carevia is a domain-specialized healthcare AI system designed to transform compl
 
 ---
 
-## 📸 Screenshots
+## 📄 Demo Reports
 
-*(Add screenshots here — Upload, Insights, Trends, Alerts UI)*
+[Demo Reports](#)  
+*(Add Google Drive link of reports here)*
 
 ---
 
@@ -72,8 +73,7 @@ Carevia coordinates a **Multi-Agent AI Pipeline** to build a trustworthy and pro
 
 ## 🏗 Architecture Diagram
 
-![Architecture](./assets/architecture.png)  
-*(Add your architecture diagram here)*
+![Architecture](./assets/architecture.png)
 
 ---
 
@@ -90,6 +90,8 @@ Carevia operates through a coordinated sequence of specialized agents:
 7. **Alert/Family Agent** triggers notifications if risk is critical  
 8. **Language Agent** translates insights into regional languages  
 9. **Audit Logger** records every step for transparency  
+
+![App Work Flow](./assets/app-flow.png)
 
 ---
 
