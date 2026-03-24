@@ -69,7 +69,7 @@ const AboutScreen = () => {
 
                     <View style={[styles.section, { borderBottomWidth: 0 }]}>
                         <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('version')}</Text>
-                        <Text style={[styles.sectionText, { color: colors.textSecondary }]}>{t('app_version')}: 1.0.0</Text>
+                        <Text style={[styles.sectionText, { color: colors.textSecondary }]}>{t('app_version')}: 1.0.1</Text>
                     </View>
                 </View>
 

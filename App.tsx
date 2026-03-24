@@ -33,6 +33,7 @@ import ForgotPasswordOTP from './src/screens/Login/ForgotPasswordOTP';
 
 // Components
 import BottomNavbar from './src/components/navigation/bottom-navigation/bottom-navbar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -282,13 +283,15 @@ export default function App() {
     }
 
     return (
-        <AppProvider>
-            <NavigationProvider>
-                <TourProvider>
-                    <AppContent />
-                </TourProvider>
-            </NavigationProvider>
-        </AppProvider>
+        <SafeAreaProvider>
+            <AppProvider>
+                <NavigationProvider>
+                    <TourProvider>
+                        <AppContent />
+                    </TourProvider>
+                </NavigationProvider>
+            </AppProvider>
+        </SafeAreaProvider>
     );
 }
 

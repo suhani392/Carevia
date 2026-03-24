@@ -181,6 +181,6 @@ Tone: Calm, Neutral, Supportive, Clear, Medically responsible.`;
         return new Response(JSON.stringify({ text: aiText, is_emergency: false }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
     } catch (err: any) {
-        return new Response(JSON.stringify({ error: err.message }), { status: 200, headers: corsHeaders });
+        return new Response(JSON.stringify({ error: err.message }), { status: 400, headers: corsHeaders });
     }
 })

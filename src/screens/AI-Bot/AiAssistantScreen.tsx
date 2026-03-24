@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Platform, Dimensions, Pressable, KeyboardAvoidingView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '../../context/NavigationContext';
 import { useAppContext } from '../../context/AppContext';
 import { supabase } from '../../lib/supabase';
@@ -13,6 +14,7 @@ const { width, height } = Dimensions.get('window');
 const AiAssistantScreen = () => {
     const { navigate } = useNavigation();
     const { reports, documents, t, language, colors } = useAppContext();
+    const insets = useSafeAreaInsets();
 
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [inputText, setInputText] = useState('');
@@ -72,9 +74,9 @@ const AiAssistantScreen = () => {
             setMessages(prev => [...prev, newMessage]);
             setInputText('');
 
+            const loadingId = messages.length + 2;
             try {
                 // Add temporary bot loading message
-                const loadingId = messages.length + 2;
                 setMessages(prev => [...prev, { id: loadingId, type: 'bot', text: '...' }]);
 
                 const { data, error } = await supabase.functions.invoke('ai-chat', {
@@ -84,7 +86,7 @@ const AiAssistantScreen = () => {
                     }
                 });
 
-                if (error || !data) throw new Error(error?.message || "Function error");
+                if (error || !data || (data as any).error) throw new Error((data as any)?.error || error?.message || "Function error");
 
                 setMessages(prev => {
                     const filtered = prev.filter(m => m.id !== loadingId);
@@ -98,7 +100,10 @@ const AiAssistantScreen = () => {
 
             } catch (err: any) {
                 console.error("Chat Error:", err);
-                setMessages(prev => [...prev, { id: prev.length + 1, type: 'bot', text: "Sorry, I had trouble connecting. Please try again." }]);
+                setMessages(prev => {
+                    const filtered = prev.filter(m => m.id !== loadingId);
+                    return [...filtered, { id: Date.now(), type: 'bot', text: `Chat Error: ${err.message}` }];
+                });
             }
         }
     };
@@ -184,7 +189,7 @@ const AiAssistantScreen = () => {
                                     { color: colors.text },
                                     (msg as any).isEmergency && { color: '#D32F2F', fontFamily: 'Judson-Bold' }
                                 ]}>
-                                    {msg.text.split(/(\*\*.*?\*\*)/g).map((part: string, index: number) => {
+                                    {(msg.text || "").split(/(\*\*.*?\*\*)/g).map((part: string, index: number) => {
                                         if (part.startsWith('**') && part.endsWith('**')) {
                                             return <Text key={index} style={{ fontFamily: 'Judson-Bold' }}>{part.slice(2, -2)}</Text>;
                                         }
@@ -206,7 +211,7 @@ const AiAssistantScreen = () => {
                 </ScrollView>
 
                 {/* Input Area */}
-                <View style={[styles.inputContainer, { backgroundColor: colors.background }]}>
+                <View style={[styles.inputContainer, { backgroundColor: colors.background, paddingBottom: Math.max(insets.bottom, 15) }]}>
                     <View style={[styles.inputWrapper, { backgroundColor: colors.inputBg, borderColor: colors.border, borderWidth: 1 }]}>
                         {selectedAttachment && (
                             <View style={[styles.attachmentBadge, { backgroundColor: colors.primaryLight }]}>
@@ -356,7 +361,6 @@ const styles = StyleSheet.create({
     },
     inputContainer: {
         paddingTop: 10,
-        paddingBottom: Platform.OS === 'ios' ? 30 : 20,
         paddingHorizontal: 20,
     },
     inputWrapper: {

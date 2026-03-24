@@ -39,7 +39,7 @@ export class RiskAgent {
         let prevReport = null;
         let matchtype = "none";
 
-        // Step A: Attempt strict identity match first
+        // Step A: Attempt strict identity match (Case-insensitive fuzzy match)
         if (isSelfAnalysis) {
             const { data: latestNamed } = await supabase
                 .from('structured_reports')
@@ -57,25 +57,10 @@ export class RiskAgent {
             }
         }
 
-        // Step B: Resilient Fallback (If no name match, find ANY most recent report for this user)
-        if (!prevReport) {
-            const { data: lastAny } = await supabase
-                .from('structured_reports')
-                .select('parsed_json, report_date, patient_name')
-                .eq('user_id', userId)
-                .neq('report_id', reportId)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .maybeSingle();
-            
-            if (lastAny) {
-                prevReport = lastAny;
-                matchtype = "account_match";
-            }
-        }
-
-        // Step B: Resilient Fallback (If no name match, find ANY most recent report for this user)
-        if (!prevReport) {
+        // Step B: Resilient Fallback (Account Match)
+        // ONLY if it's potentially the same person (SelfAnalysis was fuzzy OR name is missing)
+        // This prevents friends' reports from being compared to the user's data.
+        if (!prevReport && (isSelfAnalysis || !currentPatientName)) {
             const { data: lastAny } = await supabase
                 .from('structured_reports')
                 .select('parsed_json, report_date, patient_name')
@@ -131,8 +116,10 @@ export class RiskAgent {
         // Identity logging for debugging
         if (isSelfAnalysis) {
             await AuditLogger.log(supabase, reportId, 'Risk Evaluation Agent', 'Identity Verification', `Identity match: ${currentPatientName}. Searching history...`, 'HIGH');
+        } else if (!currentPatientName) {
+            await AuditLogger.log(supabase, reportId, 'Risk Evaluation Agent', 'Identity Verification', `No patient name detected. Falling back to account history for trends.`, 'MEDIUM');
         } else {
-            await AuditLogger.log(supabase, reportId, 'Risk Evaluation Agent', 'Identity Verification', `No direct identity match between ${currentPatientName} and ${userFullName}. Skipping Trends.`, 'MEDIUM');
+            await AuditLogger.log(supabase, reportId, 'Risk Evaluation Agent', 'Identity Verification', `Name mismatch: Report is for ${currentPatientName}, User is ${userFullName}. Skipping Trends.`, 'MEDIUM');
         }
 
         // 3. Mathematical Execution & Context Testing

@@ -16,11 +16,17 @@ Carevia is a domain-specialized healthcare AI system designed to transform compl
 
 [Download APK here](https://drive.google.com/drive/folders/1H139BSbz1BOCSpheIBpywdVzP4VaWgU7?usp=sharing)
 
+(Note: Make sure to download the latest version of the APK to experience the latest features with modified previous versions)
+
 ---
 
 ## 📄 Demo Reports
 
 [Get Demo Reports here](https://drive.google.com/drive/folders/1gO8AtUDGSR4-1hyfZuyE4l0dGXvcQeHp?usp=sharing)
+
+You may use these demo reports to see how the app analyses and processes the reports.
+
+**Disclaimer:** The demo reports are for testing purposes only and should not be used for any medical decisions.
 
 ---
 

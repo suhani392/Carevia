@@ -207,6 +207,6 @@ serve(async (req) => {
             // Log pipeline failures
             await AuditLogger.log(supabase, reportId, 'System Orchestrator', 'Pipeline Failure', err.message, 'LOW');
         }
-        return new Response(JSON.stringify({ error: err.message }), { status: 200, headers: corsHeaders });
+        return new Response(JSON.stringify({ error: err.message }), { status: 400, headers: corsHeaders });
     }
 })
