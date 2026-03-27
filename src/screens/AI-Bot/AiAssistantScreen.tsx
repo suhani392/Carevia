@@ -62,7 +62,7 @@ const AiAssistantScreen = () => {
     const handleSend = async () => {
         if (inputText.trim() || selectedAttachment) {
             const userMsgText = inputText.trim();
-            const attachment = reports.find(r => r.name === selectedAttachment);
+            const attachment = [...reports, ...documents].find(r => r.name === selectedAttachment);
             const reportId = attachment?.id || null;
 
             const newMessage = {
@@ -86,23 +86,41 @@ const AiAssistantScreen = () => {
                     }
                 });
 
-                if (error || !data || (data as any).error) throw new Error((data as any)?.error || error?.message || "Function error");
+                // If error is non-null, it means we got a non-2xx status code
+                if (error) {
+                    console.error("[AiAssistant] Edge Function Invoke Error:", error);
+                    // Supabase FunctionsHttpError might have a status code we can show
+                    const status = (error as any).status || "unknown";
+                    throw new Error(`${error.message} (Status: ${status})`);
+                }
+
+                if (!data) {
+                    throw new Error("Empty response from AI assistant.");
+                }
+
+                if ((data as any).error) {
+                    throw new Error((data as any).error);
+                }
 
                 setMessages(prev => {
                     const filtered = prev.filter(m => m.id !== loadingId);
                     return [...filtered, {
                         id: loadingId,
                         type: 'bot',
-                        text: data.text,
+                        text: data.text || "I'm sorry, I couldn't understand that.",
                         isEmergency: data.isEmergency
                     }];
                 });
 
             } catch (err: any) {
-                console.error("Chat Error:", err);
+                console.error("Chat Interaction Error:", err);
                 setMessages(prev => {
                     const filtered = prev.filter(m => m.id !== loadingId);
-                    return [...filtered, { id: Date.now(), type: 'bot', text: `Chat Error: ${err.message}` }];
+                    return [...filtered, { 
+                        id: Date.now(), 
+                        type: 'bot', 
+                        text: `Chat Error: ${err.message || "An unexpected error occurred."}` 
+                    }];
                 });
             }
         }
