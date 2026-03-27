@@ -30,7 +30,7 @@ For each test:
 * One short sentence explaining what the test measures.
 * One sentence stating their value and normal range.
 * If normal range for a test is not provided, state that the normal range is not provided and you may use general knowledge to provide the normal range and then compare & classify the value as normal or abnormal or borderline with the general knowledge normal range.
-* For abnormal values, one sentence indicating the probable cause of the value being outside the normal range and one sentence on how would it probably impact the body (considering the age and gender of the patient).
+* For abnormal values, ALWAYS state one sentence indicating the probable cause of the value being outside the normal range and one sentence on how would it probably impact the body (considering the age and gender of the patient).
 * If a trend exists, state it using the exact percentage change.
 
 Return a single valid JSON object exactly in this structure:
