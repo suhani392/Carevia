@@ -16,7 +16,7 @@ Carevia is a domain-specialized healthcare AI system designed to transform compl
 
 [Download APK here](https://drive.google.com/drive/folders/1H139BSbz1BOCSpheIBpywdVzP4VaWgU7?usp=sharing)
 
-(Note: Make sure to download the latest version of the APK to experience the latest features with modified previous versions)
+(Note: To test the app download the APK from the above link)
 
 ---
 
@@ -26,18 +26,30 @@ Carevia is a domain-specialized healthcare AI system designed to transform compl
 
 You may use these demo reports to see how the app analyses and processes the reports.
 
+(Note: If using the demo reports, login by using the credentials provided below to experience the full features of the app :)
+Email: [EMAIL_ADDRESS]
+Password: Sahil@123
+
 **Disclaimer:** The demo reports are for testing purposes only and should not be used for any medical decisions.
 
 ---
 
 ## 🩺 Problem Statement
-**The Problem:**
+
+### 🏆 The Challenge: Domain-Specialized AI Agents
+**Challenge:** Build a domain-specific AI agent for healthcare that executes domain workflows, handles edge cases properly, and stays within regulatory and policy guardrails at all times.
+
+**Focus Area:** Healthcare Operations Agents — navigating complex medical rule sets with auditable reasoning at each step.
+
+### 🏥 The Problem: The "Last Mile" of Healthcare
 Medical reports are often a source of anxiety rather than clarity. Patients and their families face several critical challenges:
+
 - **Medical Jargon:** Interpreting complex values (like HbA1c or Triglycerides) without a medical background is nearly impossible.
 - **Data Fragmentation:** Health history is scattered across physical papers, PDFs, and emails.
 - **Lack of Continuity:** There is no easy way to track how health markers change over time.
 - **Delayed Intervention:** Critical findings in elderly family members may go unnoticed by caregivers.
 - **AI Hallucinations:** Generic AI tools often provide unsafe medical advice or incorrect diagnoses.
+
 
 ---
 
@@ -51,8 +63,7 @@ Medical reports are often a source of anxiety rather than clarity. Patients and 
 
 ---
 
-## 🏆 Hackathon Evaluation Focus
-*How Carevia meets the Hackathon criteria:*
+## 🏆 How Carevia meets the Hachathon Criteria
 
 | Criterion | Implementation in Carevia |
 | :--- | :--- |
