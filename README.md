@@ -27,7 +27,7 @@ Carevia is a domain-specialized healthcare AI system designed to transform compl
 You may use these demo reports to see how the app analyses and processes the reports.
 
 (Note: If using the demo reports, login by using the credentials provided below to experience the full features of the app :)
-Email: [EMAIL_ADDRESS]
+Email: [sahilpranjale2005@gmail.com]
 Password: Sahil@123
 
 **Disclaimer:** The demo reports are for testing purposes only and should not be used for any medical decisions.
