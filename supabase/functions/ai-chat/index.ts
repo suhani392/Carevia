@@ -55,8 +55,19 @@ Deno.serve(async (req: Request) => {
     const isUUID = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
     const validId = (report_id && isUUID(report_id)) ? report_id : null;
 
-    let systemPrompt = "You are Carevia AI, a professional health assistant. Provide concise, expert-level help (around 100-150 words). Use **bold** for key medical terms and important values. Always end with: 'Note: I cannot provide medical diagnoses. Please consult a doctor for clinical advice.'";
-    let contextData = "General wellness context.";
+    // Fetch prompts from database
+    const { data: promptsData } = await supabase
+      .from('system_prompts')
+      .select('agent_name, prompt_template')
+      .in('agent_name', ['ai_chat_general', 'ai_chat_report']);
+
+    const generalPromptTpl = promptsData?.find((p: any) => p.agent_name === 'ai_chat_general')?.prompt_template 
+      || "You are Carevia AI, a professional health assistant. Provide concise, expert-level help (around 100-150 words). Use **bold** for key medical terms and important values. Always end with: 'Note: I cannot provide medical diagnoses. Please consult a doctor for clinical advice.'";
+      
+    const reportPromptTpl = promptsData?.find((p: any) => p.agent_name === 'ai_chat_report')?.prompt_template 
+      || "You are Carevia AI in Report Analysis mode. Use the provided **REPORT DATA** to answer accurately. Be professional, direct, and concise (max 2 short paragraphs). Highlight important values or findings in **bold**. Always include the medical disclaimer at the end.\n\nCONTEXT: {{CONTEXT_DATA}}\nUSER QUESTION: {{USER_QUESTION}}";
+
+    let finalPrompt = "";
 
     if (validId) {
       const { data: struct } = await supabase
@@ -66,9 +77,16 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
       
       if (struct) {
-        contextData = `REPORT DATA: ${JSON.stringify(struct.parsed_json)}`;
-        systemPrompt = "You are Carevia AI in Report Analysis mode. Use the provided **REPORT DATA** to answer accurately. Be professional, direct, and concise (max 2 short paragraphs). Highlight important values or findings in **bold**. Always include the medical disclaimer at the end.";
+        const contextData = `REPORT DATA: ${JSON.stringify(struct.parsed_json)}`;
+        finalPrompt = reportPromptTpl
+          .replace('{{CONTEXT_DATA}}', contextData)
+          .replace('{{USER_QUESTION}}', message);
+      } else {
+        // Fallback to general if report data is missing
+        finalPrompt = `${generalPromptTpl}\n\nUSER QUESTION: ${message}`;
       }
+    } else {
+        finalPrompt = `${generalPromptTpl}\n\nUSER QUESTION: ${message}`;
     }
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${aiKey}`;
@@ -76,7 +94,8 @@ Deno.serve(async (req: Request) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: `${systemPrompt}\n\nCONTEXT: ${contextData}\n\nUSER QUESTION: ${message}` }] }],
+        contents: [{ parts: [{ text: finalPrompt }] }],
+
         generationConfig: { temperature: 0.2, maxOutputTokens: 800 }
       })
     });

@@ -11,19 +11,26 @@ export class LanguageAgent {
             console.log(`[LanguageAgent] Translating analysis to ${targetLanguage} for report ${reportId}...`);
             await supabase.from('reports').update({ analysis: "Translating insights to your language..." }).eq('id', reportId);
 
+            // Fetch prompt from database
+            const { data: promptData, error: promptErr } = await supabase
+                .from('system_prompts')
+                .select('prompt_template')
+                .eq('agent_name', 'language_agent')
+                .single();
+
+            if (promptErr || !promptData) {
+                throw new Error('Failed to load Language prompt from database');
+            }
+
+            const systemInstruction = promptData.prompt_template.replace('{{TARGET_LANGUAGE}}', targetLanguage);
+
             const genAI = new GoogleGenerativeAI(aiKey);
             const model = genAI.getGenerativeModel({
                 model: "gemini-2.5-flash",
-                systemInstruction: `You are an expert medical translator. Translate the provided JSON object strictly into the ${targetLanguage} language (e.g., if targetLanguage is 'hi', translate to Hindi, if 'mr' translate to Marathi). 
-CRITICAL RULES:
-1. Keep ALL JSON keys exactly the same (in English).
-2. ONLY translate the string values.
-3. Keep the overall formatting, bullet points, and structure identical.
-4. Output STRICTLY valid JSON without any markdown code wrappers (no \`\`\`json).
-5. Ensure the medical terminology used is accurate and easily understandable in the target language.`
+                systemInstruction: systemInstruction
             });
 
-            const prompt = `Translate this JSON object to ${targetLanguage}:\n\n${JSON.stringify(englishExplanation, null, 2)}`;
+            const prompt = `Translate this JSON object:\n\n${JSON.stringify(englishExplanation, null, 2)}`;
 
             const result = await model.generateContent(prompt);
             let rawText = result.response.text().trim();

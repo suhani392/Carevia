@@ -12,23 +12,18 @@ export class OcrAgent {
         aiKey: string
     ): Promise<{ extracted_text: string; confidence: 'HIGH' | 'MEDIUM' | 'LOW'; ambiguity_notes: string | null }> {
         
-        // We modified the original prompt to demand JSON and an explicit CONFIDENCE score.
-        const ocrPrompt = `You are an advanced medical OCR extraction engine.
-Your task is to extract all visible and readable text exactly as it appears from the provided medical report image.
+        // Fetch prompt from database
+        const { data: promptData, error: promptErr } = await supabase
+            .from('system_prompts')
+            .select('prompt_template')
+            .eq('agent_name', 'ocr_agent')
+            .single();
 
-STRICT INSTRUCTIONS:
-• Extract every readable word, number, symbol, abbreviation, handwritten note, table value, reference range and unit.
-• Preserve original spelling, capitalization, punctuation, line breaks, spacing, and formatting as closely as possible.
-• Maintain the exact reading order (left to right, top to bottom).
-• Evaluate the visual quality of the document. If it is blurry, glary, cut off, zoomed out, or illegible, reduce confidence to LOW or MEDIUM.
-• Do NOT correct spelling. Do NOT summarize or explain.
+        if (promptErr || !promptData) {
+            throw new Error('Failed to load OCR prompt from database');
+        }
 
-Return a single valid JSON object EXACTLY in this structure:
-{
-  "extracted_text": "The perfectly preserved raw text goes here...",
-  "confidence": "HIGH" | "MEDIUM" | "LOW",
-  "ambiguity_notes": "State why it is low confidence (e.g., 'Bottom left is blurry', 'Too dark'), or set to null if perfectly readable."
-}`;
+        const ocrPrompt = promptData.prompt_template;
 
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${aiKey}`, {
             method: 'POST',

@@ -63,18 +63,6 @@ Medical reports are often a source of anxiety rather than clarity. Patients and 
 
 ---
 
-## 🏆 How Carevia meets the Hachathon Criteria
-
-| Criterion | Implementation in Carevia |
-| :--- | :--- |
-| **Domain Expertise Depth** | Uses a `Structuring Agent` to normalize raw OCR text into **standardized Medical JSON** (biomarkers, units, and ranges) rather than just summarizing text. |
-| **Compliance & Guardrails** | A dedicated `Guardrail Agent` filters every AI response. It uses **Zero-Diagnosis logic** to strip any names of diseases or drug prescriptions, ensuring safety. |
-| **Edge-Case Handling** | The `OCR Agent` calculates **Confidence Scores**; if a report is blurry, it triggers a "Safety Re-upload" request instead of guessing. Handles missing reference ranges gracefully. |
-| **Full Task Completion** | A complete **End-to-End Pipeline**: Upload → OCR → Structuring → Trend Analysis → Risk Evaluation → Family Alerting → Localization. |
-| **Auditability** | Every single agent decision (Logic, Reasoning, and Confidence) is stored in the `audit_logs` table, providing a **full transparent reasoning trail**. |
-
----
-
 ## ✨ Solution: The Multi-Agent Pipeline
 Carevia coordinates a **Multi-Agent AI Pipeline** to build a trustworthy and proactive healthcare intelligence system.
 
